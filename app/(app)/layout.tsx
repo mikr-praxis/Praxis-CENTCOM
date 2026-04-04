@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
+import { AppShell } from '@/components/layout/AppShell'
 import { DeployStatus } from '@/components/ui/DeployStatus'
 
 export default function AppLayout({
@@ -12,7 +13,9 @@ export default function AppLayout({
       <Sidebar />
       <div className="md:pl-64">
         <TopBar />
-        <main className="p-6 pb-24 md:pb-6">{children}</main>
+        <main className="p-6 pb-24 md:pb-6">
+          <AppShell>{children}</AppShell>
+        </main>
       </div>
       <DeployStatus />
     </div>
