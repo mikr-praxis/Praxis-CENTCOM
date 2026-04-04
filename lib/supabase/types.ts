@@ -6,6 +6,9 @@ export type Task = {
   assignee: string | null
   due_date: string | null
   tag: string | null
+  assignee_id: string | null
+  tags: string[]
+  group_id: string | null
   user_id: string
   created_at: string
   updated_at: string
@@ -18,6 +21,8 @@ export type BudgetItem = {
   cost: number
   expense_type: 'Personal' | 'Business'
   card: string | null
+  tags: string[]
+  group_id: string | null
   user_id: string
   created_at: string
 }
@@ -30,6 +35,9 @@ export type Event = {
   duration: string | null
   event_type: string
   attendees: number
+  tags: string[]
+  assignee_id: string | null
+  group_id: string | null
   user_id: string
   created_at: string
 }
@@ -42,6 +50,9 @@ export type Workflow = {
   platform: string
   last_run: string | null
   run_count: number
+  tags: string[]
+  assignee_id: string | null
+  group_id: string | null
   user_id: string
   created_at: string
 }
