@@ -86,5 +86,5 @@ export function getTagsByCategory(categoryId: string) {
 export function getMembersByGroup(groupId: string) {
   const group = GROUPS.find((g) => g.id === groupId)
   if (!group) return []
-  return TEAM_MEMBERS.filter((m) => group.members.includes(m.id as any))
+  return TEAM_MEMBERS.filter((m) => (group.members as readonly string[]).includes(m.id))
 }
