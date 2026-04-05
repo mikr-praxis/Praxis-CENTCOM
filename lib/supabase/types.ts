@@ -108,6 +108,17 @@ export const PROJECT_STAGES: { key: ProjectStage; label: string; color: string }
   { key: 'deployed', label: 'Deployed', color: 'green' },
 ]
 
+export type GoogleToken = {
+  id: string
+  user_id: string
+  email: string
+  access_token: string
+  refresh_token: string
+  token_expiry: string
+  created_at: string
+  updated_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -151,6 +162,12 @@ export type Database = {
         Row: Project
         Insert: Partial<Project> & Pick<Project, 'name' | 'user_id'>
         Update: Partial<Project>
+        Relationships: []
+      }
+      google_tokens: {
+        Row: GoogleToken
+        Insert: Partial<GoogleToken> & Pick<GoogleToken, 'user_id' | 'email' | 'access_token' | 'refresh_token' | 'token_expiry'>
+        Update: Partial<GoogleToken>
         Relationships: []
       }
     }
