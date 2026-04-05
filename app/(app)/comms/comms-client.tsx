@@ -23,6 +23,7 @@ export function CommsClient({ initialWorkflows }: { initialWorkflows: WorkflowTy
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
   const [selectedChannelName, setSelectedChannelName] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [writeChannelId, setWriteChannelId] = useState<string | null>(null)
 
   const handleToggle = (id: string, newStatus: 'active' | 'paused') => {
     setWorkflows((prev) =>
@@ -108,6 +109,7 @@ export function CommsClient({ initialWorkflows }: { initialWorkflows: WorkflowTy
             <ChannelSelector
               selectedChannel={selectedChannel}
               onSelect={handleChannelSelect}
+              onWriteChannelLoaded={(id) => setWriteChannelId(id)}
             />
           </div>
 
@@ -118,11 +120,19 @@ export function CommsClient({ initialWorkflows }: { initialWorkflows: WorkflowTy
               channelName={selectedChannelName}
               refreshKey={refreshKey}
             />
-            <SlackComposer
-              channelId={selectedChannel}
-              channelName={selectedChannelName}
-              onMessageSent={handleMessageSent}
-            />
+            {selectedChannel === writeChannelId ? (
+              <SlackComposer
+                channelId={selectedChannel}
+                channelName={selectedChannelName}
+                onMessageSent={handleMessageSent}
+              />
+            ) : selectedChannel ? (
+              <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 px-4 py-3">
+                <p className="text-xs text-slate-500">
+                  Read-only — CentCom can only send messages to <span className="text-slate-400 font-medium">#backend-progress-updates-by-task</span>
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

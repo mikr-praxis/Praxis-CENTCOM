@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { getSlackClient } from '@/lib/slack'
+import { getSlackClient, SLACK_WRITE_CHANNEL_ID } from '@/lib/slack'
 import { createServerClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
@@ -17,6 +17,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'channel and message are required' },
         { status: 400 }
+      )
+    }
+
+    // CentCom can only write to the designated channel
+    if (channel !== SLACK_WRITE_CHANNEL_ID) {
+      return NextResponse.json(
+        { error: 'CentCom can only send messages to #backend-progress-updates-by-task' },
+        { status: 403 }
       )
     }
 

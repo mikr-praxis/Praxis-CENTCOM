@@ -1,5 +1,9 @@
 import { WebClient } from '@slack/web-api'
 
+// The only channel CentCom is allowed to write to
+export const SLACK_WRITE_CHANNEL_ID = 'C0APYEU7N1M'
+export const SLACK_WRITE_CHANNEL_NAME = 'backend-progress-updates-by-task'
+
 let slackClient: WebClient | null = null
 
 export function getSlackClient(): WebClient {
