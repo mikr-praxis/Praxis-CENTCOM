@@ -5,13 +5,21 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { AgentOutput } from './AgentOutput'
-import { Play, Loader2, FileText, DollarSign, ListOrdered, Mail } from 'lucide-react'
+import {
+  Play, Loader2, FileText, DollarSign, ListOrdered, Mail,
+  Cpu, Wind, UserCheck, HeartPulse, TrendingUp,
+} from 'lucide-react'
 
 const iconMap: Record<string, React.ElementType> = {
   FileText,
   DollarSign,
   ListOrdered,
   Mail,
+  Cpu,
+  Wind,
+  UserCheck,
+  HeartPulse,
+  TrendingUp,
 }
 
 type AgentCardProps = {
