@@ -34,16 +34,16 @@ create index idx_projects_client_tag on projects(client_tag);
 insert into projects (name, client_tag, slack_tag, stage, priority, owner_id, description, user_id) values
   ('Breathe for Change', 'breathe-for-change', '[B4C]', 'building', 'high', 'nadeem',
    'Education-focused breathwork/wellness — scaling virtual events with paid media and funnel optimization.',
-   'seed'),
+   'user_3BrziAlQGvWKidvMWyaxmXAABZR'),
   ('ManTalks', 'mantalks', '[MT]', 'building', 'high', 'kevin',
    'Connor Beaton''s men''s personal development — multi-day virtual events and community growth.',
-   'seed'),
+   'user_3BrziAlQGvWKidvMWyaxmXAABZR'),
   ('John Wineland', 'john-wineland', '[JW]', 'onboarded', 'medium', 'kevin',
    'Embodiment and relational work — event infrastructure and paid acquisition.',
-   'seed'),
+   'user_3BrziAlQGvWKidvMWyaxmXAABZR'),
   ('Soma Plus IQ', 'soma-plus-iq', '[SOMA]', 'deployed', 'medium', 'nadeem',
    'Three-day live breathwork workshops with high-ticket post-workshop nurture. Nadeem is CEO.',
-   'seed'),
+   'user_3BrziAlQGvWKidvMWyaxmXAABZR'),
   ('Krista Mishore', 'krista-mishore', '[KM]', 'discovery', 'medium', 'nadeem',
    'New client — initial discovery and fit assessment in progress.',
-   'seed');
+   'user_3BrziAlQGvWKidvMWyaxmXAABZR');
