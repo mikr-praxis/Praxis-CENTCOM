@@ -10,11 +10,13 @@ import {
   DollarSign,
   MessageSquare,
   Bot,
+  FolderKanban,
   Zap,
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
   { name: 'Events', href: '/events', icon: Calendar },
   { name: 'Budget', href: '/budget', icon: DollarSign },

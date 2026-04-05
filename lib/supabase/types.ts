@@ -79,6 +79,35 @@ export type MessageLog = {
   created_at: string
 }
 
+export type ProjectStage = 'lead' | 'discovery' | 'proposal' | 'onboarded' | 'building' | 'qa' | 'deployed'
+
+export type Project = {
+  id: string
+  name: string
+  client_tag: string | null
+  slack_tag: string | null
+  slack_channel_id: string | null
+  stage: ProjectStage
+  priority: 'high' | 'medium' | 'low'
+  owner_id: string | null
+  description: string | null
+  deadline: string | null
+  notes: string | null
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export const PROJECT_STAGES: { key: ProjectStage; label: string; color: string }[] = [
+  { key: 'lead', label: 'Lead', color: 'slate' },
+  { key: 'discovery', label: 'Discovery', color: 'purple' },
+  { key: 'proposal', label: 'Proposal', color: 'blue' },
+  { key: 'onboarded', label: 'Onboarded', color: 'cyan' },
+  { key: 'building', label: 'Building', color: 'amber' },
+  { key: 'qa', label: 'QA', color: 'orange' },
+  { key: 'deployed', label: 'Deployed', color: 'green' },
+]
+
 export type Database = {
   public: {
     Tables: {
@@ -116,6 +145,12 @@ export type Database = {
         Row: MessageLog
         Insert: Partial<MessageLog> & Pick<MessageLog, 'channel_id' | 'message_text' | 'user_id'>
         Update: Partial<MessageLog>
+        Relationships: []
+      }
+      projects: {
+        Row: Project
+        Insert: Partial<Project> & Pick<Project, 'name' | 'user_id'>
+        Update: Partial<Project>
         Relationships: []
       }
     }
