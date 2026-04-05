@@ -42,7 +42,7 @@ export async function createProject(formData: FormData) {
 
   const name = formData.get('name') as string
   const stage = (formData.get('stage') as ProjectStage) || 'lead'
-  const priority = (formData.get('priority') as string) || 'medium'
+  const priority = (formData.get('priority') as 'high' | 'medium' | 'low') || 'medium'
   const slackTag = formData.get('slack_tag') as string || null
   const clientTag = formData.get('client_tag') as string || null
   const ownerId = formData.get('owner_id') as string || null
