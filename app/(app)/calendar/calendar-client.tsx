@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import {
@@ -11,6 +11,9 @@ import {
   Clock,
   MapPin,
   ExternalLink,
+  AlertCircle,
+  CalendarCheck,
+  Flame,
 } from 'lucide-react'
 import type { CalendarEvent } from '@/lib/google/calendar'
 
@@ -42,6 +45,33 @@ function isSameDay(a: Date, b: Date) {
 function formatTime(iso: string) {
   const d = new Date(iso)
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function formatRelativeDay(date: Date, today: Date): string {
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diff = Math.round((dateStart.getTime() - todayStart.getTime()) / 86400000)
+
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Tomorrow'
+  if (diff < 7) return date.toLocaleDateString('en-US', { weekday: 'long' })
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+type PriorityLevel = 'urgent' | 'upcoming' | 'later'
+
+function getPriority(eventStart: Date, now: Date): PriorityLevel {
+  const hoursUntil = (eventStart.getTime() - now.getTime()) / 3600000
+  if (hoursUntil < 0) return 'urgent'    // overdue or happening now
+  if (hoursUntil < 24) return 'urgent'   // within 24 hours
+  if (hoursUntil < 72) return 'upcoming' // within 3 days
+  return 'later'
+}
+
+const PRIORITY_CONFIG: Record<PriorityLevel, { label: string; color: string; bg: string; icon: typeof Flame }> = {
+  urgent:   { label: 'Now / Next 24h', color: 'text-red-400',    bg: 'bg-red-500/10',    icon: Flame },
+  upcoming: { label: 'Next 3 Days',    color: 'text-amber-400',  bg: 'bg-amber-500/10',  icon: AlertCircle },
+  later:    { label: 'This Week+',     color: 'text-slate-400',  bg: 'bg-slate-500/10',  icon: CalendarCheck },
 }
 
 const MONTH_NAMES = [
@@ -149,6 +179,45 @@ export function CalendarClient() {
     })
 
   const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
+
+  // ── Priority task list ────────────────────────────────────────────────
+  // Shows upcoming events from today forward, grouped by urgency.
+  // Filterable later by calendar, event type, keywords, etc.
+
+  const priorityEvents = useMemo(() => {
+    const now = new Date()
+    // Get events from now forward (not past), up to 14 days out
+    const cutoff = new Date(now)
+    cutoff.setDate(cutoff.getDate() + 14)
+
+    const upcoming = visibleEvents
+      .filter((e) => {
+        const start = new Date(e.start)
+        // Include events happening now (started but not ended) or in the future
+        const end = new Date(e.end)
+        return end >= now && start <= cutoff
+      })
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+
+    // Group by priority level
+    const grouped: Record<PriorityLevel, (CalendarEvent & { priority: PriorityLevel })[]> = {
+      urgent: [],
+      upcoming: [],
+      later: [],
+    }
+
+    for (const ev of upcoming) {
+      const p = getPriority(new Date(ev.start), now)
+      grouped[p].push({ ...ev, priority: p })
+    }
+
+    return grouped
+  }, [visibleEvents])
+
+  const totalPriorityCount =
+    priorityEvents.urgent.length +
+    priorityEvents.upcoming.length +
+    priorityEvents.later.length
 
   return (
     <div className="space-y-6">
@@ -290,9 +359,91 @@ export function CalendarClient() {
           </Card>
         </div>
 
-        {/* Sidebar — 1 col */}
+        {/* Right sidebar — 1 col */}
         <div className="space-y-4">
-          {/* Calendar layers */}
+
+          {/* ── Priority Task List ──────────────────────────────────── */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-slate-300 flex items-center gap-1.5">
+                <Flame className="h-4 w-4 text-amber-400" />
+                Priority
+              </h3>
+              {totalPriorityCount > 0 && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400">
+                  {totalPriorityCount}
+                </span>
+              )}
+            </div>
+
+            {totalPriorityCount === 0 && !loading && (
+              <p className="text-xs text-slate-500">
+                No upcoming events. Connect Google Calendar to see your schedule.
+              </p>
+            )}
+
+            <div className="space-y-4">
+              {(['urgent', 'upcoming', 'later'] as PriorityLevel[]).map((level) => {
+                const items = priorityEvents[level]
+                if (items.length === 0) return null
+                const config = PRIORITY_CONFIG[level]
+                const Icon = config.icon
+
+                return (
+                  <div key={level}>
+                    <div className={`flex items-center gap-1.5 mb-2 ${config.color}`}>
+                      <Icon className="h-3 w-3" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider">
+                        {config.label}
+                      </span>
+                      <span className="text-[10px] opacity-60">({items.length})</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {items.slice(0, 5).map((ev) => {
+                        const start = new Date(ev.start)
+                        return (
+                          <button
+                            key={ev.id}
+                            onClick={() => setSelectedDay(start)}
+                            className={`
+                              w-full text-left rounded-lg px-2.5 py-2 border transition-colors
+                              border-slate-700/40 hover:border-slate-600/60 hover:bg-slate-800/40
+                            `}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs font-medium text-slate-200 leading-tight truncate">
+                                {ev.title}
+                              </p>
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0 mt-1"
+                                style={{ backgroundColor: ev.color }}
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                              <span>{formatRelativeDay(start, today)}</span>
+                              {!ev.allDay && (
+                                <span className="flex items-center gap-0.5">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {formatTime(ev.start)}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                      {items.length > 5 && (
+                        <p className="text-[10px] text-slate-500 pl-2.5">
+                          +{items.length - 5} more
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+
+          {/* ── Calendar layers ─────────────────────────────────────── */}
           <Card className="p-4">
             <h3 className="text-sm font-medium text-slate-300 mb-3">Calendars</h3>
             {(data?.calendars || []).length === 0 && !loading && (
@@ -332,7 +483,7 @@ export function CalendarClient() {
             </div>
           </Card>
 
-          {/* Selected day detail */}
+          {/* ── Selected day detail ─────────────────────────────────── */}
           <Card className="p-4">
             <h3 className="text-sm font-medium text-slate-300 mb-3">
               {selectedDay

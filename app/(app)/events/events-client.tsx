@@ -36,10 +36,12 @@ export function EventsClient({ initialEvents }: { initialEvents: Event[] }) {
           <p className="text-sm text-slate-400 mt-1">Upcoming meetings and milestones</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled>
-            <Calendar className="h-4 w-4 mr-1" />
-            Sync Google Calendar
-          </Button>
+          <a href="/calendar">
+            <Button variant="secondary">
+              <Calendar className="h-4 w-4 mr-1" />
+              View Calendar
+            </Button>
+          </a>
           <Button onClick={() => setShowForm(!showForm)}>
             {showForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
             {showForm ? 'Cancel' : 'New Event'}
