@@ -1,7 +1,7 @@
 'use client'
 
 import { AgentCard } from '@/components/agents/AgentCard'
-import { AGENTS } from '@/lib/anthropic/agents'
+import { AGENTS } from '@/lib/agents/config'
 import { runAgent, approveAgent } from '@/actions/agents'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
