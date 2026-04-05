@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const slack = getSlackClient()
     const result = await slack.conversations.list({
-      types: 'public_channel,private_channel',
+      types: 'public_channel',
       exclude_archived: true,
       limit: 100,
     })
