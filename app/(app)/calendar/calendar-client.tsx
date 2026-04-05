@@ -15,6 +15,7 @@ import {
   CalendarCheck,
   Flame,
 } from 'lucide-react'
+import { TaskDeadlineModule } from '@/components/calendar/TaskDeadlineModule'
 import type { CalendarEvent } from '@/lib/google/calendar'
 
 type CalendarData = {
@@ -555,6 +556,8 @@ export function CalendarClient() {
           </Card>
         </div>
       </div>
+      {/* Task Deadline Module — full width below calendar */}
+      <TaskDeadlineModule calendarEvents={visibleEvents} />
     </div>
   )
 }
