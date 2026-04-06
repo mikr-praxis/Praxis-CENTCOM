@@ -1,11 +1,13 @@
 // Monday.com GraphQL API client
 // Docs: https://developer.monday.com/api-reference
 
+import { getConfig } from '@/lib/config'
+
 const MONDAY_API_URL = 'https://api.monday.com/v2'
 
-function getToken() {
-  const token = process.env.MONDAY_API_KEY
-  if (!token) throw new Error('MONDAY_API_KEY is not set')
+async function getToken() {
+  const token = await getConfig('MONDAY_API_KEY')
+  if (!token) throw new Error('MONDAY_API_KEY is not set. Configure it at /config.')
   return token
 }
 
@@ -13,11 +15,12 @@ export async function mondayQuery<T = Record<string, unknown>>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
+  const token = await getToken()
   const res = await fetch(MONDAY_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: getToken(),
+      Authorization: token,
       'API-Version': '2024-10',
     },
     body: JSON.stringify({ query, variables }),

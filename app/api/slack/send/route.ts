@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const slack = getSlackClient()
+    const slack = await getSlackClient()
 
     // Send the message
     const result = await slack.chat.postMessage({

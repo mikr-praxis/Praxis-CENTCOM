@@ -1,20 +1,25 @@
 import { WebClient } from '@slack/web-api'
+import { getConfig } from '@/lib/config'
 
 // The only channel CentCom is allowed to write to
 export const SLACK_WRITE_CHANNEL_ID = 'C0APYEU7N1M'
 export const SLACK_WRITE_CHANNEL_NAME = 'backend-progress-updates-by-task'
 
 let slackClient: WebClient | null = null
+let _slackToken: string | null = null
 
-export function getSlackClient(): WebClient {
-  if (!slackClient) {
-    const token = process.env.SLACK_BOT_TOKEN
-    if (!token) {
-      throw new Error(
-        'SLACK_BOT_TOKEN is not set. Add it to your environment variables.'
-      )
-    }
+export async function getSlackClient(): Promise<WebClient> {
+  const token = await getConfig('SLACK_BOT_TOKEN')
+  if (!token) {
+    throw new Error(
+      'SLACK_BOT_TOKEN is not set. Configure it at /config.'
+    )
+  }
+
+  // Re-create client if token changed (hot-swap after config edit)
+  if (!slackClient || _slackToken !== token) {
     slackClient = new WebClient(token)
+    _slackToken = token
   }
   return slackClient
 }

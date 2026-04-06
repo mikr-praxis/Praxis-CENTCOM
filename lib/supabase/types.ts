@@ -119,6 +119,15 @@ export type GoogleToken = {
   updated_at: string
 }
 
+export type AppConfig = {
+  id: string
+  key: string
+  value: string
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -162,6 +171,12 @@ export type Database = {
         Row: Project
         Insert: Partial<Project> & Pick<Project, 'name' | 'user_id'>
         Update: Partial<Project>
+        Relationships: []
+      }
+      app_config: {
+        Row: AppConfig
+        Insert: Partial<AppConfig> & Pick<AppConfig, 'key' | 'value'>
+        Update: Partial<AppConfig>
         Relationships: []
       }
       google_tokens: {

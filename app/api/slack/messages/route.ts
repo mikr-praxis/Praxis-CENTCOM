@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const slack = getSlackClient()
+    const slack = await getSlackClient()
 
     // Fetch messages
     const history = await slack.conversations.history({

@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import {
   getOpsCalendar,
-  OPS_CALENDAR_ID,
+  getOpsCalendarId,
   getUserCalendar,
   getOAuth2Client,
   fetchCalendarEvents,
@@ -33,10 +33,11 @@ export async function GET(request: NextRequest) {
 
   // 1) Ops calendar (always loaded)
   try {
-    const opsCalendar = getOpsCalendar()
+    const opsCalendar = await getOpsCalendar()
+    const opsCalId = await getOpsCalendarId()
     const opsEvents = await fetchCalendarEvents(
       opsCalendar,
-      OPS_CALENDAR_ID,
+      opsCalId,
       'Praxis Ops',
       '#f59e0b', // amber
       start,
@@ -44,10 +45,10 @@ export async function GET(request: NextRequest) {
     )
     allEvents.push(...opsEvents)
     calendars.push({
-      id: OPS_CALENDAR_ID,
+      id: opsCalId,
       name: 'Praxis Ops',
       color: '#f59e0b',
-      email: OPS_CALENDAR_ID,
+      email: opsCalId,
     })
   } catch (err) {
     console.error('Failed to load ops calendar:', err)
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
     // Refresh if expired
     if (new Date(tokenRow.token_expiry) < new Date()) {
       try {
-        const oauth2 = getOAuth2Client()
+        const oauth2 = await getOAuth2Client()
         oauth2.setCredentials({ refresh_token: tokenRow.refresh_token })
         const { credentials } = await oauth2.refreshAccessToken()
         accessToken = credentials.access_token || accessToken

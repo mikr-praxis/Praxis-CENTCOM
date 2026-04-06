@@ -1,12 +1,13 @@
 import { google, calendar_v3 } from 'googleapis'
+import { getConfig } from '@/lib/config'
 
 // ── Ops calendar (service account) ──────────────────────────────────────
 // The ops@builtbypraxis.com calendar is accessed via a service account
 // whose JSON key is stored as a single env var (base64-encoded).
 
-function getServiceAuth() {
-  const encoded = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (!encoded) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is not set')
+async function getServiceAuth() {
+  const encoded = await getConfig('GOOGLE_SERVICE_ACCOUNT_KEY')
+  if (!encoded) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is not set. Configure it at /config.')
 
   const credentials = JSON.parse(
     Buffer.from(encoded, 'base64').toString('utf-8')
@@ -19,30 +20,36 @@ function getServiceAuth() {
 }
 
 let _opsCalendar: calendar_v3.Calendar | null = null
+let _opsServiceKey: string | null = null
 
-export function getOpsCalendar() {
-  if (!_opsCalendar) {
-    const auth = getServiceAuth()
+export async function getOpsCalendar() {
+  const key = await getConfig('GOOGLE_SERVICE_ACCOUNT_KEY')
+  // Re-create if key changed (hot-swap after config edit)
+  if (!_opsCalendar || _opsServiceKey !== key) {
+    const auth = await getServiceAuth()
     _opsCalendar = google.calendar({ version: 'v3', auth })
+    _opsServiceKey = key || null
   }
   return _opsCalendar
 }
 
 // The calendar ID for ops@builtbypraxis.com — defaults to the email itself
 // unless overridden (some orgs use a shared calendar with a different ID).
-export const OPS_CALENDAR_ID =
-  process.env.OPS_CALENDAR_ID || 'ops@builtbypraxis.com'
+export async function getOpsCalendarId(): Promise<string> {
+  return (await getConfig('OPS_CALENDAR_ID')) || 'ops@builtbypraxis.com'
+}
 
 // ── User calendars (OAuth2) ─────────────────────────────────────────────
 // Each user can connect their own Google Calendar via OAuth2.
 // Tokens are stored in Supabase (google_tokens table).
 
-export function getOAuth2Client() {
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`
-  )
+export async function getOAuth2Client() {
+  const clientId = await getConfig('GOOGLE_CLIENT_ID')
+  const clientSecret = await getConfig('GOOGLE_CLIENT_SECRET')
+  const redirectUri = (await getConfig('GOOGLE_REDIRECT_URI')) ||
+    `${await getConfig('NEXT_PUBLIC_APP_URL')}/api/auth/google/callback`
+
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri)
 }
 
 export function getUserCalendar(accessToken: string) {

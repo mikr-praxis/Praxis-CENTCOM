@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const oauth2 = getOAuth2Client()
+    const oauth2 = await getOAuth2Client()
     const { tokens } = await oauth2.getToken(code)
 
     if (!tokens.access_token || !tokens.refresh_token) {

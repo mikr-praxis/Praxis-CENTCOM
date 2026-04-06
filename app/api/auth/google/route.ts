@@ -9,7 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const oauth2 = getOAuth2Client()
+  const oauth2 = await getOAuth2Client()
   const url = oauth2.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',

@@ -3,6 +3,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { getAnthropicClient, AGENTS } from '@/lib/anthropic/agents'
 import { getRedis } from '@/lib/upstash/redis'
+import { hasConfig } from '@/lib/config'
 import { createServerClient } from '@/lib/supabase/server'
 
 export async function runAgent(agentId: string) {
@@ -10,8 +11,8 @@ export async function runAgent(agentId: string) {
   if (!userId) throw new Error('Unauthorized')
 
   // Rate limit: 10 runs/hour per user (skip if Redis not configured)
-  if (process.env.UPSTASH_REDIS_REST_URL) {
-    const redis = getRedis()
+  if (await hasConfig('UPSTASH_REDIS_REST_URL')) {
+    const redis = await getRedis()
     const key = `agent_runs:${userId}`
     const runs = await redis.incr(key)
     if (runs === 1) await redis.expire(key, 3600)
@@ -140,11 +141,7 @@ export async function runAgent(agentId: string) {
       break
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('Anthropic API key not configured. Add ANTHROPIC_API_KEY to your environment variables to enable AI agents.')
-  }
-
-  const anthropic = getAnthropicClient()
+  const anthropic = await getAnthropicClient()
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 1024,

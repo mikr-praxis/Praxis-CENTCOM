@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { getAllTasks, getUsers } from '@/lib/monday/client'
+import { hasConfig } from '@/lib/config'
 
 // GET /api/monday?boardIds=123,456  (optional — fetches all boards if omitted)
 export async function GET(request: NextRequest) {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Check if Monday.com is configured
-  if (!process.env.MONDAY_API_KEY) {
+  if (!(await hasConfig('MONDAY_API_KEY'))) {
     return NextResponse.json({
       tasks: [],
       users: [],

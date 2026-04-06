@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const slack = getSlackClient()
+    const slack = await getSlackClient()
     const messages: Array<{
       ts: string
       user: string
