@@ -67,6 +67,18 @@ export type AgentLog = {
   created_at: string
 }
 
+export type MessageLog = {
+  id: string
+  channel_id: string
+  channel_name: string | null
+  message_text: string
+  slack_ts: string | null
+  direction: 'inbound' | 'outbound'
+  workflow_id: string | null
+  user_id: string
+  created_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -98,6 +110,12 @@ export type Database = {
         Row: AgentLog
         Insert: Partial<AgentLog> & Pick<AgentLog, 'agent_id' | 'user_id'>
         Update: Partial<AgentLog>
+        Relationships: []
+      }
+      message_logs: {
+        Row: MessageLog
+        Insert: Partial<MessageLog> & Pick<MessageLog, 'channel_id' | 'message_text' | 'user_id'>
+        Update: Partial<MessageLog>
         Relationships: []
       }
     }

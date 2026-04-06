@@ -66,7 +66,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               name="title"
               placeholder="Task title"
               required
-              className="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 sm:col-span-2 lg:col-span-1"
             />
             <select
               name="priority"
@@ -86,7 +86,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               type="date"
               className="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
               {isPending ? 'Adding...' : 'Add Task'}
             </Button>
           </div>
