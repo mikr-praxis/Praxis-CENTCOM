@@ -21,55 +21,9 @@ import {
 import { advanceProject, updateProjectStage } from '@/actions/projects'
 import { PROJECT_STAGES } from '@/lib/supabase/types'
 import type { Project, ProjectStage } from '@/lib/supabase/types'
-
-type SlackMessage = {
-  ts: string
-  user: string
-  username?: string
-  text: string
-  channel: string
-  channel_name?: string
-}
-
-const stageColors: Record<ProjectStage, string> = {
-  lead: 'bg-slate-500',
-  discovery: 'bg-purple-500',
-  proposal: 'bg-blue-500',
-  onboarded: 'bg-cyan-500',
-  building: 'bg-amber-500',
-  qa: 'bg-orange-500',
-  deployed: 'bg-emerald-500',
-}
-
-const stageBadgeVariant: Record<ProjectStage, 'gray' | 'blue' | 'amber' | 'green' | 'orange' | 'default'> = {
-  lead: 'gray',
-  discovery: 'default',
-  proposal: 'blue',
-  onboarded: 'blue',
-  building: 'amber',
-  qa: 'orange',
-  deployed: 'green',
-}
-
-function formatSlackTs(ts: string): string {
-  const date = new Date(Number(ts) * 1000)
-  const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
-  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-  if (isToday) return `Today ${time}`
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ` ${time}`
-}
-
-function formatSlackText(text: string): string {
-  return text
-    .replace(/<@(\w+)>/g, '@user')
-    .replace(/<#(\w+)\|([^>]+)>/g, '#$2')
-    .replace(/<(https?:\/\/[^|>]+)\|([^>]+)>/g, '$2')
-    .replace(/<(https?:\/\/[^>]+)>/g, '$1')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-}
+import type { SlackMessage } from '@/lib/slack'
+import { formatSlackTs, formatSlackText } from '@/lib/slack'
+import { stageColors, stageBadgeVariant } from '@/lib/styles/colors'
 
 export function ProjectDetailClient({ project }: { project: Project }) {
   const [messages, setMessages] = useState<SlackMessage[]>([])

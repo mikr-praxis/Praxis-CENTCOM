@@ -43,3 +43,27 @@ export type SlackMessage = {
   thread_ts?: string
   reply_count?: number
 }
+
+// ── Formatting utils (shared across client components) ─────────────────
+
+/** Convert a Slack ts (epoch seconds) to a human-readable string. */
+export function formatSlackTs(ts: string): string {
+  const date = new Date(Number(ts) * 1000)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  if (isToday) return `Today ${time}`
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ` ${time}`
+}
+
+/** Strip Slack mrkdwn to plain-ish text for display. */
+export function formatSlackText(text: string): string {
+  return text
+    .replace(/<@(\w+)>/g, '@user')
+    .replace(/<#(\w+)\|([^>]+)>/g, '#$2')
+    .replace(/<(https?:\/\/[^|>]+)\|([^>]+)>/g, '$2')
+    .replace(/<(https?:\/\/[^>]+)>/g, '$1')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+}

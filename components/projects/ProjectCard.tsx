@@ -5,23 +5,8 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/Badge'
 import { ChevronRight, Calendar, User, Hash } from 'lucide-react'
 import { advanceProject } from '@/actions/projects'
-import type { Project, ProjectStage } from '@/lib/supabase/types'
-
-const stageBadgeVariant: Record<ProjectStage, 'gray' | 'blue' | 'amber' | 'green' | 'orange' | 'red' | 'default'> = {
-  lead: 'gray',
-  discovery: 'default',
-  proposal: 'blue',
-  onboarded: 'blue',
-  building: 'amber',
-  qa: 'orange',
-  deployed: 'green',
-}
-
-const priorityVariant = {
-  high: 'red' as const,
-  medium: 'amber' as const,
-  low: 'gray' as const,
-}
+import type { Project } from '@/lib/supabase/types'
+import { priorityVariant } from '@/lib/styles/colors'
 
 export function ProjectCard({ project }: { project: Project }) {
   const [isPending, startTransition] = useTransition()
