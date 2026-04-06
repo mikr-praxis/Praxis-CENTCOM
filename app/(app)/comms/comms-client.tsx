@@ -9,11 +9,11 @@ import { SlackComposer } from '@/components/comms/SlackComposer'
 import { Button } from '@/components/ui/Button'
 import { Plus, X, MessageSquare, Workflow } from 'lucide-react'
 import { toggleWorkflow, createWorkflow } from '@/actions/workflows'
-import type { Workflow as WorkflowType } from '@/lib/supabase/types'
+import type { Workflow as WorkflowType, MessageLog as MessageLogType } from '@/lib/supabase/types'
 
 type Tab = 'slack' | 'workflows'
 
-export function CommsClient({ initialWorkflows }: { initialWorkflows: WorkflowType[] }) {
+export function CommsClient({ initialWorkflows, initialMessageLogs }: { initialWorkflows: WorkflowType[]; initialMessageLogs: MessageLogType[] }) {
   const [workflows, setWorkflows] = useState(initialWorkflows)
   const [showForm, setShowForm] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -52,12 +52,14 @@ export function CommsClient({ initialWorkflows }: { initialWorkflows: WorkflowTy
     setRefreshKey((k) => k + 1)
   }
 
-  // Mock message logs for workflows (keep existing)
-  const logs = [
-    { id: '1', workflow: 'Weekly Standup Summary', message: 'Standup summary generated and posted to #all-team-members', platform: 'Slack', time: 'Mon 9:05 AM' },
-    { id: '2', workflow: 'Budget Alert Monitor', message: 'Monthly burn within budget. No alerts triggered.', platform: 'Slack', time: 'Today 8:02 AM' },
-    { id: '3', workflow: 'Sprint Report Generator', message: 'Sprint report drafted and sent to stakeholders', platform: 'Email', time: 'Fri 4:12 PM' },
-  ]
+  // Real message logs from DB
+  const logs = initialMessageLogs.map((log) => ({
+    id: log.id,
+    workflow: log.channel_name || log.channel_id,
+    message: log.message_text,
+    platform: 'Slack',
+    time: formatLogTime(new Date(log.created_at)),
+  }))
 
   return (
     <div className="space-y-6">
@@ -175,4 +177,18 @@ export function CommsClient({ initialWorkflows }: { initialWorkflows: WorkflowTy
       )}
     </div>
   )
+}
+
+function formatLogTime(date: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffHours = diffMs / 3600000
+
+  if (diffHours < 24) {
+    return `Today ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  }
+  if (diffHours < 48) {
+    return `Yesterday ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  }
+  return date.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
 }

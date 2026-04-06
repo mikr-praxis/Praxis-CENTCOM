@@ -9,11 +9,24 @@ export default async function CommsPage() {
   if (!userId) return null
 
   const supabase = createServerClient()
-  const { data: workflows } = await supabase
-    .from('workflows')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+  const [workflowsRes, logsRes] = await Promise.all([
+    supabase
+      .from('workflows')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('message_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ])
 
-  return <CommsClient initialWorkflows={workflows || []} />
+  return (
+    <CommsClient
+      initialWorkflows={workflowsRes.data || []}
+      initialMessageLogs={logsRes.data || []}
+    />
+  )
 }
