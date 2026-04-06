@@ -154,6 +154,10 @@ export function CalendarClient() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [addingMember, setAddingMember] = useState(false)
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [newMemberName, setNewMemberName] = useState('')
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastFetchRef = useRef<number>(0)
 
@@ -262,6 +266,32 @@ export function CalendarClient() {
       fetchEvents()
     } finally {
       setDisconnecting(false)
+    }
+  }
+
+  const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!newMemberEmail || !newMemberName) return
+    setAddingMember(true)
+    try {
+      const res = await fetch('/api/calendar/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newMemberEmail,
+          displayName: newMemberName,
+        }),
+      })
+      if (res.ok) {
+        setShowAddMember(false)
+        setNewMemberEmail('')
+        setNewMemberName('')
+        fetchEvents(true)
+      }
+    } catch (err) {
+      console.error('Failed to add team member:', err)
+    } finally {
+      setAddingMember(false)
     }
   }
 
@@ -800,12 +830,52 @@ export function CalendarClient() {
                 <Users className="h-4 w-4 text-slate-400" />
                 Team Calendars
               </h3>
-              {calendarStats.total > 0 && (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-500/10 text-slate-400">
-                  {calendarStats.accessible}/{calendarStats.total}
-                </span>
-              )}
+              <div className="flex items-center gap-1.5">
+                {calendarStats.total > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-500/10 text-slate-400">
+                    {calendarStats.accessible}/{calendarStats.total}
+                  </span>
+                )}
+                <button
+                  onClick={() => setShowAddMember(!showAddMember)}
+                  className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors"
+                  title="Add team member"
+                >
+                  {showAddMember ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                </button>
+              </div>
             </div>
+
+            {showAddMember && (
+              <form onSubmit={handleAddMember} className="mb-3 space-y-2 p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                <input
+                  type="text"
+                  placeholder="Display name"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  className="w-full text-xs px-2 py-1.5 rounded bg-slate-900/50 border border-slate-700 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  required
+                />
+                <input
+                  type="email"
+                  placeholder="email@builtbypraxis.com"
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  className="w-full text-xs px-2 py-1.5 rounded bg-slate-900/50 border border-slate-700 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  required
+                />
+                <Button
+                  type="submit"
+                  disabled={addingMember}
+                  className="w-full text-xs py-1.5"
+                >
+                  {addingMember ? 'Adding…' : 'Add to Calendar'}
+                </Button>
+                <p className="text-[10px] text-slate-500 leading-snug">
+                  They&apos;ll need to share their Google Calendar with mscott@builtbypraxis.com.
+                </p>
+              </form>
+            )}
 
             {loading ? (
               <SidebarSkeleton />
