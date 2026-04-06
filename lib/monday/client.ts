@@ -214,3 +214,170 @@ export async function getAllTasks(boardIds?: string[]): Promise<MondayTask[]> {
     .filter((item) => item.state === 'active')
     .map(itemToTask)
 }
+
+// ── Expanded API functions ──────────────────────────────────────────────────
+
+export type MondayBoard = {
+  id: string
+  name: string
+  board_kind: string
+  state: string
+  columns: {
+    id: string
+    title: string
+    type: string
+  }[]
+}
+
+export async function listBoards(): Promise<MondayBoard[]> {
+  const data = await mondayQuery<{
+    boards: MondayBoard[]
+  }>(`query {
+    boards(limit: 50) {
+      id
+      name
+      board_kind
+      state
+      columns {
+        id
+        title
+        type
+      }
+    }
+  }`)
+
+  return data.boards
+}
+
+export async function getBoardItemsById(boardId: string, limit?: number): Promise<MondayItem[]> {
+  const queryLimit = limit || 200
+  const data = await mondayQuery<{
+    boards: {
+      items_page: {
+        items: MondayItem[]
+      }
+    }[]
+  }>(`query ($id: ID!, $limit: Int!) {
+    boards(ids: [$id]) {
+      items_page(limit: $limit) {
+        items {
+          id
+          name
+          state
+          board { id name }
+          group { id title }
+          column_values {
+            id
+            title
+            text
+            type
+            value
+          }
+          subscribers {
+            id
+            name
+          }
+        }
+      }
+    }
+  }`, { id: boardId, limit: queryLimit })
+
+  return data.boards[0]?.items_page.items || []
+}
+
+export type MondayUpdate = {
+  id: string
+  text_body: string
+  creator: {
+    id: string
+    name: string
+  }
+  created_at: string
+}
+
+export async function getItemUpdates(itemId: string, limit?: number): Promise<MondayUpdate[]> {
+  const queryLimit = limit || 50
+  const data = await mondayQuery<{
+    items: {
+      updates: MondayUpdate[]
+    }[]
+  }>(`query ($id: [ID!]!, $limit: Int!) {
+    items(ids: [$id]) {
+      updates(limit: $limit) {
+        id
+        text_body
+        creator {
+          id
+          name
+        }
+        created_at
+      }
+    }
+  }`, { id: [itemId], limit: queryLimit })
+
+  return data.items[0]?.updates || []
+}
+
+export async function createItem(
+  boardId: string,
+  groupId: string,
+  itemName: string,
+  columnValues?: Record<string, unknown>
+): Promise<{ id: string; name: string }> {
+  // Prepare column values JSON
+  const columnValuesJson = columnValues
+    ? JSON.stringify(columnValues)
+    : '{}'
+
+  const data = await mondayQuery<{
+    create_item: {
+      id: string
+      name: string
+    }
+  }>(`mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON) {
+    create_item(
+      board_id: $boardId
+      group_id: $groupId
+      item_name: $itemName
+      column_values: $columnValues
+    ) {
+      id
+      name
+    }
+  }`, {
+    boardId,
+    groupId,
+    itemName,
+    columnValues: columnValuesJson,
+  })
+
+  return data.create_item
+}
+
+export async function updateItem(
+  boardId: string,
+  itemId: string,
+  columnValues: Record<string, unknown>
+): Promise<{ id: string }> {
+  const columnValuesJson = JSON.stringify(columnValues)
+
+  const data = await mondayQuery<{
+    update_item_column_values: {
+      id: string
+    }
+  }>(`mutation ($boardId: ID!, $itemId: ID!, $columnValues: JSON) {
+    update_item_column_values(
+      board_id: $boardId
+      item_id: $itemId
+      column_values: $columnValues
+    ) {
+      id
+    }
+  }`, {
+    boardId,
+    itemId,
+    columnValues: columnValuesJson,
+  })
+
+  return data.update_item_column_values
+}

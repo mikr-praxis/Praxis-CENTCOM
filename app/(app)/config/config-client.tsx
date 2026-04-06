@@ -19,6 +19,7 @@ import {
   Gauge,
   BarChart3,
   Rocket,
+  Target,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -60,6 +61,7 @@ const iconMap: Record<string, React.ElementType> = {
   upstash: Gauge,
   posthog: BarChart3,
   vercel: Rocket,
+  hubspot: Target,
 }
 
 const statusConfig = {

@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getConfig, setConfig, deleteConfig, bustConfigCache } from '@/lib/config'
+import { ACTIVECAMPAIGN_MODULE } from '@/lib/activecampaign/config-entry'
 
 // Keys that CANNOT be edited from the UI — they're required at boot time
 // before Supabase is even available (chicken-and-egg).
@@ -113,6 +114,17 @@ export const MODULES = [
     vars: [
       { key: 'VERCEL_API_TOKEN', label: 'API Token', hint: 'Vercel → Settings → Tokens → Create' },
       { key: 'VERCEL_PROJECT_ID', label: 'Project ID', hint: 'Vercel → Project → Settings → General → Project ID' },
+    ],
+  },
+  ACTIVECAMPAIGN_MODULE,
+  {
+    id: 'hubspot',
+    name: 'HubSpot CRM',
+    description: 'Deal pipeline, contacts, and revenue tracking. Powers the pipeline dashboard.',
+    docsUrl: 'https://app.hubspot.com/settings/api-key',
+    editable: true,
+    vars: [
+      { key: 'HUBSPOT_ACCESS_TOKEN', label: 'Private App Token', hint: 'HubSpot → Settings → Integrations → Private Apps → Create → Access Token' },
     ],
   },
 ]
