@@ -1,6 +1,6 @@
 -- Team calendars: stores Google Calendar emails for each employee
--- The service account reads these calendars (employee must share with the SA).
--- Users who connect via OAuth get their token stored in google_tokens instead.
+-- The OAuth2-authenticated user (mscott@builtbypraxis.com) reads these calendars.
+-- Team members must share their calendar with mscott@builtbypraxis.com.
 
 create table if not exists team_calendars (
   id uuid primary key default gen_random_uuid(),
@@ -10,7 +10,7 @@ create table if not exists team_calendars (
   role text,                        -- e.g. 'Co-Founder', 'Team Member'
   is_ops boolean default false,     -- true for the main ops@builtbypraxis.com calendar
   enabled boolean default true,     -- toggle visibility without deleting
-  source text default 'service_account', -- 'service_account' | 'oauth'
+  source text default 'oauth',           -- 'oauth' (via refresh token)
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

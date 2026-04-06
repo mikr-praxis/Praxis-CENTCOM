@@ -968,7 +968,7 @@ function CalendarToggle({
       {cal.hasAccess ? (
         <Shield className="h-3 w-3 text-emerald-500/60 flex-shrink-0" title="Connected" />
       ) : (
-        <ShieldAlert className="h-3 w-3 text-red-400/60 flex-shrink-0" title="Not shared with service account" />
+        <ShieldAlert className="h-3 w-3 text-red-400/60 flex-shrink-0" title="Calendar not shared — ask team member to share with mscott@builtbypraxis.com" />
       )}
     </label>
   )

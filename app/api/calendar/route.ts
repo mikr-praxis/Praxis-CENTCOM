@@ -50,17 +50,17 @@ export async function GET(request: NextRequest) {
     .eq('enabled', true)
     .order('is_ops', { ascending: false }) // ops first
 
-  // ── 2. Get the service account calendar client (if configured) ────
+  // ── 2. Get the OAuth2 calendar client (if configured) ─────────────
   let opsCalClient: Awaited<ReturnType<typeof getOpsCalendar>> | null = null
   try {
     opsCalClient = await getOpsCalendar()
   } catch (err) {
-    console.error('Service account not configured:', err)
+    console.error('Google Calendar OAuth2 not configured:', err)
   }
 
-  // ── 3. Fetch each team calendar via service account ───────────────
-  // The service account can read any calendar shared with it.
-  // Each employee shares their calendar → we read all of them.
+  // ── 3. Fetch each team calendar via OAuth2 ───────────────────────
+  // The authenticated user (mscott@builtbypraxis.com) can read any
+  // calendar shared with them — team members share their calendars.
   if (teamCalendars && opsCalClient) {
     const fetches = teamCalendars.map(async (tc) => {
       try {
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
           hasAccess: true,
         })
       } catch (err) {
-        // Calendar not shared with service account — still list it but flag it
+        // Calendar not shared with authenticated user — still list it but flag it
         console.error(`Cannot read calendar ${tc.email}:`, err)
         calendars.push({
           id: tc.id,
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     })
     await Promise.all(fetches)
   } else if (teamCalendars) {
-    // Service account not available — still list calendars as non-accessible
+    // OAuth2 not available — still list calendars as non-accessible
     for (const tc of teamCalendars) {
       calendars.push({
         id: tc.id,

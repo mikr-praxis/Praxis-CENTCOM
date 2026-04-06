@@ -1,34 +1,38 @@
 import { google, calendar_v3 } from 'googleapis'
 import { getConfig } from '@/lib/config'
 
-// ── Ops calendar (service account) ──────────────────────────────────────
-// The ops@builtbypraxis.com calendar is accessed via a service account
-// whose JSON key is stored as a single env var (base64-encoded).
+// ── Ops calendar (OAuth2 with refresh token) ───────────────────────────
+// The mscott@builtbypraxis.com calendar is accessed via OAuth2 credentials
+// with a long-lived refresh token (obtained once via OAuth Playground).
+// Config keys: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
 
-async function getServiceAuth() {
-  const encoded = await getConfig('GOOGLE_SERVICE_ACCOUNT_KEY')
-  if (!encoded) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is not set. Configure it at /config.')
+async function getOpsAuth() {
+  const clientId = await getConfig('GOOGLE_CLIENT_ID')
+  const clientSecret = await getConfig('GOOGLE_CLIENT_SECRET')
+  const refreshToken = await getConfig('GOOGLE_REFRESH_TOKEN')
 
-  const credentials = JSON.parse(
-    Buffer.from(encoded, 'base64').toString('utf-8')
-  )
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      'Google Calendar OAuth2 credentials are not set. ' +
+      'Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN at /config.'
+    )
+  }
 
-  return new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/calendar'],
-  })
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret)
+  oauth2Client.setCredentials({ refresh_token: refreshToken })
+  return oauth2Client
 }
 
 let _opsCalendar: calendar_v3.Calendar | null = null
-let _opsServiceKey: string | null = null
+let _opsRefreshToken: string | null = null
 
 export async function getOpsCalendar() {
-  const key = await getConfig('GOOGLE_SERVICE_ACCOUNT_KEY')
-  // Re-create if key changed (hot-swap after config edit)
-  if (!_opsCalendar || _opsServiceKey !== key) {
-    const auth = await getServiceAuth()
+  const token = await getConfig('GOOGLE_REFRESH_TOKEN')
+  // Re-create if token changed (hot-swap after config edit)
+  if (!_opsCalendar || _opsRefreshToken !== token) {
+    const auth = await getOpsAuth()
     _opsCalendar = google.calendar({ version: 'v3', auth })
-    _opsServiceKey = key || null
+    _opsRefreshToken = token || null
   }
   return _opsCalendar
 }

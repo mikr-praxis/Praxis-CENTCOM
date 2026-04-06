@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { getOpsCalendar, getOpsCalendarId } from '@/lib/google/calendar'
 
 // POST /api/calendar/create
-// Creates an event on the ops calendar via the service account.
+// Creates an event on the ops calendar via OAuth2 refresh token.
 // Body: { title, date, startTime?, endTime?, allDay? }
 
 export async function POST(request: NextRequest) {
@@ -26,9 +26,9 @@ export async function POST(request: NextRequest) {
   try {
     calendar = await getOpsCalendar()
   } catch (err) {
-    console.error('Service account not configured:', err)
+    console.error('Google Calendar not configured:', err)
     return NextResponse.json(
-      { error: 'Service account not configured. Add GOOGLE_SERVICE_ACCOUNT_KEY in /config.' },
+      { error: 'Google Calendar OAuth2 not configured. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN in /config.' },
       { status: 503 }
     )
   }
