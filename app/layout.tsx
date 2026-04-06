@@ -16,6 +16,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Praxis — Internal Ops',
   description: 'Internal operations dashboard for Built by Praxis',
+  other: {
+    'viewport': 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'theme-color': '#0f172a',
+  },
 }
 
 export default function RootLayout({
@@ -36,6 +42,9 @@ export default function RootLayout({
       }}
     >
       <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+        </head>
         <body className="min-h-full bg-slate-950">{children}</body>
       </html>
     </ClerkProvider>

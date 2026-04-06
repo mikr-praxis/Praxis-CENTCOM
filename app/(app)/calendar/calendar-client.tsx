@@ -223,7 +223,7 @@ export function CalendarClient() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Calendar</h1>
           <p className="text-sm text-slate-400 mt-1">
@@ -260,23 +260,23 @@ export function CalendarClient() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={prev}
-                  className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-slate-200"
+                  className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 active:scale-95 transition-transform"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h2 className="text-lg font-semibold text-slate-100 min-w-[200px] text-center">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-100 min-w-[160px] sm:min-w-[200px] text-center">
                   {MONTH_NAMES[month]} {year}
                 </h2>
                 <button
                   onClick={next}
-                  className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-slate-200"
+                  className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 active:scale-95 transition-transform"
                 >
                   <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
               <button
                 onClick={goToday}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                className="px-3 py-2 min-h-[44px] text-xs font-medium rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-95 transition-transform"
               >
                 Today
               </button>
@@ -287,9 +287,10 @@ export function CalendarClient() {
               {DAY_NAMES.map((d) => (
                 <div
                   key={d}
-                  className="px-2 py-2 text-center text-xs font-medium text-slate-500 uppercase tracking-wider"
+                  className="px-1 sm:px-2 py-2 text-center text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider"
                 >
-                  {d}
+                  <span className="sm:hidden">{d[0]}</span>
+                  <span className="hidden sm:inline">{d}</span>
                 </div>
               ))}
             </div>
@@ -314,7 +315,7 @@ export function CalendarClient() {
                       key={i}
                       onClick={() => isCurrentMonth && setSelectedDay(date)}
                       className={`
-                        min-h-[90px] p-1.5 border-b border-r border-slate-700/30 text-left
+                        min-h-[60px] sm:min-h-[90px] p-1 sm:p-1.5 border-b border-r border-slate-700/30 text-left
                         transition-colors relative
                         ${isCurrentMonth ? 'hover:bg-slate-800/50 cursor-pointer' : 'opacity-30 cursor-default'}
                         ${isSelected ? 'bg-amber-500/10 ring-1 ring-amber-500/30' : ''}

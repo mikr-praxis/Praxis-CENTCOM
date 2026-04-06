@@ -13,7 +13,7 @@ export default function AppLayout({
       <Sidebar />
       <div className="md:pl-64">
         <TopBar />
-        <main className="p-6 pb-24 md:pb-6">
+        <main className="p-4 pb-28 md:p-6 md:pb-6">
           <AppShell>{children}</AppShell>
         </main>
       </div>

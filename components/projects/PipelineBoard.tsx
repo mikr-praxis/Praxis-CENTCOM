@@ -2,17 +2,8 @@
 
 import { ProjectCard } from './ProjectCard'
 import { PROJECT_STAGES } from '@/lib/supabase/types'
-import type { Project, ProjectStage } from '@/lib/supabase/types'
-
-const stageColors: Record<ProjectStage, string> = {
-  lead: 'bg-slate-500',
-  discovery: 'bg-purple-500',
-  proposal: 'bg-blue-500',
-  onboarded: 'bg-cyan-500',
-  building: 'bg-amber-500',
-  qa: 'bg-orange-500',
-  deployed: 'bg-emerald-500',
-}
+import { stageColors } from '@/lib/styles/colors'
+import type { Project } from '@/lib/supabase/types'
 
 export function PipelineBoard({ projects }: { projects: Project[] }) {
   const byStage = PROJECT_STAGES.map((stage) => ({
@@ -21,9 +12,9 @@ export function PipelineBoard({ projects }: { projects: Project[] }) {
   }))
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2">
+    <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory">
       {byStage.map((stage) => (
-        <div key={stage.key} className="flex-shrink-0 w-64">
+        <div key={stage.key} className="flex-shrink-0 w-60 sm:w-64 snap-center">
           {/* Column header */}
           <div className="flex items-center gap-2 mb-3 px-1">
             <div className={`h-2 w-2 rounded-full ${stageColors[stage.key]}`} />

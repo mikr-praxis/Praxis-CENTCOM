@@ -72,9 +72,11 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700/50 z-50">
-        <div className="flex justify-around items-center h-16 px-2">
+      {/* Mobile bottom nav — scrollable with safe area insets */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-700/50 z-50"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="flex items-center h-16 px-1 overflow-x-auto scrollbar-hide gap-0.5">
           {navigation.map((item) => {
             const isActive = pathname.startsWith(item.href)
             return (
@@ -82,12 +84,12 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={clsx(
-                  'flex flex-col items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-xs',
-                  isActive ? 'text-amber-400' : 'text-slate-500'
+                  'flex flex-col items-center justify-center min-w-[48px] min-h-[48px] rounded-xl text-xs flex-shrink-0 px-1.5 active:scale-95 transition-transform',
+                  isActive ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500 active:text-slate-300'
                 )}
               >
                 <item.icon className="h-5 w-5" />
-                <span className="mt-1 text-[10px]">{item.name}</span>
+                <span className="mt-0.5 text-[9px] font-medium leading-tight">{item.name}</span>
               </Link>
             )
           })}

@@ -29,6 +29,35 @@ body {
   background: #475569;
 }
 
+/* iOS safe area support */
+html {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* iOS form element resets — prevent zoom on focus, remove native styling */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-size: 16px; /* Prevents iOS auto-zoom when focusing inputs */
+  border-radius: 0.5rem;
+}
+
+/* Prevent iOS tap highlight on interactive elements */
+button,
+a,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth momentum scrolling on iOS */
+.overflow-x-auto,
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Clerk overrides for dark theme */
 .cl-rootBox,
 .cl-card {

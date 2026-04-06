@@ -17,11 +17,11 @@ type KanbanBoardProps = {
 
 export function KanbanBoard({ tasks, onAdvance }: KanbanBoardProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+    <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 md:overflow-visible md:snap-none xl:grid-cols-4 md:mx-0 md:px-0">
       {columns.map((col) => {
         const columnTasks = tasks.filter((t) => t.status === col.id)
         return (
-          <div key={col.id}>
+          <div key={col.id} className="flex-shrink-0 w-[75vw] sm:w-72 md:w-auto snap-center">
             <div className="flex items-center gap-2 mb-4">
               <div className={`h-2.5 w-2.5 rounded-full ${col.color}`} />
               <h3 className="text-sm font-semibold text-slate-300">{col.label}</h3>

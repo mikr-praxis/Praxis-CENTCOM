@@ -269,7 +269,7 @@ export function ConfigClient() {
               {/* Module header */}
               <button
                 onClick={() => toggleExpand(mod.id)}
-                className="w-full flex items-center gap-4 p-5 text-left hover:bg-slate-700/20 transition-colors"
+                className="w-full flex items-center gap-3 sm:gap-4 p-4 sm:p-5 text-left hover:bg-slate-700/20 active:bg-slate-700/30 transition-colors"
               >
                 <div className="rounded-lg bg-slate-700/40 p-2.5">
                   <Icon className="h-5 w-5 text-slate-300" />
@@ -341,7 +341,10 @@ export function ConfigClient() {
                                 placeholder={v.configured ? 'Leave blank to keep current value' : `Paste ${v.label} here...`}
                                 value={editing[mod.id]?.[v.key] || ''}
                                 onChange={(e) => updateField(mod.id, v.key, e.target.value)}
-                                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono placeholder:text-slate-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/30"
+                                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 min-h-[44px] text-sm text-slate-200 font-mono placeholder:text-slate-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/30"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
                               />
                               {saveResults[v.key] && !saveResults[v.key].ok && (
                                 <p className="text-[10px] text-red-400 mt-1">{saveResults[v.key].error}</p>
@@ -364,7 +367,7 @@ export function ConfigClient() {
                   )}
 
                   {/* Actions */}
-                  <div className="mt-4 pt-3 border-t border-slate-700/30 flex items-center gap-3">
+                  <div className="mt-4 pt-3 border-t border-slate-700/30 flex items-center gap-3 flex-wrap">
                     {mod.editable && !isEditing && (
                       <Button
                         size="sm"
