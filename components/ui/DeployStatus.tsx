@@ -53,9 +53,9 @@ export function DeployStatus() {
     : null
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-20 right-4 z-50 md:bottom-4 hidden md:block">
       {expanded && (
-        <div className="mb-2 w-72 rounded-xl border border-slate-700/50 bg-slate-800/95 p-4 shadow-2xl backdrop-blur-sm">
+        <div className="mb-2 w-64 sm:w-72 rounded-xl border border-slate-700/50 bg-slate-800/95 p-4 shadow-2xl backdrop-blur-sm">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-100">Deploy Status</span>
             <button
