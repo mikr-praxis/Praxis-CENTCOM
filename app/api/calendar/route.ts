@@ -3,15 +3,26 @@ import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import {
   getOpsCalendar,
-  getOpsCalendarId,
   getUserCalendar,
   getOAuth2Client,
   fetchCalendarEvents,
   type CalendarEvent,
 } from '@/lib/google/calendar'
 
+export type TeamCalendar = {
+  id: string
+  email: string
+  name: string
+  color: string
+  role: string | null
+  isOps: boolean
+  enabled: boolean
+  source: string
+  hasAccess: boolean   // true if we successfully fetched events
+}
+
 // GET /api/calendar?start=ISO&end=ISO
-// Returns events from ops calendar + user's connected calendar
+// Returns events from ops calendar + all team member calendars
 export async function GET(request: NextRequest) {
   const { userId } = await auth()
   if (!userId) {
@@ -28,41 +39,100 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  const supabase = createServerClient()
   const allEvents: CalendarEvent[] = []
-  const calendars: { id: string; name: string; color: string; email: string }[] = []
+  const calendars: TeamCalendar[] = []
 
-  // 1) Ops calendar (always loaded)
+  // ── 1. Load team calendars from DB ────────────────────────────────
+  const { data: teamCalendars } = await supabase
+    .from('team_calendars')
+    .select('*')
+    .eq('enabled', true)
+    .order('is_ops', { ascending: false }) // ops first
+
+  // ── 2. Get the service account calendar client (if configured) ────
+  let opsCalClient: Awaited<ReturnType<typeof getOpsCalendar>> | null = null
   try {
-    const opsCalendar = await getOpsCalendar()
-    const opsCalId = await getOpsCalendarId()
-    const opsEvents = await fetchCalendarEvents(
-      opsCalendar,
-      opsCalId,
-      'Praxis Ops',
-      '#f59e0b', // amber
-      start,
-      end
-    )
-    allEvents.push(...opsEvents)
-    calendars.push({
-      id: opsCalId,
-      name: 'Praxis Ops',
-      color: '#f59e0b',
-      email: opsCalId,
-    })
+    opsCalClient = await getOpsCalendar()
   } catch (err) {
-    console.error('Failed to load ops calendar:', err)
+    console.error('Service account not configured:', err)
   }
 
-  // 2) User's connected Google Calendar
-  const supabase = createServerClient()
+  // ── 3. Fetch each team calendar via service account ───────────────
+  // The service account can read any calendar shared with it.
+  // Each employee shares their calendar → we read all of them.
+  if (teamCalendars && opsCalClient) {
+    const fetches = teamCalendars.map(async (tc) => {
+      try {
+        const events = await fetchCalendarEvents(
+          opsCalClient!,
+          tc.email,
+          tc.display_name,
+          tc.color,
+          start,
+          end
+        )
+        allEvents.push(...events)
+        calendars.push({
+          id: tc.id,
+          email: tc.email,
+          name: tc.display_name,
+          color: tc.color,
+          role: tc.role,
+          isOps: tc.is_ops,
+          enabled: tc.enabled,
+          source: tc.source,
+          hasAccess: true,
+        })
+      } catch (err) {
+        // Calendar not shared with service account — still list it but flag it
+        console.error(`Cannot read calendar ${tc.email}:`, err)
+        calendars.push({
+          id: tc.id,
+          email: tc.email,
+          name: tc.display_name,
+          color: tc.color,
+          role: tc.role,
+          isOps: tc.is_ops,
+          enabled: tc.enabled,
+          source: tc.source,
+          hasAccess: false,
+        })
+      }
+    })
+    await Promise.all(fetches)
+  } else if (teamCalendars) {
+    // Service account not available — still list calendars as non-accessible
+    for (const tc of teamCalendars) {
+      calendars.push({
+        id: tc.id,
+        email: tc.email,
+        name: tc.display_name,
+        color: tc.color,
+        role: tc.role,
+        isOps: tc.is_ops,
+        enabled: tc.enabled,
+        source: tc.source,
+        hasAccess: false,
+      })
+    }
+  }
+
+  // ── 4. User's own OAuth-connected calendar (fallback / supplement) ─
+  // If the current user connected via OAuth AND their calendar isn't
+  // already covered by a team_calendars entry, add it.
   const { data: tokenRow } = await supabase
     .from('google_tokens')
     .select('*')
     .eq('user_id', userId)
     .single()
 
-  if (tokenRow) {
+  const userOAuthConnected = !!tokenRow
+  const userAlreadyCovered = calendars.some(
+    (c) => c.hasAccess && c.email === tokenRow?.email
+  )
+
+  if (tokenRow && !userAlreadyCovered) {
     let accessToken = tokenRow.access_token
 
     // Refresh if expired
@@ -73,7 +143,6 @@ export async function GET(request: NextRequest) {
         const { credentials } = await oauth2.refreshAccessToken()
         accessToken = credentials.access_token || accessToken
 
-        // Update stored token
         await supabase
           .from('google_tokens')
           .update({
@@ -95,19 +164,24 @@ export async function GET(request: NextRequest) {
         userCal,
         'primary',
         tokenRow.email,
-        '#8b5cf6', // purple
+        '#8b5cf6',
         start,
         end
       )
       allEvents.push(...userEvents)
       calendars.push({
-        id: 'primary',
-        name: tokenRow.email,
-        color: '#8b5cf6',
+        id: `oauth-${userId}`,
         email: tokenRow.email,
+        name: `${tokenRow.email} (personal)`,
+        color: '#8b5cf6',
+        role: null,
+        isOps: false,
+        enabled: true,
+        source: 'oauth',
+        hasAccess: true,
       })
     } catch (err) {
-      console.error('Failed to load user calendar:', err)
+      console.error('Failed to load user OAuth calendar:', err)
     }
   }
 
@@ -117,6 +191,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     events: allEvents,
     calendars,
-    userConnected: !!tokenRow,
+    userConnected: userOAuthConnected,
   })
 }

@@ -15,7 +15,7 @@ async function getServiceAuth() {
 
   return new google.auth.GoogleAuth({
     credentials,
-    scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+    scopes: ['https://www.googleapis.com/auth/calendar'],
   })
 }
 
