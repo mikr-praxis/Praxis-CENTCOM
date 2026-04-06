@@ -16,6 +16,8 @@ import {
   Zap,
   Columns3,
 } from 'lucide-react'
+import { useRole } from '@/components/providers/RoleProvider'
+import { ROUTE_PERMISSIONS } from '@/lib/roles'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -32,6 +34,13 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { role } = useRole()
+
+  // Filter navigation to only show routes the current role can access
+  const visibleNav = navigation.filter((item) => {
+    const perm = ROUTE_PERMISSIONS.find((r) => item.href.startsWith(r.href))
+    return !perm || perm.roles.includes(role)
+  })
 
   return (
     <>
@@ -43,7 +52,7 @@ export function Sidebar() {
             <span className="ml-3 text-xl font-bold text-white tracking-tight">Praxis</span>
           </div>
           <nav className="mt-8 flex-1 px-3 space-y-1">
-            {navigation.map((item) => {
+            {visibleNav.map((item) => {
               const isActive = pathname.startsWith(item.href)
               return (
                 <Link
@@ -79,7 +88,7 @@ export function Sidebar() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <div className="flex items-center h-16 px-1 overflow-x-auto scrollbar-hide gap-0.5">
-          {navigation.map((item) => {
+          {visibleNav.map((item) => {
             const isActive = pathname.startsWith(item.href)
             return (
               <Link

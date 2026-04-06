@@ -1,12 +1,11 @@
-import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { BudgetClient } from './budget-client'
+import { requireRole } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 export default async function BudgetPage() {
-  const { userId } = await auth()
-  if (!userId) return null
+  const { userId } = await requireRole('/budget')
 
   const supabase = createServerClient()
   const { data: items } = await supabase
