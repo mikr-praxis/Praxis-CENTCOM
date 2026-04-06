@@ -128,6 +128,60 @@ export type AppConfig = {
   updated_at: string
 }
 
+export type TeamCalendar = {
+  id: string
+  email: string
+  display_name: string
+  color: string
+  role: string | null
+  is_ops: boolean
+  enabled: boolean
+  source: string
+  created_at: string
+  updated_at: string
+}
+
+export type MondayTask = {
+  id: string
+  name: string
+  board_id: string
+  board_name: string
+  group_id: string
+  group_name: string
+  status: string | null
+  priority: string | null
+  due_date: string | null
+  timeline_start: string | null
+  timeline_end: string | null
+  assignees: unknown
+  column_values: unknown
+  state: string
+  synced_at: string
+  created_at: string
+  updated_at: string
+}
+
+export type MondayWebhookLog = {
+  id: string
+  event_type: string
+  item_id: string | null
+  board_id: string | null
+  payload: unknown
+  processed: boolean
+  created_at: string
+}
+
+export type MondayColumnMapping = {
+  board_id: string
+  board_name: string
+  status_column_id: string | null
+  date_column_id: string | null
+  priority_column_id: string | null
+  timeline_column_id: string | null
+  custom_mappings: unknown
+  updated_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -183,6 +237,30 @@ export type Database = {
         Row: GoogleToken
         Insert: Partial<GoogleToken> & Pick<GoogleToken, 'user_id' | 'email' | 'access_token' | 'refresh_token' | 'token_expiry'>
         Update: Partial<GoogleToken>
+        Relationships: []
+      }
+      team_calendars: {
+        Row: TeamCalendar
+        Insert: Partial<TeamCalendar> & Pick<TeamCalendar, 'email' | 'display_name'>
+        Update: Partial<TeamCalendar>
+        Relationships: []
+      }
+      monday_tasks: {
+        Row: MondayTask
+        Insert: Partial<MondayTask> & Pick<MondayTask, 'id' | 'name' | 'board_id' | 'board_name' | 'group_id' | 'group_name'>
+        Update: Partial<MondayTask>
+        Relationships: []
+      }
+      monday_webhook_log: {
+        Row: MondayWebhookLog
+        Insert: Partial<MondayWebhookLog> & Pick<MondayWebhookLog, 'event_type'>
+        Update: Partial<MondayWebhookLog>
+        Relationships: []
+      }
+      monday_column_mappings: {
+        Row: MondayColumnMapping
+        Insert: Partial<MondayColumnMapping> & Pick<MondayColumnMapping, 'board_id' | 'board_name'>
+        Update: Partial<MondayColumnMapping>
         Relationships: []
       }
     }
