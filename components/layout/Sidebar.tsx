@@ -14,12 +14,14 @@ import {
   FolderKanban,
   Settings,
   Zap,
+  Columns3,
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { name: 'Monday', href: '/monday', icon: Columns3 },
   { name: 'Calendar', href: '/calendar', icon: CalendarDays },
   { name: 'Events', href: '/events', icon: Calendar },
   { name: 'Budget', href: '/budget', icon: DollarSign },
