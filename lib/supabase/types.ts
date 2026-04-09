@@ -171,6 +171,18 @@ export type MondayWebhookLog = {
   created_at: string
 }
 
+export type GitHubToken = {
+  id: string
+  user_id: string
+  github_username: string
+  github_id: number
+  access_token: string
+  token_scope: string
+  avatar_url: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type MondayColumnMapping = {
   board_id: string
   board_name: string
@@ -243,6 +255,12 @@ export type Database = {
         Row: TeamCalendar
         Insert: Partial<TeamCalendar> & Pick<TeamCalendar, 'email' | 'display_name'>
         Update: Partial<TeamCalendar>
+        Relationships: []
+      }
+      github_tokens: {
+        Row: GitHubToken
+        Insert: Partial<GitHubToken> & Pick<GitHubToken, 'user_id' | 'github_username' | 'github_id' | 'access_token' | 'token_scope'>
+        Update: Partial<GitHubToken>
         Relationships: []
       }
       monday_tasks: {

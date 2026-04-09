@@ -127,6 +127,19 @@ export const MODULES = [
       { key: 'HUBSPOT_ACCESS_TOKEN', label: 'Private App Token', hint: 'HubSpot → Settings → Integrations → Private Apps → Create → Access Token' },
     ],
   },
+  {
+    id: 'github',
+    name: 'GitHub',
+    description: 'Repository access, code insights, and deployment hooks. Per-user OAuth connects individual GitHub accounts.',
+    docsUrl: 'https://github.com/settings/developers',
+    editable: true,
+    vars: [
+      { key: 'GITHUB_APP_ID', label: 'App ID', hint: 'GitHub → Settings → Developer settings → OAuth Apps → App ID (86624988)' },
+      { key: 'GITHUB_CLIENT_ID', label: 'OAuth Client ID', hint: 'GitHub → Settings → Developer settings → OAuth Apps → Client ID' },
+      { key: 'GITHUB_CLIENT_SECRET', label: 'OAuth Client Secret', hint: 'GitHub → OAuth App → Client secrets → Generate' },
+      { key: 'GITHUB_REDIRECT_URI', label: 'OAuth Redirect URI (optional)', hint: 'Defaults to <app-url>/api/auth/github/callback' },
+    ],
+  },
 ]
 
 // ── GET — return module status ────────────────────────────────────────────
