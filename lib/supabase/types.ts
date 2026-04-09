@@ -182,6 +182,19 @@ export type MondayColumnMapping = {
   updated_at: string
 }
 
+export type TaskMilestone = {
+  id: string
+  monday_task_id: string
+  title: string
+  description: string | null
+  status: 'pending' | 'in_progress' | 'done'
+  sort_order: number
+  due_date: string | null
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -261,6 +274,12 @@ export type Database = {
         Row: MondayColumnMapping
         Insert: Partial<MondayColumnMapping> & Pick<MondayColumnMapping, 'board_id' | 'board_name'>
         Update: Partial<MondayColumnMapping>
+        Relationships: []
+      }
+      task_milestones: {
+        Row: TaskMilestone
+        Insert: Partial<TaskMilestone> & Pick<TaskMilestone, 'monday_task_id' | 'title' | 'user_id'>
+        Update: Partial<TaskMilestone>
         Relationships: []
       }
     }

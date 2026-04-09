@@ -227,6 +227,13 @@ export type MondayItem = {
   subscribers: { id: string; name: string }[]
 }
 
+export type MondaySubitem = {
+  id: string
+  name: string
+  status: string | null
+  dueDate: string | null
+}
+
 export type MondayTask = {
   id: string
   name: string
@@ -240,6 +247,7 @@ export type MondayTask = {
   priority: string | null
   timelineStart: string | null
   timelineEnd: string | null
+  subitems?: MondaySubitem[]
 }
 
 export type MondayBoard = {
@@ -301,6 +309,18 @@ const ITEM_FIELDS = `
   group { id title }
   column_values { id title text type value }
   subscribers { id name }
+`
+
+const ITEM_FIELDS_WITH_SUBITEMS = `
+  id name state
+  board { id name }
+  group { id title }
+  column_values { id title text type value }
+  subscribers { id name }
+  subitems {
+    id name
+    column_values { id title text type value }
+  }
 `
 
 export async function getBoards(): Promise<{ id: string; name: string }[]> {
@@ -595,4 +615,73 @@ export async function getAllTasks(boardIds?: string[]): Promise<MondayTask[]> {
   return items
     .filter((item) => item.state === 'active')
     .map(itemToTask)
+}
+
+// ── Tasks with subitems (for aggregated board) ────────────────────────────
+
+type MondayItemWithSubitems = MondayItem & {
+  subitems?: {
+    id: string
+    name: string
+    column_values: { id: string; title: string; text: string; type: string; value: string | null }[]
+  }[]
+}
+
+function extractSubitemStatus(
+  subitem: { column_values: { id: string; title: string; text: string; type: string; value: string | null }[] }
+): string | null {
+  const col = subitem.column_values.find(
+    (c) => c.type === 'status' || c.type === 'color' ||
+    c.title.toLowerCase().includes('status')
+  )
+  return col?.text || null
+}
+
+function extractSubitemDate(
+  subitem: { column_values: { id: string; title: string; text: string; type: string; value: string | null }[] }
+): string | null {
+  const col = subitem.column_values.find(
+    (c) => c.type === 'date' || c.title.toLowerCase().includes('due') || c.title.toLowerCase().includes('date')
+  )
+  if (!col?.text) return null
+  const match = col.text.match(/(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
+}
+
+export function itemToTaskWithSubitems(item: MondayItemWithSubitems): MondayTask {
+  const base = itemToTask(item)
+  if (!item.subitems || item.subitems.length === 0) return base
+
+  return {
+    ...base,
+    subitems: item.subitems.map((si) => ({
+      id: si.id,
+      name: si.name,
+      status: extractSubitemStatus(si),
+      dueDate: extractSubitemDate(si),
+    })),
+  }
+}
+
+export async function getAllTasksWithSubitems(boardIds?: string[]): Promise<MondayTask[]> {
+  let ids = boardIds
+  if (!ids || ids.length === 0) {
+    const boards = await getBoards()
+    ids = boards.map((b) => b.id)
+  }
+
+  if (ids.length === 0) return []
+
+  const data = await mondayQuery<{
+    boards: { items_page: { items: MondayItemWithSubitems[] } }[]
+  }>(`query ($ids: [ID!]!) {
+    boards(ids: $ids) {
+      items_page(limit: 200) { items { ${ITEM_FIELDS_WITH_SUBITEMS} } }
+    }
+  }`, { ids })
+
+  const items = data.boards.flatMap((b) => b.items_page.items)
+  return items
+    .filter((item) => item.state === 'active')
+    .map(itemToTaskWithSubitems)
 }

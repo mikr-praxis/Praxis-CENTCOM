@@ -4,6 +4,8 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid'
 import { TrendChart } from '@/components/dashboard/TrendChart'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { StackHealth } from '@/components/dashboard/StackHealth'
+import { SlackWidget } from '@/components/dashboard/SlackWidget'
+import { MondayWidget } from '@/components/dashboard/MondayWidget'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { AlertCircle } from 'lucide-react'
@@ -160,6 +162,11 @@ export default async function DashboardPage() {
           <TrendChart data={trendData} />
         </div>
         <ActivityFeed activities={sortedActivities} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SlackWidget />
+        <MondayWidget />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
