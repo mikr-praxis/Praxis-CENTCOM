@@ -285,7 +285,7 @@ export type ColumnMapping = {
 const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   statusTypes: ['status', 'color'],
   statusTitles: ['status', 'stage', 'state', 'progress'],
-  dateTitles: ['due', 'date', 'deadline', 'end date', 'delivery', 'target'],
+  dateTitles: ['due date', 'due', 'deadline', 'delivery', 'target'],
   priorityTitles: ['priority', 'urgency', 'importance', 'p0', 'p1', 'p2'],
 }
 
@@ -552,15 +552,30 @@ function extractColumnValue(
   return col?.text || null
 }
 
+// Column titles that indicate a non-due date (creation, paid, submission, etc.)
+const EXCLUDE_DATE_TITLES = ['created', 'paid', 'submission', 'submitted', 'completed', 'start date', 'modified', 'updated']
+
 function extractDateFromColumn(
   item: MondayItem,
   titles: string[]
 ): string | null {
-  const col = item.column_values.find((c) => {
+  const dateCols = item.column_values.filter((c) => {
     const colTitle = c.column?.title || ''
-    return titles.some((t) => colTitle.toLowerCase().includes(t)) &&
-      (c.type === 'date' || c.type === 'timeline')
+    const lower = colTitle.toLowerCase()
+    // Must be a date/timeline type
+    if (c.type !== 'date' && c.type !== 'timeline') return false
+    // Exclude known non-due columns
+    if (EXCLUDE_DATE_TITLES.some((ex) => lower.includes(ex))) return false
+    // Must match at least one title keyword
+    return titles.some((t) => lower.includes(t))
   })
+
+  // Prefer columns that explicitly say "due" or "deadline"
+  const preferred = dateCols.find((c) => {
+    const lower = (c.column?.title || '').toLowerCase()
+    return lower.includes('due') || lower.includes('deadline')
+  })
+  const col = preferred || dateCols[0]
   if (!col?.text) return null
 
   const match = col.text.match(/(\d{4}-\d{2}-\d{2})/)
