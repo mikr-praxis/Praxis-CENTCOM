@@ -26,7 +26,7 @@ import {
   Trash2,
 } from 'lucide-react'
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// ââ Types âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 type Milestone = {
   id: string
@@ -89,7 +89,7 @@ const TIERS: TierConfig[] = [
   {
     id: 'critical',
     label: 'Critical',
-    description: 'Urgent, overdue, blocked — needs attention now',
+    description: 'Urgent, overdue, blocked â needs attention now',
     icon: AlertTriangle,
     accentColor: 'text-red-400',
     headerBg: 'bg-red-500/5 border-red-500/20',
@@ -118,7 +118,7 @@ const TIERS: TierConfig[] = [
   },
 ]
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function deadlineLabel(dateStr: string): { text: string; color: string } {
   const today = new Date()
@@ -165,7 +165,7 @@ const STATUS_OPTIONS = [
   'Working on it', 'Stuck', 'Done', 'Waiting for review', 'Blocked', 'Not Started',
 ]
 
-// ── SlackThread: loads messages for a task ────────────────────────────────
+// ââ SlackThread: loads messages for a task ââââââââââââââââââââââââââââââââ
 
 function SlackThread({ slackContext, taskName }: { slackContext: SlackContext | null; taskName: string }) {
   const [messages, setMessages] = useState<SlackMessage[]>([])
@@ -262,7 +262,7 @@ function SlackThread({ slackContext, taskName }: { slackContext: SlackContext | 
   )
 }
 
-// ── MilestoneCards: CENTCOM-defined steps ──────────────────────────────────
+// ââ MilestoneCards: CENTCOM-defined steps ââââââââââââââââââââââââââââââââââ
 
 function MilestoneCards({
   taskId,
@@ -349,7 +349,7 @@ function MilestoneCards({
           <span className="text-[10px] text-slate-500 font-medium">Milestones</span>
           {milestones.length > 0 && (
             <span className="text-[10px] text-slate-600">
-              {completedCount}/{milestones.length} · {pct}%
+              {completedCount}/{milestones.length} Â· {pct}%
             </span>
           )}
         </div>
@@ -401,11 +401,18 @@ function MilestoneCards({
               {m.description && (
                 <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2">{m.description}</p>
               )}
-              {m.due_date && (
-                <span className={`text-[10px] mt-0.5 ${deadlineLabel(m.due_date).color}`}>
-                  {deadlineLabel(m.due_date).text}
-                </span>
-              )}
+              {m.due_date && (() => {
+                const dl = deadlineLabel(m.due_date)
+                const milestoneDone = m.status === 'done'
+                const displayDl = milestoneDone && dl.color.includes('red')
+                  ? { text: dl.text.replace(/overdue/, 'late (done)'), color: 'text-slate-500' }
+                  : dl
+                return (
+                  <span className={`text-[10px] mt-0.5 ${displayDl.color}`}>
+                    {displayDl.text}
+                  </span>
+                )
+              })()}
             </div>
             <button
               onClick={() => handleDelete(m.id)}
@@ -449,7 +456,7 @@ function MilestoneCards({
   )
 }
 
-// ── TaskRow: full task card ───────────────────────────────────────────────
+// ââ TaskRow: full task card âââââââââââââââââââââââââââââââââââââââââââââââ
 
 function TaskRow({
   task,
@@ -465,7 +472,11 @@ function TaskRow({
   const [expanded, setExpanded] = useState(false)
   const [editingStatus, setEditingStatus] = useState(false)
   const [updating, setUpdating] = useState(false)
-  const deadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+  const rawDeadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+  const taskDone = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
+  const deadline = rawDeadline && taskDone && rawDeadline.color.includes('red')
+    ? { text: rawDeadline.text.replace(/overdue/, 'late (done)'), color: 'text-slate-500' }
+    : rawDeadline
 
   const handleStatusChange = async (newStatus: string) => {
     setUpdating(true)
@@ -498,9 +509,9 @@ function TaskRow({
           <p className="text-sm font-medium text-slate-200 truncate">{task.name}</p>
           <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
             <span className="truncate max-w-[140px]">{task.boardName}</span>
-            <span className="text-slate-700">·</span>
+            <span className="text-slate-700">Â·</span>
             <span className="truncate max-w-[100px]">{task.groupName}</span>
-            <span className="text-slate-700">·</span>
+            <span className="text-slate-700">Â·</span>
             <span className="text-slate-600 italic">{task.tierReason}</span>
           </div>
         </div>
@@ -552,7 +563,7 @@ function TaskRow({
             <button
               onClick={() => setEditingStatus(true)}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-slate-100 transition-colors group"
-              title="Update status → syncs to Monday"
+              title="Update status â syncs to Monday"
             >
               <span className={`w-2 h-2 rounded-full ${statusColor(task.status)}`} />
               <span className="group-hover:underline decoration-dotted underline-offset-2">
@@ -617,7 +628,7 @@ function TaskRow({
                     <span className={si.status?.toLowerCase().includes('done') ? 'line-through text-slate-600' : ''}>
                       {si.name}
                     </span>
-                    {si.status && <span className="text-slate-600">· {si.status}</span>}
+                    {si.status && <span className="text-slate-600">Â· {si.status}</span>}
                   </div>
                 ))}
               </div>
@@ -636,7 +647,7 @@ function TaskRow({
   )
 }
 
-// ── Main Component ────────────────────────────────────────────────────────
+// ââ Main Component ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export function AggregatedBoard() {
   const [data, setData] = useState<{
@@ -823,35 +834,35 @@ export function AggregatedBoard() {
             {!isCollapsed && (
               <div className="divide-y divide-slate-800/30">
                 {tierTasks.length === 0 && (
-                  <div className="px-4 py-6 text-center">
-                    <p className="text-xs text-slate-500">No tasks in this tier</p>
-                  </div>
-                )}
-                {tierTasks.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    tierColor={tier.borderColor}
-                    onStatusUpdate={handleStatusUpdate}
-                    onMilestonesUpdate={() => fetchData(true)}
-                  />
-                ))}
-              </div>
-            )}
-          </Card>
-        )
-      })}
+                <div className="px-4 py-6 text-center">
+                  <p className="text-xs text-slate-500">No tasks in this tier</p>
+                </div>
+              )}
+              {tierTasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  tierColor={tier.borderColor}
+                  onStatusUpdate={handleStatusUpdate}
+                  onMilestonesUpdate={() => fetchData(true)}
+                />
+              ))}
+            </div>
+          )}
+        </Card>
+      )
+    })}
 
-      {/* Summary */}
-      {data?.counts && (
-        <div className="flex items-center justify-center gap-6 text-xs text-slate-500 py-2">
-          <span>{data.counts.total} active</span>
-          <span className="text-slate-700">·</span>
-          <span className="text-red-400">{data.counts.critical} critical</span>
-          <span className="text-amber-400">{data.counts.followup} follow-ups</span>
-          <span className="text-blue-400">{data.counts.building} building</span>
-        </div>
-      )}
-    </div>
-  )
+    {/* Summary */}
+    {data?.counts && (
+      <div className="flex items-center justify-center gap-6 text-xs text-slate-500 py-2">
+        <span>{data.counts.total} active</span>
+        <span className="text-slate-700">Â·</span>
+        <span className="text-red-400">{data.counts.critical} critical</span>
+        <span className="text-amber-400">{data.counts.followup} follow-ups</span>
+        <span className="text-blue-400">{data.counts.building} building</span>
+      </div>
+    )}
+  </div>
+ )
 }
