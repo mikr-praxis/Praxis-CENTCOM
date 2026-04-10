@@ -628,7 +628,7 @@ export function MondayClient() {
               const boardTasks = tasks.filter((t) => t.boardId === board.id)
               const doneTasks = boardTasks.filter((t) => t.status?.toLowerCase().includes('done') || t.status?.toLowerCase().includes('complete'))
               const overdue = boardTasks.filter((t) => {
-                const isDone = (s) => s?.toLowerCase().includes('done') || s?.toLowerCase().includes('complete')
+                const isDone = (s: string | null | undefined) => s?.toLowerCase().includes('done') || s?.toLowerCase().includes('complete')
                 if (!t.dueDate || isDone(t.status)) return false
                 return new Date(t.dueDate + 'T00:00:00') < new Date(new Date().toDateString())
               })
