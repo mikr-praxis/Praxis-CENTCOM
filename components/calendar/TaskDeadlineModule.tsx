@@ -26,7 +26,7 @@ type MatchedTask = MondayTask & {
   matchReason: string | null
 }
 
-// ── Auto-match logic ────────────────────────────────────────────────────
+// ââ Auto-match logic ââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Matches tasks to calendar events by:
 // 1. Exact or partial title match (fuzzy)
 // 2. Same-day date overlap (task due date = event date)
@@ -111,7 +111,7 @@ function matchTaskToEvent(
   return { event: bestMatch, reason }
 }
 
-// ── Relative date display ───────────────────────────────────────────────
+// ââ Relative date display âââââââââââââââââââââââââââââââââââââââââââââââ
 
 function formatDeadline(dateStr: string): { label: string; urgency: 'overdue' | 'today' | 'soon' | 'later' } {
   const now = new Date()
@@ -136,7 +136,7 @@ const URGENCY_STYLES = {
   later: 'text-slate-400 bg-slate-500/10',
 }
 
-// ── Component ───────────────────────────────────────────────────────────
+// ââ Component âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 type Props = {
   calendarEvents: CalendarEvent[]
@@ -338,26 +338,31 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
                     : task.timelineEnd
                       ? formatDeadline(task.timelineEnd)
                       : null
+                  const taskDone = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
+                  // Override overdue styling for completed tasks
+                  const displayDeadline = deadline && taskDone && deadline.urgency === 'overdue'
+                    ? { label: deadline.label.replace(/overdue/, 'late (done)'), urgency: 'later' as const }
+                    : deadline
 
                   return (
                     <div
                       key={task.id}
-                      className="flex items-start gap-3 rounded-lg border border-slate-700/40 px-3 py-2.5 hover:border-slate-600/50 transition-colors"
+                      className={`flex items-start gap-3 rounded-lg border border-slate-700/40 px-3 py-2.5 hover:border-slate-600/50 transition-colors ${taskDone ? 'opacity-60' : ''}`}
                     >
                       {/* Task info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium text-slate-200 leading-tight">
+                          <p className={`text-sm font-medium leading-tight ${taskDone ? 'text-slate-400 line-through' : 'text-slate-200'}`}>
                             {task.name}
                           </p>
-                          {deadline && (
+                          {displayDeadline && (
                             <span
                               className={`
                                 flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap
-                                ${URGENCY_STYLES[deadline.urgency]}
+                                ${URGENCY_STYLES[displayDeadline.urgency]}
                               `}
                             >
-                              {deadline.label}
+                              {displayDeadline.label}
                             </span>
                           )}
                         </div>
