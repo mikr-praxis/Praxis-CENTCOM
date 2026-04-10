@@ -75,8 +75,9 @@ export function MondayWidget() {
       const allTasks: MondayTask[] = data.tasks || []
 
       // Filter to active tasks, sort by due date urgency
+      const isDone = (t: MondayTask) => t.status?.toLowerCase().includes('done') || t.status?.toLowerCase().includes('complete')
       const active = allTasks
-        .filter((t) => t.status?.toLowerCase() !== 'done')
+        .filter((t) => !isDone(t))
         .sort((a, b) => {
           if (!a.due_date && !b.due_date) return 0
           if (!a.due_date) return 1
@@ -97,8 +98,8 @@ export function MondayWidget() {
         }
         const board = boardMap.get(name)!
         board.total++
-        if (t.status?.toLowerCase() === 'done') board.done++
-        if (t.due_date && new Date(t.due_date) < now && t.status?.toLowerCase() !== 'done') {
+        if (isDone(t)) board.done++
+        if (t.due_date && new Date(t.due_date) < now && !isDone(t)) {
           board.overdue++
         }
       }
