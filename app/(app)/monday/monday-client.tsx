@@ -486,6 +486,10 @@ export function MondayClient() {
           <div className="divide-y divide-slate-700/30">
             {paged.map((task) => {
               const deadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+              const taskDone = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
+              const displayDeadline = deadline && taskDone && deadline.color.includes('red')
+                ? { text: deadline.text.replace(/overdue/, 'late (done)'), color: 'text-slate-500 bg-slate-500/10' }
+                : deadline
 
               return (
                 <div
@@ -532,9 +536,9 @@ export function MondayClient() {
 
                   {/* Due date */}
                   <div className="sm:col-span-2">
-                    {deadline && (
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${deadline.color}`}>
-                        {deadline.text}
+                    {displayDeadline && (
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${displayDeadline.color}`}>
+                        {displayDeadline.text}
                       </span>
                     )}
                   </div>
@@ -624,7 +628,8 @@ export function MondayClient() {
               const boardTasks = tasks.filter((t) => t.boardId === board.id)
               const doneTasks = boardTasks.filter((t) => t.status?.toLowerCase().includes('done') || t.status?.toLowerCase().includes('complete'))
               const overdue = boardTasks.filter((t) => {
-                if (!t.dueDate) return false
+                const isDone = (s) => s?.toLowerCase().includes('done') || s?.toLowerCase().includes('complete')
+                if (!t.dueDate || isDone(t.status)) return false
                 return new Date(t.dueDate + 'T00:00:00') < new Date(new Date().toDateString())
               })
               const isExpanded = expandedBoards.has(board.id)
@@ -706,6 +711,11 @@ export function MondayClient() {
                           .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
                           .map((task) => {
                             const deadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+                            // Override overdue styling for completed tasks
+                            const taskDone2 = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
+                            const displayDl = deadline && taskDone2 && deadline.color.includes('red')
+                              ? { text: deadline.text.replace(/overdue/, 'late (done)'), color: 'text-slate-500 bg-slate-500/10' }
+                              : deadline
                             return (
                               <div key={task.id} className="grid grid-cols-12 gap-2 px-5 py-2.5 hover:bg-slate-800/20 transition-colors items-center text-sm">
                                 {/* Task name */}
@@ -735,9 +745,9 @@ export function MondayClient() {
                                 </div>
                                 {/* Due date */}
                                 <div className="col-span-2">
-                                  {deadline ? (
-                                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${deadline.color}`}>
-                                      {deadline.text}
+                                  {displayDl ? (
+                                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${displayDl.color}`}>
+                                      {displayDl.text}
                                     </span>
                                   ) : (
                                     <span className="text-[11px] text-slate-600">No date</span>
