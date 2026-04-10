@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   AlertTriangle,
   Clock,
@@ -163,8 +163,8 @@ function TaskRow({ task }: { task: BoardTaskSummary }) {
 
 // ââ AssigneeSection (expanded per-user breakdown) ââââââââââââââââââââââââââ
 
-function AssigneeSection({ assignee }: { assignee: AssigneeSummary }) {
-  const [open, setOpen] = useState(false)
+function AssigneeSection({ assignee, highlighted = false }: { assignee: AssigneeSummary; highlighted?: boolean }) {
+  const [open, setOpen] = useState(highlighted)
 
   // Group tasks by tier
   const byTier = {
@@ -174,10 +174,10 @@ function AssigneeSection({ assignee }: { assignee: AssigneeSummary }) {
   }
 
   return (
-    <div className="border-b border-slate-700/30 last:border-b-0">
+    <div className={`border-b border-slate-700/30 last:border-b-0 ${highlighted ? 'bg-amber-500/5 rounded-lg' : ''}`}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2.5 w-full py-2 px-2 hover:bg-slate-800/30 transition-colors rounded-md"
+        className={`flex items-center gap-2.5 w-full py-2 px-2 hover:bg-slate-800/30 transition-colors rounded-md ${highlighted ? 'ring-1 ring-amber-500/20' : ''}`}
       >
         {/* Avatar */}
         <div className="h-6 w-6 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
@@ -228,8 +228,21 @@ function AssigneeSection({ assignee }: { assignee: AssigneeSummary }) {
 
 // ââ Main ProjectBoardCard ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-export function ProjectBoardCard({ board }: { board: ProjectBoardData }) {
-  const [expanded, setExpanded] = useState(false)
+export function ProjectBoardCard({
+  board,
+  expandByDefault = false,
+  highlightMemberId = null,
+}: {
+  board: ProjectBoardData
+  expandByDefault?: boolean
+  highlightMemberId?: string | null
+}) {
+  const [expanded, setExpanded] = useState(expandByDefault)
+
+  // Auto-expand/collapse when filter state changes
+  useEffect(() => {
+    setExpanded(expandByDefault)
+  }, [expandByDefault])
 
   // Determine accent color based on highest-severity tier
   const accentBorder = board.counts.critical > 0
@@ -322,7 +335,11 @@ export function ProjectBoardCard({ board }: { board: ProjectBoardData }) {
       {expanded && (
         <div className="border-t border-slate-700/50 px-3 py-2">
           {board.assignees.map((assignee) => (
-            <AssigneeSection key={assignee.id} assignee={assignee} />
+            <AssigneeSection
+              key={assignee.id}
+              assignee={assignee}
+              highlighted={highlightMemberId === assignee.id}
+            />
           ))}
 
           {/* Unassigned tasks */}
