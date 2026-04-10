@@ -148,26 +148,6 @@ function TierToggles({
     </div>
   )
 }
-
-// ââ Main component ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-
-export function ProjectsClient({ initialProjects }: { initialProjects  key={tier}
-            onClick={() => onToggle(tier)}
-            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-all ${
-              active
-                ? `${cfg.bg} ${cfg.color}`
-                : 'border-slate-700/30 bg-slate-800/30 text-slate-600 opacity-50'
-            }`}
-          >
-            <cfg.icon className="h-3 w-3" />
-            <span>{count}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 // ââ Main component ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export function ProjectsClient({ initialProjects }: { initialProjects: Project[] }) {
