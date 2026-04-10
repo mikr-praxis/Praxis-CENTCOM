@@ -55,7 +55,7 @@ type ErrorInfo = {
   retryAfter?: number
 }
 
-// ── Status color helper ────────────────────────────────────────────────
+// ââ Status color helper ââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function statusColor(status: string | null): string {
   if (!status) return 'bg-slate-600'
@@ -93,7 +93,7 @@ function deadlineLabel(dateStr: string): { text: string; color: string } {
 
 const ITEMS_PER_PAGE = 25
 
-// ── Component ──────────────────────────────────────────────────────────
+// ââ Component ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export function MondayClient() {
   const [tasks, setTasks] = useState<MondayTask[]>([])
@@ -119,6 +119,9 @@ export function MondayClient() {
   // Archive/delete confirmations
   const [archiving, setArchiving] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+
+  // Expanded board cards
+  const [expandedBoards, setExpandedBoards] = useState<Set<string>>(new Set())
 
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -152,7 +155,7 @@ export function MondayClient() {
         setBoards(data.boards || [])
       }
     } catch (err) {
-      setError({ error: 'Network error — could not reach the server', errorCode: 'NETWORK_ERROR' })
+      setError({ error: 'Network error â could not reach the server', errorCode: 'NETWORK_ERROR' })
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -228,7 +231,7 @@ export function MondayClient() {
     finally { setDeleting(null) }
   }
 
-  // ── Derived data ────────────────────────────────────────────────────
+  // ââ Derived data ââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
   const allStatuses = useMemo(() => {
     const set = new Set<string>()
@@ -297,7 +300,7 @@ export function MondayClient() {
       : <ChevronDown className="h-3 w-3 opacity-30" />
   )
 
-  // ── Render ──────────────────────────────────────────────────────────
+  // ââ Render ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
   return (
     <div className="space-y-6">
@@ -315,7 +318,7 @@ export function MondayClient() {
           <p className="text-sm text-slate-400 mt-1">
             {connected
               ? `${tasks.length} active task${tasks.length !== 1 ? 's' : ''} across ${boards.length} board${boards.length !== 1 ? 's' : ''}`
-              : 'Not connected — add your API key at /config'}
+              : 'Not connected â add your API key at /config'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -494,11 +497,11 @@ export function MondayClient() {
                     <p className="text-sm font-medium text-slate-200 truncate">{task.name}</p>
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
                       <span className="truncate max-w-[120px]">{task.boardName}</span>
-                      <span className="text-slate-600">·</span>
+                      <span className="text-slate-600">Â·</span>
                       <span className="truncate max-w-[100px]">{task.groupName}</span>
                       {task.assignees.length > 0 && (
                         <>
-                          <span className="text-slate-600">·</span>
+                          <span className="text-slate-600">Â·</span>
                           <span className="flex items-center gap-0.5">
                             <Users className="h-3 w-3" />
                             {task.assignees.map((a) => a.name.split(' ')[0]).join(', ')}
@@ -624,48 +627,131 @@ export function MondayClient() {
                 if (!t.dueDate) return false
                 return new Date(t.dueDate + 'T00:00:00') < new Date(new Date().toDateString())
               })
+              const isExpanded = expandedBoards.has(board.id)
 
               return (
-                <Card key={board.id} className="p-4 hover:border-slate-600/50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-200">{board.name}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {board.board_kind} · {board.columns.length} columns
-                      </p>
+                <Card key={board.id} className={`p-0 overflow-hidden transition-colors ${isExpanded ? 'sm:col-span-2 lg:col-span-3 border-slate-600/50' : 'hover:border-slate-600/50'}`}>
+                  {/* Card header â clickable */}
+                  <button
+                    onClick={() => {
+                      setExpandedBoards((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(board.id)) next.delete(board.id)
+                        else next.add(board.id)
+                        return next
+                      })
+                    }}
+                    className="w-full p-4 text-left hover:bg-slate-800/30 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                        <div>
+                          <p className="text-sm font-medium text-slate-200">{board.name}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {board.board_kind} Â· {board.columns.length} columns
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={`https://monday.com/boards/${board.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 rounded hover:bg-slate-700/50 text-slate-500 hover:text-slate-300"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
                     </div>
-                    <a
-                      href={`https://monday.com/boards/${board.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1 rounded hover:bg-slate-700/50 text-slate-500 hover:text-slate-300"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </div>
-                  <div className="flex items-center gap-3 mt-3 text-xs">
-                    <span className="flex items-center gap-1 text-slate-400">
-                      <Circle className="h-3 w-3" />
-                      {boardTasks.length} tasks
-                    </span>
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {doneTasks.length} done
-                    </span>
-                    {overdue.length > 0 && (
-                      <span className="flex items-center gap-1 text-red-400">
-                        <AlertCircle className="h-3 w-3" />
-                        {overdue.length} overdue
+                    <div className="flex items-center gap-3 mt-3 ml-6 text-xs">
+                      <span className="flex items-center gap-1 text-slate-400">
+                        <Circle className="h-3 w-3" />
+                        {boardTasks.length} tasks
                       </span>
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {doneTasks.length} done
+                      </span>
+                      {overdue.length > 0 && (
+                        <span className="flex items-center gap-1 text-red-400">
+                          <AlertCircle className="h-3 w-3" />
+                          {overdue.length} overdue
+                        </span>
+                      )}
+                    </div>
+                    {/* Progress bar */}
+                    {boardTasks.length > 0 && (
+                      <div className="mt-2 ml-6 h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                          style={{ width: `${(doneTasks.length / boardTasks.length) * 100}%` }}
+                        />
+                      </div>
                     )}
-                  </div>
-                  {/* Progress bar */}
-                  {boardTasks.length > 0 && (
-                    <div className="mt-2 h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                        style={{ width: `${(doneTasks.length / boardTasks.length) * 100}%` }}
-                      />
+                  </button>
+
+                  {/* Expanded task list */}
+                  {isExpanded && boardTasks.length > 0 && (
+                    <div className="border-t border-slate-700/50">
+                      {/* Column headers */}
+                      <div className="grid grid-cols-12 gap-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-800/20">
+                        <div className="col-span-5">Task</div>
+                        <div className="col-span-2">Status</div>
+                        <div className="col-span-3">DRI</div>
+                        <div className="col-span-2">Due Date</div>
+                      </div>
+                      {/* Task rows */}
+                      <div className="divide-y divide-slate-700/20 max-h-[400px] overflow-y-auto">
+                        {boardTasks
+                          .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
+                          .map((task) => {
+                            const deadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+                            return (
+                              <div key={task.id} className="grid grid-cols-12 gap-2 px-5 py-2.5 hover:bg-slate-800/20 transition-colors items-center text-sm">
+                                {/* Task name */}
+                                <div className="col-span-5 min-w-0">
+                                  <p className="text-slate-200 truncate">{task.name}</p>
+                                  <p className="text-[11px] text-slate-500 truncate">{task.groupName}</p>
+                                </div>
+                                {/* Status */}
+                                <div className="col-span-2">
+                                  {task.status && (
+                                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-300">
+                                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor(task.status)}`} />
+                                      <span className="truncate">{task.status}</span>
+                                    </span>
+                                  )}
+                                </div>
+                                {/* DRI (assignees) */}
+                                <div className="col-span-3">
+                                  {task.assignees.length > 0 ? (
+                                    <span className="flex items-center gap-1 text-xs text-slate-300">
+                                      <Users className="h-3 w-3 text-slate-500 flex-shrink-0" />
+                                      <span className="truncate">{task.assignees.map((a) => a.name).join(', ')}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-slate-600 italic">Unassigned</span>
+                                  )}
+                                </div>
+                                {/* Due date */}
+                                <div className="col-span-2">
+                                  {deadline ? (
+                                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${deadline.color}`}>
+                                      {deadline.text}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-slate-600">No date</span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
+                  {isExpanded && boardTasks.length === 0 && (
+                    <div className="border-t border-slate-700/50 px-5 py-4 text-sm text-slate-500 text-center">
+                      No tasks in this board
                     </div>
                   )}
                 </Card>
