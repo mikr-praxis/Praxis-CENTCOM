@@ -11,11 +11,12 @@ import {
   Calendar,
   Hash,
   User,
+  ListTodo,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import type { ProjectBoardData, AssigneeSummary, BoardTaskSummary, TaskTier } from '@/app/api/projects/board-data/route'
 
-// ââ Tier config ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- Tier config ----------------------------------------------------------------
 
 const TIER_CONFIG: Record<TaskTier, {
   label: string
@@ -47,7 +48,7 @@ const TIER_CONFIG: Record<TaskTier, {
   },
 }
 
-// ââ Helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- Helpers --------------------------------------------------------------------
 
 function deadlineLabel(dateStr: string): { text: string; color: string } {
   const today = new Date()
@@ -80,7 +81,7 @@ function initials(name: string): string {
     .slice(0, 2)
 }
 
-// ââ TierBadge (inline count badges) ââââââââââââââââââââââââââââââââââââââââ
+// -- TierBadges (inline count badges) -------------------------------------------
 
 function TierBadges({ counts }: { counts: { critical: number; followup: number; building: number } }) {
   return (
@@ -107,7 +108,7 @@ function TierBadges({ counts }: { counts: { critical: number; followup: number; 
   )
 }
 
-// ââ Avatar row (collapsed view) ââââââââââââââââââââââââââââââââââââââââââââ
+// -- Avatar row (collapsed view) ------------------------------------------------
 
 function AvatarRow({ assignees }: { assignees: AssigneeSummary[] }) {
   const shown = assignees.slice(0, 5)
@@ -145,7 +146,7 @@ function AvatarRow({ assignees }: { assignees: AssigneeSummary[] }) {
   )
 }
 
-// ââ TaskRow (single task in expanded view) âââââââââââââââââââââââââââââââââ
+// -- TaskRow (single task in expanded view) -------------------------------------
 
 function TaskRow({ task }: { task: BoardTaskSummary }) {
   const tierCfg = TIER_CONFIG[task.tier]
@@ -161,7 +162,7 @@ function TaskRow({ task }: { task: BoardTaskSummary }) {
   )
 }
 
-// ââ AssigneeSection (expanded per-user breakdown) ââââââââââââââââââââââââââ
+// -- AssigneeSection (expanded per-user breakdown) ------------------------------
 
 function AssigneeSection({ assignee, highlighted = false }: { assignee: AssigneeSummary; highlighted?: boolean }) {
   const [open, setOpen] = useState(highlighted)
@@ -226,7 +227,76 @@ function AssigneeSection({ assignee, highlighted = false }: { assignee: Assignee
   )
 }
 
-// ââ Main ProjectBoardCard ââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- AllTasksSection (flat task list grouped by tier) ---------------------------
+
+function AllTasksSection({ board }: { board: ProjectBoardData }) {
+  const allTasks = [
+    ...board.assignees.flatMap((a) => a.tasks),
+    ...board.unassigned,
+  ]
+
+  const byTier = {
+    critical: allTasks.filter((t) => t.tier === 'critical'),
+    followup: allTasks.filter((t) => t.tier === 'followup'),
+    building: allTasks.filter((t) => t.tier === 'building'),
+  }
+
+  return (
+    <div className="space-y-1">
+      {(['critical', 'followup', 'building'] as const).map((tier) => {
+        const tasks = byTier[tier]
+        if (tasks.length === 0) return null
+        const cfg = TIER_CONFIG[tier]
+        return (
+          <div key={tier}>
+            <div className={`flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-medium ${cfg.color} opacity-70`}>
+              <cfg.icon className="h-2.5 w-2.5" />
+              {cfg.label} ({tasks.length})
+            </div>
+            {tasks.map((task) => (
+              <TaskRow key={task.id} task={task} />
+            ))}
+          </div>
+        )
+      })}
+      {allTasks.length === 0 && (
+        <p className="text-xs text-slate-500 px-2 py-3 text-center">No tasks</p>
+      )}
+    </div>
+  )
+}
+
+// -- ExpandedViewTabs -----------------------------------------------------------
+
+type ExpandedTab = 'members' | 'tasks'
+
+function ExpandedViewTabs({ active, onChange }: { active: ExpandedTab; onChange: (tab: ExpandedTab) => void }) {
+  const tabs: { key: ExpandedTab; label: string; icon: React.ElementType }[] = [
+    { key: 'members', label: 'By Member', icon: Users },
+    { key: 'tasks', label: 'All Tasks', icon: ListTodo },
+  ]
+
+  return (
+    <div className="flex items-center gap-1 mb-2">
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          onClick={() => onChange(tab.key)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+            active === tab.key
+              ? 'bg-slate-700/60 text-slate-200'
+              : 'text-slate-500 hover:text-slate-400 hover:bg-slate-800/40'
+          }`}
+        >
+          <tab.icon className="h-3 w-3" />
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// -- Main ProjectBoardCard ------------------------------------------------------
 
 export function ProjectBoardCard({
   board,
@@ -238,6 +308,7 @@ export function ProjectBoardCard({
   highlightMemberId?: string | null
 }) {
   const [expanded, setExpanded] = useState(expandByDefault)
+  const [expandedTab, setExpandedTab] = useState<ExpandedTab>('members')
 
   // Auto-expand/collapse when filter state changes
   useEffect(() => {
@@ -255,7 +326,7 @@ export function ProjectBoardCard({
     <div
       className={`rounded-xl border border-slate-700/50 bg-slate-800/50 border-l-[3px] ${accentBorder} transition-all hover:bg-slate-800/70`}
     >
-      {/* Header â always visible */}
+      {/* Header -- always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full text-left p-4 pb-3"
@@ -331,31 +402,41 @@ export function ProjectBoardCard({
         </div>
       </button>
 
-      {/* Expanded: per-user task breakdown */}
+      {/* Expanded: tabbed view (members / all tasks) */}
       {expanded && (
         <div className="border-t border-slate-700/50 px-3 py-2">
-          {board.assignees.map((assignee) => (
-            <AssigneeSection
-              key={assignee.id}
-              assignee={assignee}
-              highlighted={highlightMemberId === assignee.id}
-            />
-          ))}
+          <ExpandedViewTabs active={expandedTab} onChange={setExpandedTab} />
 
-          {/* Unassigned tasks */}
-          {board.unassigned.length > 0 && (
-            <div className="border-t border-slate-700/30 mt-1 pt-1">
-              <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-slate-500">
-                <Users className="h-3.5 w-3.5" />
-                <span className="font-medium">Unassigned</span>
-                <span className="text-[10px] ml-auto">{board.unassigned.length} task{board.unassigned.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="space-y-0.5">
-                {board.unassigned.map((task) => (
-                  <TaskRow key={task.id} task={task} />
-                ))}
-              </div>
-            </div>
+          {expandedTab === 'members' && (
+            <>
+              {board.assignees.map((assignee) => (
+                <AssigneeSection
+                  key={assignee.id}
+                  assignee={assignee}
+                  highlighted={highlightMemberId === assignee.id}
+                />
+              ))}
+
+              {/* Unassigned tasks */}
+              {board.unassigned.length > 0 && (
+                <div className="border-t border-slate-700/30 mt-1 pt-1">
+                  <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-slate-500">
+                    <Users className="h-3.5 w-3.5" />
+                    <span className="font-medium">Unassigned</span>
+                    <span className="text-[10px] ml-auto">{board.unassigned.length} task{board.unassigned.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {board.unassigned.map((task) => (
+                      <TaskRow key={task.id} task={task} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {expandedTab === 'tasks' && (
+            <AllTasksSection board={board} />
           )}
         </div>
       )}
