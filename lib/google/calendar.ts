@@ -1,7 +1,7 @@
 import { google, calendar_v3 } from 'googleapis'
 import { getConfig } from '@/lib/config'
 
-// ── Ops calendar (OAuth2 with refresh token) ───────────────────────────
+// ââ Ops calendar (OAuth2 with refresh token) âââââââââââââââââââââââââââ
 // The mscott@builtbypraxis.com calendar is accessed via OAuth2 credentials
 // with a long-lived refresh token (obtained once via OAuth Playground).
 // Config keys: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
@@ -37,13 +37,13 @@ export async function getOpsCalendar() {
   return _opsCalendar
 }
 
-// The calendar ID for ops@builtbypraxis.com — defaults to the email itself
+// The calendar ID for ops@builtbypraxis.com â defaults to the email itself
 // unless overridden (some orgs use a shared calendar with a different ID).
 export async function getOpsCalendarId(): Promise<string> {
   return (await getConfig('OPS_CALENDAR_ID')) || 'ops@builtbypraxis.com'
 }
 
-// ── User calendars (OAuth2) ─────────────────────────────────────────────
+// ââ User calendars (OAuth2) âââââââââââââââââââââââââââââââââââââââââââââ
 // Each user can connect their own Google Calendar via OAuth2.
 // Tokens are stored in Supabase (google_tokens table).
 
@@ -62,7 +62,7 @@ export function getUserCalendar(accessToken: string) {
   return google.calendar({ version: 'v3', auth })
 }
 
-// ── Shared helpers ──────────────────────────────────────────────────────
+// ââ Shared helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export type CalendarEvent = {
   id: string
@@ -126,7 +126,25 @@ export async function fetchCalendarEvents(
     return (res.data.items || [])
       .map((e) => mapGoogleEvent(e, calendarId, calendarName, color))
       .filter((e): e is CalendarEvent => e !== null)
-  } catch (err) {
+  } catch (err: unknown) {
+    // Re-throw auth errors (expired token, revoked access) so callers
+    // can properly flag calendars as inaccessible instead of showing
+    // an empty calendar that looks like "no events".
+    const status = (err as { code?: number })?.code
+    const message = (err as { message?: string })?.message || ''
+    const isAuthError =
+      status === 401 ||
+      status === 403 ||
+      message.includes('invalid_grant') ||
+      message.includes('Token has been expired or revoked')
+
+    if (isAuthError) {
+      console.error(`Auth error fetching calendar ${calendarId}:`, message)
+      throw err
+    }
+
+    // Non-auth errors (e.g. calendar not found, network blip) â
+    // log and return empty so other calendars can still load.
     console.error(`Failed to fetch calendar ${calendarId}:`, err)
     return []
   }
