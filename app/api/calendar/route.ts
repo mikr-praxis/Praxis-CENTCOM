@@ -42,15 +42,16 @@ export async function GET(request: NextRequest) {
   const supabase = createServerClient()
   const allEvents: CalendarEvent[] = []
   const calendars: TeamCalendar[] = []
+  let authError: string | null = null
 
-  // ── 1. Load team calendars from DB ────────────────────────────────
+  // ââ 1. Load team calendars from DB ââââââââââââââââââââââââââââââââ
   const { data: teamCalendars } = await supabase
     .from('team_calendars')
     .select('*')
     .eq('enabled', true)
     .order('is_ops', { ascending: false }) // ops first
 
-  // ── 2. Get the OAuth2 calendar client (if configured) ─────────────
+  // ââ 2. Get the OAuth2 calendar client (if configured) âââââââââââââ
   let opsCalClient: Awaited<ReturnType<typeof getOpsCalendar>> | null = null
   try {
     opsCalClient = await getOpsCalendar()
@@ -58,9 +59,9 @@ export async function GET(request: NextRequest) {
     console.error('Google Calendar OAuth2 not configured:', err)
   }
 
-  // ── 3. Fetch each team calendar via OAuth2 ───────────────────────
+  // ââ 3. Fetch each team calendar via OAuth2 âââââââââââââââââââââââ
   // The authenticated user (mscott@builtbypraxis.com) can read any
-  // calendar shared with them — team members share their calendars.
+  // calendar shared with them â team members share their calendars.
   if (teamCalendars && opsCalClient) {
     const fetches = teamCalendars.map(async (tc) => {
       try {
@@ -84,8 +85,16 @@ export async function GET(request: NextRequest) {
           source: tc.source,
           hasAccess: true,
         })
-      } catch (err) {
-        // Calendar not shared with authenticated user — still list it but flag it
+      } catch (err: unknown) {
+        const message = (err as { message?: string })?.message || ''
+        const isAuth =
+          message.includes('invalid_grant') ||
+          message.includes('Token has been expired or revoked')
+
+        if (isAuth && !authError) {
+          authError = 'Google Calendar token expired or revoked. Re-authenticate at /config.'
+        }
+
         console.error(`Cannot read calendar ${tc.email}:`, err)
         calendars.push({
           id: tc.id,
@@ -102,7 +111,7 @@ export async function GET(request: NextRequest) {
     })
     await Promise.all(fetches)
   } else if (teamCalendars) {
-    // OAuth2 not available — still list calendars as non-accessible
+    // OAuth2 not available â still list calendars as non-accessible
     for (const tc of teamCalendars) {
       calendars.push({
         id: tc.id,
@@ -118,7 +127,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── 4. User's own OAuth-connected calendar (fallback / supplement) ─
+  // ââ 4. User's own OAuth-connected calendar (fallback / supplement) â
   // If the current user connected via OAuth AND their calendar isn't
   // already covered by a team_calendars entry, add it.
   const { data: tokenRow } = await supabase
@@ -192,5 +201,6 @@ export async function GET(request: NextRequest) {
     events: allEvents,
     calendars,
     userConnected: userOAuthConnected,
+    ...(authError ? { authError } : {}),
   })
 }
