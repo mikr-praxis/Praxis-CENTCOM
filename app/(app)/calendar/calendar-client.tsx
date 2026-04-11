@@ -416,7 +416,25 @@ export function CalendarClient() {
     return eventsForDay(date)
   }, [eventsForDay])
 
-  const handleDisconnect = async () => {
+  // Month grid helpers
+  const daysInMonth = getDaysInMonth(year, month)
+  const firstDay = getFirstDayOfWeek(year, month)
+  const totalCells = firstDay + daysInMonth + ((7 - (firstDay + daysInMonth) % 7) % 7)
+
+  // List view grouped events
+  const listViewEvents = useMemo(() => {
+    if (!data) return []
+    const grouped: { date: Date; events: typeof data.events }[] = []
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month, d)
+      const events = eventsForDay(date)
+      if (events.length > 0) grouped.push({ date, events })
+    }
+    return grouped
+  }, [data, year, month, daysInMonth, eventsForDay])
+
+  const handleDisconnect
+ = async () => {
     setDisconnecting(true)
     try {
       await fetch('/api/auth/google/disconnect', { method: 'POST' })
