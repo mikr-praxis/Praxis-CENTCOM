@@ -163,6 +163,7 @@ function getTaskTierColor(tier: TaskTier): string {
     case 'critical': return '#ef4444'
     case 'followup': return '#f59e0b'
     case 'building': return '#3b82f6'
+    default: return '#3b82f6'
   }
 }
 
