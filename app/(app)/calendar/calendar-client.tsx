@@ -404,7 +404,15 @@ export function CalendarClient() {
   const tasksForDay = useCallback((date: Date) => {
     if (!mondayData || !mondayData.tasks) return []
     const dateStr = date.toISOString().split('T')[0]
-    return mondayData.tasks.filter(task => task.dueDate === dateStr)
+    return mondayData.tasks.filter(task => {
+      // Match by exact due date
+      if (task.dueDate === dateStr) return true
+      // Match by timeline range (task spans this day)
+      if (task.timelineStart && task.timelineEnd) {
+        if (dateStr >= task.timelineStart && dateStr <= task.timelineEnd) return true
+      }
+      return false
+    })
   }, [mondayData])
 
   const selectedEvents = useMemo(() => {
