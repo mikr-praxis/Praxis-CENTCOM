@@ -171,13 +171,22 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
   const matchedTasks: MatchedTask[] = useMemo(() => {
     if (!mondayData?.tasks) return []
 
-    return mondayData.tasks
+    // Filter out completed tasks and template/tutorial items
+    const activeTasks = mondayData.tasks.filter((task) => {
+      const status = (task.status || '').toLowerCase()
+      if (status.includes('done') || status.includes('complete')) return false
+      // Skip Monday.com tutorial items
+      if (task.name.startsWith('Click here to learn')) return false
+      return true
+    })
+
+    return activeTasks
       .map((task) => {
         const { event, reason } = matchTaskToEvent(task, calendarEvents)
         return { ...task, matchedEvent: event, matchReason: reason }
       })
-      .filter((t) => t.dueDate || t.timelineEnd) // only tasks with dates
       .sort((a, b) => {
+        // Tasks with dates first (sorted by date), then undated tasks
         const dateA = a.dueDate || a.timelineEnd || '9999'
         const dateB = b.dueDate || b.timelineEnd || '9999'
         return dateA.localeCompare(dateB)
@@ -273,7 +282,7 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
           )}
 
           {!loading && mondayData?.connected && matchedTasks.length === 0 && (
-            <p className="text-sm text-slate-500 py-4">No tasks with deadlines found.</p>
+            <p className="text-sm text-slate-500 py-4">No active tasks found.</p>
           )}
 
           {!loading && mondayData?.connected && matchedTasks.length > 0 && (
@@ -337,7 +346,7 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
                     ? formatDeadline(task.dueDate)
                     : task.timelineEnd
                       ? formatDeadline(task.timelineEnd)
-                      : null
+                      : { label: 'No date', urgency: 'later' as const }
                   const taskDone = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
                   // Override overdue styling for completed tasks
                   const displayDeadline = deadline && taskDone && deadline.urgency === 'overdue'
