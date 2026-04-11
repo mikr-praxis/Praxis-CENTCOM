@@ -26,11 +26,18 @@ import {
 import { TaskDeadlineModule } from '@/components/calendar/TaskDeadlineModule'
 import type { CalendarEvent } from '@/lib/google/calendar'
 import type { TeamCalendar } from '@/app/api/calendar/route'
+import type { MondayTask } from '@/lib/monday/client'
 
 type CalendarData = {
   events: CalendarEvent[]
   calendars: TeamCalendar[]
   userConnected: boolean
+}
+
+type MondayData = {
+  tasks: MondayTask[]
+  users: { id: string; name: string; email: string }[]
+  connected: boolean
 }
 
 // 🔴 Helpers 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
@@ -136,6 +143,36 @@ function eventHeightPx(startIso: string, endIso: string): number {
   const hours = (e.getTime() - s.getTime()) / 3600000
   return Math.max(hours * HOUR_HEIGHT, 20) // min 20px
 }
+type TaskTier = 'critical' | 'followup' | 'building'
+
+function getTaskTier(task: MondayTask): TaskTier {
+  const status = (task.status || '').toLowerCase()
+  const priority = (task.priority || '').toLowerCase()
+
+  if (status.includes('stuck') || status.includes('blocked') || priority.includes('critical') || priority.includes('urgent')) {
+    return 'critical'
+  }
+  if (status.includes('waiting') || status.includes('pending') || status.includes('review')) {
+    return 'followup'
+  }
+  return 'building'
+}
+
+function getTaskTierColor(tier: TaskTier): string {
+  switch (tier) {
+    case 'critical': return '#ef4444'
+    case 'followup': return '#f59e0b'
+    case 'building': return '#3b82f6'
+  }
+}
+
+function getStatusDot(task: MondayTask): React.ReactNode {
+  const status = (task.status || '').toLowerCase()
+  if (status.includes('done') || status.includes('completed')) return '✓'
+  if (status.includes('stuck') || status.includes('blocked')) return '!'
+  if (status.includes('waiting') || status.includes('pending')) return '⋯'
+  return '•'
+}
 
 // 🔴 Skeleton Components 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
 
@@ -207,6 +244,7 @@ export function CalendarClient() {
   const [year, setYear] = useState(initial.y)
   const [month, setMonth] = useState(initial.m)
   const [data, setData] = useState<CalendarData | null>(null)
+  const [mondayData, setMondayData] = useState<MondayData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
@@ -254,16 +292,24 @@ export function CalendarClient() {
     }
 
     try {
-      const res = await fetch(
-        `/api/calendar?start=${start.toISOString()}&end=${end.toISOString()}`
-      )
-      if (res.ok) {
-        const json = await res.json()
+      const [calendarRes, mondayRes] = await Promise.all([
+        fetch(`/api/calendar?start=${start.toISOString()}&end=${end.toISOString()}`),
+        fetch('/api/monday'),
+      ])
+
+      if (calendarRes.ok) {
+        const json = await calendarRes.json()
         setData(json)
-        lastFetchRef.current = Date.now()
       }
+
+      if (mondayRes.ok) {
+        const json = await mondayRes.json()
+        setMondayData(json)
+      }
+
+      lastFetchRef.current = Date.now()
     } catch (err) {
-      console.error('Failed to fetch calendar:', err)
+      console.error('Failed to fetch calendar or monday data:', err)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -353,6 +399,12 @@ export function CalendarClient() {
       return isSameDay(start, date)
     })
   }, [data])
+
+  const tasksForDay = useCallback((date: Date) => {
+    if (!mondayData || !mondayData.tasks) return []
+    const dateStr = date.toISOString().split('T')[0]
+    return mondayData.tasks.filter(task => task.dueDate === dateStr)
+  }, [mondayData])
 
   const selectedEvents = useMemo(() => {
     if (!selectedDay) return []
@@ -656,7 +708,10 @@ export function CalendarClient() {
 
                       {/* Days grid */}
                       <div className="flex-1 grid grid-cols-7">
-                        {weekDays.map((day, i) => (
+                        {weekDays.map((day, i) => {
+                          const dayTasks = tasksForDay(day)
+                          const hasTasksRow = dayTasks.length > 0
+                          return (
                           <div key={i} className="border-r border-slate-700/50 relative">
                             <div className="sticky top-0 z-10 bg-slate-900/80 border-b border-slate-700/50 p-2 text-center">
                               <p className="text-xs font-medium text-slate-400 uppercase">{DAY_NAMES[i]}</p>
@@ -664,6 +719,38 @@ export function CalendarClient() {
                                 {day.getDate()}
                               </p>
                             </div>
+
+                              {/* Tasks row */}
+                              <div className="border-b border-slate-700/30 px-1 py-1 bg-slate-900/40 h-12 flex items-center gap-1 overflow-hidden">
+                                {hasTasksRow ? (
+                                  <div className="flex flex-wrap gap-1 w-full">
+                                    {dayTasks.slice(0, 3).map(task => {
+                                      const tier = getTaskTier(task)
+                                      const tierColor = getTaskTierColor(tier)
+                                      const statusDot = getStatusDot(task)
+                                      return (
+                                        <div
+                                          key={task.id}
+                                          className="rounded-full px-2 py-1 text-[10px] font-medium text-slate-200 flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                                          style={{
+                                            backgroundColor: 'rgb(30, 41, 59, 0.4)',
+                                            borderLeft: `2px dashed ${tierColor}`,
+                                            paddingLeft: '0.5rem',
+                                          }}
+                                          title={task.name}
+                                        >
+                                          <span style={{ color: tierColor, fontSize: '9px' }}>{statusDot}</span>
+                                          <span className="truncate max-w-[60px]">{task.name}</span>
+                                        </div>
+                                      )
+                                    })}
+                                    {dayTasks.length > 3 && (
+                                      <span className="text-[9px] text-slate-500 self-center">+{dayTasks.length - 3} more</span>
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+
                             <div className="relative" style={{ height: WEEK_HOURS.length * HOUR_HEIGHT }}>
                               {/* Hour lines */}
                               {WEEK_HOURS.map(h => (
@@ -691,7 +778,8 @@ export function CalendarClient() {
                               ))}
                             </div>
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   </div>
@@ -979,7 +1067,7 @@ export function CalendarClient() {
           {/* Add member form */}
           {!showAddMember && addingMember === false && (
             <Button onClick={() => setShowAddMember(!showAddMember)} className="w-full">
-              {showAddMember ? 'Dismiss' : 'Adding…' : 'Add to Calendar'}
+              {showAddMember ? 'Dismiss' : 'Add to Calendar'}
             </Button>
           )}
 
