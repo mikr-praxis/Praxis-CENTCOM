@@ -399,7 +399,10 @@ export function CalendarClient() {
 
   const eventsForDay = useCallback((date: Date) => {
     if (!data) return []
+    const seen = new Set<string>()
     return data.events.filter(e => {
+      if (seen.has(e.id)) return false
+      seen.add(e.id)
       const start = new Date(e.start)
       return isSameDay(start, date)
     })
@@ -546,6 +549,14 @@ export function CalendarClient() {
         )
       }
     }
+
+    // Deduplicate events by ID (same event can appear on multiple calendars)
+    const seen = new Set<string>()
+    events = events.filter(e => {
+      if (seen.has(e.id)) return false
+      seen.add(e.id)
+      return true
+    })
 
     return events
   }, [data, hiddenCalendars, mode, selectedUser, selectedGroup])
