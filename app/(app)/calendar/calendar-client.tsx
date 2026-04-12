@@ -1024,6 +1024,68 @@ export function CalendarClient() {
         {/* Right sidebar – 1 col */}
         <div className="space-y-4">
 
+          {/* Event detail popover – shown at top of sidebar when an event is selected */}
+          {selectedEvent && (
+            <Card className="p-4 relative">
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="absolute top-3 right-3 p-1 rounded-lg hover:bg-slate-700/50 text-slate-500 hover:text-slate-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div
+                className="rounded-lg border border-slate-700/50 p-4 space-y-3"
+                style={{ borderLeftColor: selectedEvent.color, borderLeftWidth: 4 }}
+              >
+                <p className="text-base font-semibold text-slate-100 pr-6">{selectedEvent.title}</p>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
+                  {!selectedEvent.allDay ? (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })},{' '}
+                      {formatTime(selectedEvent.start)} – {formatTime(selectedEvent.end)}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      All day — {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5" style={{ color: selectedEvent.color }}>
+                    <Users className="h-3.5 w-3.5" />
+                    {selectedEvent.calendarName}
+                  </span>
+                </div>
+                {selectedEvent.location && (
+                  <p className="text-sm text-slate-400 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                    {selectedEvent.location.startsWith('http') ? (
+                      <a href={selectedEvent.location} target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2 truncate">
+                        {selectedEvent.location.includes('zoom') ? 'Join Zoom Meeting' : selectedEvent.location}
+                      </a>
+                    ) : (
+                      <span>{selectedEvent.location}</span>
+                    )}
+                  </p>
+                )}
+                {selectedEvent.description && (
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">{selectedEvent.description}</p>
+                )}
+                {selectedEvent.htmlLink && (
+                  <a
+                    href={selectedEvent.htmlLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-amber-400 hover:text-amber-300 transition-colors mt-1"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open in Google Calendar
+                  </a>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* Priority Task List */}
           <Card className="p-4">
             <div className="flex items-center justify-between mb-3">
@@ -1168,69 +1230,7 @@ export function CalendarClient() {
         </div>
       </div>
 
-      {/* Event detail popover */}
-      {selectedEvent && (
-        <Card className="p-4 relative">
-          <button
-            onClick={() => setSelectedEvent(null)}
-            className="absolute top-3 right-3 p-1 rounded-lg hover:bg-slate-700/50 text-slate-500 hover:text-slate-300"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <div
-            className="rounded-lg border border-slate-700/50 p-4 space-y-3"
-            style={{ borderLeftColor: selectedEvent.color, borderLeftWidth: 4 }}
-          >
-            <p className="text-base font-semibold text-slate-100 pr-6">{selectedEvent.title}</p>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
-              {!selectedEvent.allDay ? (
-                <span className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" />
-                  {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })},{' '}
-                  {formatTime(selectedEvent.start)} \u2013 {formatTime(selectedEvent.end)}
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" />
-                  All day \u2014 {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                </span>
-              )}
-              <span className="flex items-center gap-1.5" style={{ color: selectedEvent.color }}>
-                <Users className="h-3.5 w-3.5" />
-                {selectedEvent.calendarName}
-              </span>
-            </div>
-            {selectedEvent.location && (
-              <p className="text-sm text-slate-400 flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                {selectedEvent.location.startsWith('http') ? (
-                  <a href={selectedEvent.location} target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2 truncate">
-                    {selectedEvent.location.includes('zoom') ? 'Join Zoom Meeting' : selectedEvent.location}
-                  </a>
-                ) : (
-                  <span>{selectedEvent.location}</span>
-                )}
-              </p>
-            )}
-            {selectedEvent.description && (
-              <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">{selectedEvent.description}</p>
-            )}
-            {selectedEvent.htmlLink && (
-              <a
-                href={selectedEvent.htmlLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-amber-400 hover:text-amber-300 transition-colors mt-1"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open in Google Calendar
-              </a>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* Selected day details */}
+{/* Selected day details */}
       {!selectedEvent && (
       <Card className="p-4">
         <h3 className="text-sm font-medium text-slate-300 mb-3">
