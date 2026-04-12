@@ -422,31 +422,10 @@ export function CalendarClient() {
     })
   }, [mondayData])
 
-  const selectedEvents = useMemo(() => {
-    if (!selectedDay) return []
-    return eventsForDay(selectedDay)
-  }, [selectedDay, eventsForDay])
-
-  const dayToEvents = useCallback((date: Date) => {
-    return eventsForDay(date)
-  }, [eventsForDay])
-
   // Month grid helpers
   const daysInMonth = getDaysInMonth(year, month)
   const firstDay = getFirstDayOfWeek(year, month)
   const totalCells = firstDay + daysInMonth + ((7 - (firstDay + daysInMonth) % 7) % 7)
-
-  // List view grouped events
-  const listViewEvents = useMemo(() => {
-    if (!data) return []
-    const grouped: { date: Date; events: typeof data.events }[] = []
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, month, d)
-      const events = eventsForDay(date)
-      if (events.length > 0) grouped.push({ date, events })
-    }
-    return grouped
-  }, [data, year, month, daysInMonth, eventsForDay])
 
   const handleDisconnect
  = async () => {
@@ -531,21 +510,16 @@ export function CalendarClient() {
     if (mode === 'user' && selectedUser) {
       const member = TEAM_MEMBERS.find(m => m.id === selectedUser)
       if (member) {
-        const nameLower = member.name.toLowerCase()
         events = events.filter(e =>
-          e.calendarName.toLowerCase().includes(nameLower) ||
-          e.calendarId.toLowerCase().includes(nameLower)
+          e.calendarId === member.calendarEmail
         )
       }
     } else if (mode === 'group' && selectedGroup) {
       const members = getMembersByGroup(selectedGroup)
       if (members.length > 0) {
-        const names = members.map(m => m.name.toLowerCase())
+        const emails: string[] = members.map(m => m.calendarEmail)
         events = events.filter(e =>
-          names.some(n =>
-            e.calendarName.toLowerCase().includes(n) ||
-            e.calendarId.toLowerCase().includes(n)
-          )
+          emails.includes(e.calendarId)
         )
       }
     }
@@ -560,6 +534,28 @@ export function CalendarClient() {
 
     return events
   }, [data, hiddenCalendars, mode, selectedUser, selectedGroup])
+
+  // Filtered per-day helpers (uses visibleEvents so ViewSwitcher filter applies)
+  const dayToEvents = useCallback((date: Date) => {
+    return visibleEvents.filter(e => isSameDay(new Date(e.start), date))
+  }, [visibleEvents])
+
+  const selectedEvents = useMemo(() => {
+    if (!selectedDay) return []
+    return dayToEvents(selectedDay)
+  }, [selectedDay, dayToEvents])
+
+  // List view grouped events
+  const listViewEvents = useMemo(() => {
+    if (visibleEvents.length === 0) return []
+    const grouped: { date: Date; events: typeof visibleEvents }[] = []
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month, d)
+      const events = dayToEvents(date)
+      if (events.length > 0) grouped.push({ date, events })
+    }
+    return grouped
+  }, [visibleEvents, year, month, daysInMonth, dayToEvents])
 
   const priorityEvents = useMemo(() => {
     const now = new Date()
@@ -877,7 +873,7 @@ export function CalendarClient() {
                         const date = new Date(year, month, dayNum)
                         const isToday = isSameDay(date, today)
                         const isSelected = selectedDay && isSameDay(date, selectedDay)
-                        const dayEvents = isCurrentMonth ? eventsForDay(date) : []
+                        const dayEvents = isCurrentMonth ? dayToEvents(date) : []
 
                         return (
                           <button
