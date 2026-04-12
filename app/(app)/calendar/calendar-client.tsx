@@ -24,6 +24,8 @@ import {
   Users,
 } from 'lucide-react'
 import { TaskDeadlineModule } from '@/components/calendar/TaskDeadlineModule'
+import { useView } from '@/lib/views/context'
+import { TEAM_MEMBERS, GROUPS, getMembersByGroup } from '@/lib/views/data'
 import type { CalendarEvent } from '@/lib/google/calendar'
 import type { TeamCalendar } from '@/app/api/calendar/route'
 import type { MondayTask } from '@/lib/monday/client'
@@ -228,6 +230,7 @@ function SidebarSkeleton() {
 
 export function CalendarClient() {
   const today = new Date()
+  const { mode, selectedUser, selectedGroup } = useView()
 
   // Read initial month/year from URL params
   const getInitialParams = () => {
@@ -259,6 +262,7 @@ export function CalendarClient() {
   const [addingMember, setAddingMember] = useState(false)
   const [newMemberEmail, setNewMemberEmail] = useState('')
   const [newMemberName, setNewMemberName] = useState('')
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastFetchRef = useRef<number>(0)
 
@@ -518,8 +522,33 @@ export function CalendarClient() {
 
   const visibleEvents = useMemo(() => {
     if (!data) return []
-    return data.events.filter(e => !hiddenCalendars.has(e.calendarId))
-  }, [data, hiddenCalendars])
+    let events = data.events.filter(e => !hiddenCalendars.has(e.calendarId))
+
+    // Apply ViewSwitcher filter (By User / By Group)
+    if (mode === 'user' && selectedUser) {
+      const member = TEAM_MEMBERS.find(m => m.id === selectedUser)
+      if (member) {
+        const nameLower = member.name.toLowerCase()
+        events = events.filter(e =>
+          e.calendarName.toLowerCase().includes(nameLower) ||
+          e.calendarId.toLowerCase().includes(nameLower)
+        )
+      }
+    } else if (mode === 'group' && selectedGroup) {
+      const members = getMembersByGroup(selectedGroup)
+      if (members.length > 0) {
+        const names = members.map(m => m.name.toLowerCase())
+        events = events.filter(e =>
+          names.some(n =>
+            e.calendarName.toLowerCase().includes(n) ||
+            e.calendarId.toLowerCase().includes(n)
+          )
+        )
+      }
+    }
+
+    return events
+  }, [data, hiddenCalendars, mode, selectedUser, selectedGroup])
 
   const priorityEvents = useMemo(() => {
     const now = new Date()
@@ -789,19 +818,21 @@ export function CalendarClient() {
                               ))}
                               {/* Events */}
                               {dayToEvents(day).map(ev => (
-                                <div
+                                <button
                                   key={ev.id}
-                                  className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[11px] font-medium text-white overflow-hidden"
+                                  onClick={() => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+                                  className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[11px] font-medium text-white overflow-hidden text-left cursor-pointer hover:brightness-125 transition-all z-[1]"
                                   style={{
                                     top: eventTopPx(ev.start),
                                     height: eventHeightPx(ev.start, ev.end),
-                                    backgroundColor: `${ev.color}40`,
+                                    backgroundColor: selectedEvent?.id === ev.id ? `${ev.color}70` : `${ev.color}40`,
                                     borderLeft: `2px solid ${ev.color}`,
+                                    outline: selectedEvent?.id === ev.id ? `1px solid ${ev.color}` : 'none',
                                   }}
                                   title={ev.title}
                                 >
                                   {ev.title}
-                                </div>
+                                </button>
                               ))}
                             </div>
                           </div>
@@ -1126,7 +1157,70 @@ export function CalendarClient() {
         </div>
       </div>
 
+      {/* Event detail popover */}
+      {selectedEvent && (
+        <Card className="p-4 relative">
+          <button
+            onClick={() => setSelectedEvent(null)}
+            className="absolute top-3 right-3 p-1 rounded-lg hover:bg-slate-700/50 text-slate-500 hover:text-slate-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div
+            className="rounded-lg border border-slate-700/50 p-4 space-y-3"
+            style={{ borderLeftColor: selectedEvent.color, borderLeftWidth: 4 }}
+          >
+            <p className="text-base font-semibold text-slate-100 pr-6">{selectedEvent.title}</p>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
+              {!selectedEvent.allDay ? (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })},{' '}
+                  {formatTime(selectedEvent.start)} \u2013 {formatTime(selectedEvent.end)}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  All day \u2014 {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                </span>
+              )}
+              <span className="flex items-center gap-1.5" style={{ color: selectedEvent.color }}>
+                <Users className="h-3.5 w-3.5" />
+                {selectedEvent.calendarName}
+              </span>
+            </div>
+            {selectedEvent.location && (
+              <p className="text-sm text-slate-400 flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                {selectedEvent.location.startsWith('http') ? (
+                  <a href={selectedEvent.location} target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline underline-offset-2 truncate">
+                    {selectedEvent.location.includes('zoom') ? 'Join Zoom Meeting' : selectedEvent.location}
+                  </a>
+                ) : (
+                  <span>{selectedEvent.location}</span>
+                )}
+              </p>
+            )}
+            {selectedEvent.description && (
+              <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">{selectedEvent.description}</p>
+            )}
+            {selectedEvent.htmlLink && (
+              <a
+                href={selectedEvent.htmlLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-amber-400 hover:text-amber-300 transition-colors mt-1"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open in Google Calendar
+              </a>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Selected day details */}
+      {!selectedEvent && (
       <Card className="p-4">
         <h3 className="text-sm font-medium text-slate-300 mb-3">
           {selectedDay
@@ -1135,12 +1229,12 @@ export function CalendarClient() {
                 month: 'long',
                 day: 'numeric',
               })
-            : 'Select a day'}
+            : 'Select a day or click an event'}
         </h3>
 
         {!selectedDay && (
           <p className="text-xs text-slate-500">
-            Click a date to see event details.
+            Click an event on the calendar for details, or a date to see all events.
           </p>
         )}
 
@@ -1150,9 +1244,10 @@ export function CalendarClient() {
 
         <div className="space-y-3 mt-2">
           {selectedEvents.map((ev) => (
-            <div
+            <button
               key={ev.id}
-              className="rounded-lg border border-slate-700/50 p-3 space-y-1.5"
+              onClick={() => setSelectedEvent(ev)}
+              className="w-full text-left rounded-lg border border-slate-700/50 p-3 space-y-1.5 hover:border-slate-600/60 hover:bg-slate-800/40 transition-colors"
               style={{ borderLeftColor: ev.color, borderLeftWidth: 3 }}
             >
               <p className="text-sm font-medium text-slate-200">{ev.title}</p>
@@ -1172,21 +1267,11 @@ export function CalendarClient() {
                   {ev.location}
                 </p>
               )}
-              {ev.htmlLink && (
-                <a
-                  href={ev.htmlLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 p-1 rounded hover:bg-slate-700/50 text-slate-500 hover:text-slate-300"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Open in Google Calendar
-                </a>
-              )}
-            </div>
+            </button>
           ))}
         </div>
       </Card>
+      )}
     </div>
   )
 }
