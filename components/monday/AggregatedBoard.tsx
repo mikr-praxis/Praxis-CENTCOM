@@ -54,6 +54,7 @@ type AggregatedTask = {
   groupName: string
   groupId: string
   status: string | null
+  statusColumnId: string | null
   dueDate: string | null
   assignees: { id: string; name: string }[]
   priority: string | null
@@ -469,7 +470,7 @@ function TaskRow({
 }: {
   task: AggregatedTask
   tierColor: string
-  onStatusUpdate: (taskId: string, boardId: string, newStatus: string) => Promise<void>
+  onStatusUpdate: (taskId: string, boardId: string, newStatus: string, statusColumnId: string | null) => Promise<void>
   onMilestonesUpdate: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -484,7 +485,7 @@ function TaskRow({
   const handleStatusChange = async (newStatus: string) => {
     setUpdating(true)
     try {
-      await onStatusUpdate(task.id, task.boardId, newStatus)
+      await onStatusUpdate(task.id, task.boardId, newStatus, task.statusColumnId)
     } finally {
       setUpdating(false)
       setEditingStatus(false)
@@ -709,7 +710,7 @@ export function AggregatedBoard() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  const handleStatusUpdate = useCallback(async (taskId: string, boardId: string, newStatus: string) => {
+  const handleStatusUpdate = useCallback(async (taskId: string, boardId: string, newStatus: string, statusColumnId: string | null) => {
     // Optimistic update
     if (data) {
       const updated = { ...data }
@@ -721,13 +722,15 @@ export function AggregatedBoard() {
       setData(updated)
     }
 
+    // Use the actual column ID from Monday.com, fall back to 'status' if unknown
+    const colId = statusColumnId || 'status'
     try {
       const res = await fetch('/api/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'batch-update',
-          updates: [{ boardId, itemId: taskId, columnValues: { status: { label: newStatus } } }],
+          updates: [{ boardId, itemId: taskId, columnValues: { [colId]: { label: newStatus } } }],
         }),
       })
       if (!res.ok) await fetchData(true)
@@ -856,7 +859,7 @@ export function AggregatedBoard() {
               className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b ${tier.headerBg} hover:brightness-110 transition-all`}
             >
               {isCollapsed ? (
-                <ChevronRight className={`h-4 w-4 ${tier.accentColor}`} />
+                <ChevronRight className={`h-4 w-4 ` } />
               ) : (
                 <ChevronDown className={`h-4 w-4 ${tier.accentColor}`} />
               )}
@@ -943,6 +946,10 @@ export function AggregatedBoard() {
         ) : null}
       </div>
     )}
+  </div>
+ )
+}
+ )}
   </div>
  )
 }
