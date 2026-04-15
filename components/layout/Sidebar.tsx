@@ -11,6 +11,7 @@ import {
   DollarSign,
   MessageSquare,
   Bot,
+  Brain,
   FolderKanban,
   Settings,
   Zap,
@@ -29,6 +30,7 @@ const navigation = [
   { name: 'Budget', href: '/budget', icon: DollarSign },
   { name: 'Comms', href: '/comms', icon: MessageSquare },
   { name: 'Agents', href: '/agents', icon: Bot },
+  { name: 'Memory', href: '/memory', icon: Brain },
   { name: 'Config', href: '/config', icon: Settings },
 ]
 

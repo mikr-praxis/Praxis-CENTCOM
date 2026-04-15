@@ -46,6 +46,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { href: '/budget',    roles: ['exec'] },
   { href: '/comms',     roles: ['exec', 'am', 'cs'] },
   { href: '/agents',    roles: ['exec'] },
+  { href: '/memory',    roles: ['exec'] },
   { href: '/config',    roles: ['exec'] },
 ]
 
