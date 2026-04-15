@@ -1,76 +1,4 @@
-'use client'
-
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import {
-  ChevronDown, ChevronRight, RefreshCw, Loader2, AlertTriangle,
-  Clock, Hammer, Search, Users, Hash, Target, Plus, Trash2,
-  Pencil, Check, X, MessageSquare, TrendingUp, BarChart3,
-} from 'lucide-react'
-import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-} from 'recharts'
-import type { BoardDetail, DetailedTask, OwnershipData, TaskTier } from '@/app/api/projects/board-detail/route'
-import type { ProjectKPI, KPISnapshot } from '@/app/api/projects/kpis/route'
-import { MilestoneRoadmap } from '@/components/projects/MilestoneRoadmap'
-
-// Ã¢ÂÂÃ¢ÂÂ Colors & Constants Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-
-const TIER_CONFIG: Record<TaskTier, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
-  critical: { label: 'Critical', color: 'text-red-400', bg: 'bg-red-500/10', icon: AlertTriangle },
-  followup: { label: 'Follow-up', color: 'text-amber-400', bg: 'bg-amber-500/10', icon: Clock },
-  building: { label: 'Building', color: 'text-blue-400', bg: 'bg-blue-500/10', icon: Hammer },
-}
-
-const PIE_COLORS = [
-  '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444',
-  '#06b6d4', '#f97316', '#ec4899', '#6366f1', '#14b8a6',
-]
-
-const UNIT_OPTIONS = ['#', '$', '%', 'days', 'hrs', 'calls', 'leads', 'rate']
-
-// Ã¢ÂÂÃ¢ÂÂ Board Selector Dropdown Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-
-function BoardSelector({
-  boards,
-  selectedId,
-  onChange,
-  loading,
-}: {
-  boards: { id: string; name: string }[]
-  selectedId: string | null
-  onChange: (id: string) => void
-  loading: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const selected = boards.find((b) => b.id === selectedId)
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        disabled={loading || boards.length === 0}
-        className="flex items-center gap-2 rounded-xl border border-slate-700/50 bg-slate-800/50 px-4 py-2.5 text-sm font-medium text-slate-200 hover:border-slate-600 transition-colors disabled:opacity-50 min-w-[240px]"
-      >
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
-        ) : (
-          <BarChart3 className="h-4 w-4 text-amber-400" />
-        )}
-        <span className="flex-1 text-left truncate">
-          {loading ? 'Loading boards...' : selected ? selected.name : 'Select a project board'}
-        </span>
-        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && !loading && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-50 w-full min-w-[280px] max-h-[360px] overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 shadow-2xl">
-            {boards.map((board) => (
-              <button
-                key={board.id}
-                onClick={() => { onChange(board.id); setOpen(false) }}
+}}
                 className={`flex items-center w-full px-4 py-2.5 text-sm hover:bg-slate-700/50 transition-colors ${
                   board.id === selectedId ? 'text-amber-400 bg-amber-500/5' : 'text-slate-300'
                 }`}
@@ -327,6 +255,100 @@ function SlackQuadrant({ boardName }: { boardName: string | null }) {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <div className="rounded-2xl bg-slate-800/50 border border-slate-700/30 p-6 max-w-xs">
+          <MessageSquare className="h-8 w-8 text-slate-600 mx-auto mb-3" />
+          <p className="text-sm text-slate-300 font-medium mb-1">Slack Integration</p>
+          <p className="text-xs text-slate-500 mb-4">
+            Connect Slack to see project-related messages organized by channel.
+          </p>
+
+          {boardName && (
+            <div className="space-y-2 mb-4">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Channels to monitor</p>
+              {placeholderChannels.map((ch) => (
+                <div
+                  key={ch.name}
+                  className="flex items-center gap-2 rounded-lg border border-slate-700/30 bg-slate-900/30 px-3 py-2"
+                >
+                  <Hash className="h-3 w-3 text-slate-500" />
+                  <span className="text-xs text-slate-400">{ch.name}</span>
+                  <span className="text-[10px] text-slate-600 ml-auto">Ã¢ÂÂ</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5">
+            <span className="text-[11px] text-amber-400 font-medium">Coming soon</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Ã¢ÂÂÃ¢ÂÂ Q4: KPI Tracker Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+
+function KPIQuadrant({
+  boardId,
+  kpis,
+  snapshots,
+  loading,
+  onRefresh,
+}: {
+  boardId: string | null
+  kpis: ProjectKPI[]
+  snapshots: KPISnapshot[]
+  loading: boolean
+  onRefresh: () => void
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<{
+    kpi_name: string; current_value: string; target_value: string; unit: string
+  }>({ kpi_name: '', current_value: '', target_value: '', unit: '#' })
+  const [adding, setAdding] = useState(false)
+  const [newKpi, setNewKpi] = useState({ kpi_name: '', current_value: '', target_value: '', unit: '#' })
+  const [saving, setSaving] = useState(false)
+  const [selectedKpiId, setSelectedKpiId] = useState<string | null>(null)
+
+  const startEdit = (kpi: ProjectKPI) => {
+    setEditingId(kpi.id)
+    setEditValues({
+      kpi_name: kpi.kpi_name,
+      current_value: kpi.current_value?.toString() || '',
+      target_value: kpi.target_value?.toString() || '',
+      unit: kpi.unit,
+    })
+  }
+
+  const saveEdit = async () => {
+    if (!editingId) return
+    setSaving(true)
+    try {
+      await fetch('/api/projects/kpis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          id: editingId,
+          kpi_name: editValues.kpi_name,
+          current_value: editValues.current_value ? parseFloat(editValues.current_value) : null,
+          target_value: editValues.target_value ? parseFloat(editValues.target_value) : null,
+          unit: editValues.unit,
+        }),
+      })
+      setEditingId(null)
+      onRefresh()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addKpi = async () => {
+    if (!boardId || !newKpi.kpi_name.trim()) return
+    setSaving(true)
+    try {
+      afy-center px-6 text-center">
         <div className="rounded-2xl bg-slate-800/50 border border-slate-700/30 p-6 max-w-xs">
           <MessageSquare className="h-8 w-8 text-slate-600 mx-auto mb-3" />
           <p className="text-sm text-slate-300 font-medium mb-1">Slack Integration</p>
@@ -882,7 +904,7 @@ export function ProjectsClient() {
 
       {/* Full-width Milestone Roadmap below quadrants */}
       <div className="mt-3">
-        <MilestoneRoadmap />
+        <MilestoneRoadmap boardId={selectedBoardId} tasks={detail?.tasks || []} />
       </div>
     </div>
   )
