@@ -24,9 +24,12 @@ import {
   Circle,
   Play,
   Trash2,
+  CheckCircle2,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 
-// ââ Types âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- Types -----------------------------------------------------------
 
 type Milestone = {
   id: string
@@ -89,7 +92,7 @@ const TIERS: TierConfig[] = [
   {
     id: 'critical',
     label: 'Critical',
-    description: 'Urgent, overdue, blocked â needs attention now',
+    description: 'Urgent, overdue, blocked -- needs attention now',
     icon: AlertTriangle,
     accentColor: 'text-red-400',
     headerBg: 'bg-red-500/5 border-red-500/20',
@@ -118,7 +121,7 @@ const TIERS: TierConfig[] = [
   },
 ]
 
-// ââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- Helpers ---------------------------------------------------------
 
 function deadlineLabel(dateStr: string): { text: string; color: string } {
   const today = new Date()
@@ -165,7 +168,7 @@ const STATUS_OPTIONS = [
   'Working on it', 'Stuck', 'Done', 'Waiting for review', 'Blocked', 'Not Started',
 ]
 
-// ââ SlackThread: loads messages for a task ââââââââââââââââââââââââââââââââ
+// -- SlackThread loads messages for task -----------------------------
 
 function SlackThread({ slackContext, taskName }: { slackContext: SlackContext | null; taskName: string }) {
   const [messages, setMessages] = useState<SlackMessage[]>([])
@@ -262,7 +265,7 @@ function SlackThread({ slackContext, taskName }: { slackContext: SlackContext | 
   )
 }
 
-// ââ MilestoneCards: CENTCOM-defined steps ââââââââââââââââââââââââââââââââââ
+// -- MilestoneCards CENTCOM defined steps ----------------------------
 
 function MilestoneCards({
   taskId,
@@ -349,7 +352,7 @@ function MilestoneCards({
           <span className="text-[10px] text-slate-500 font-medium">Milestones</span>
           {milestones.length > 0 && (
             <span className="text-[10px] text-slate-600">
-              {completedCount}/{milestones.length} Â· {pct}%
+              {completedCount}/{milestones.length} &middot; {pct}%
             </span>
           )}
         </div>
@@ -456,7 +459,7 @@ function MilestoneCards({
   )
 }
 
-// ââ TaskRow: full task card âââââââââââââââââââââââââââââââââââââââââââââââ
+// -- TaskRow full task card ------------------------------------------
 
 function TaskRow({
   task,
@@ -506,12 +509,25 @@ function TaskRow({
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-200 truncate">{task.name}</p>
+          <div className="flex items-center gap-2">
+            <a
+              href={`https://monday.com/boards/${task.boardId}/pulses/${task.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-slate-200 truncate hover:text-amber-400 hover:underline decoration-dotted underline-offset-2 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+              title="Open in Monday.com"
+            >
+              {task.name}
+            </a>
+          </div>
           <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
-            <span className="truncate max-w-[140px]">{task.boardName}</span>
-            <span className="text-slate-700">Â·</span>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800/60 text-amber-400/80 font-medium truncate max-w-[160px]" title={`Project: ${task.boardName}`}>
+              {task.boardName}
+            </span>
+            <span className="text-slate-700">&middot;</span>
             <span className="truncate max-w-[100px]">{task.groupName}</span>
-            <span className="text-slate-700">Â·</span>
+            <span className="text-slate-700">&middot;</span>
             <span className="text-slate-600 italic">{task.tierReason}</span>
           </div>
         </div>
@@ -563,7 +579,7 @@ function TaskRow({
             <button
               onClick={() => setEditingStatus(true)}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-slate-100 transition-colors group"
-              title="Update status â syncs to Monday"
+              title="Update status -- syncs to Monday"
             >
               <span className={`w-2 h-2 rounded-full ${statusColor(task.status)}`} />
               <span className="group-hover:underline decoration-dotted underline-offset-2">
@@ -599,11 +615,12 @@ function TaskRow({
         )}
 
         <a
-          href={`https://monday.com/boards/${task.boardId}`}
+          href={`https://monday.com/boards/${task.boardId}/pulses/${task.id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-500 hover:text-slate-300 transition-colors"
           onClick={(e) => e.stopPropagation()}
+          title="Open in Monday.com"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
@@ -628,7 +645,7 @@ function TaskRow({
                     <span className={si.status?.toLowerCase().includes('done') ? 'line-through text-slate-600' : ''}>
                       {si.name}
                     </span>
-                    {si.status && <span className="text-slate-600">Â· {si.status}</span>}
+                    {si.status && <span className="text-slate-600">&middot; {si.status}</span>}
                   </div>
                 ))}
               </div>
@@ -647,18 +664,19 @@ function TaskRow({
   )
 }
 
-// ââ Main Component ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- Main Component --------------------------------------------------
 
 export function AggregatedBoard() {
   const [data, setData] = useState<{
-    tasks: Record<Tier, AggregatedTask[]>
-    counts: { critical: number; followup: number; building: number; total: number }
+    tasks: Record<Tier, AggregatedTask[]> & { completed?: AggregatedTask[] }
+    counts: { critical: number; followup: number; building: number; completed?: number; total: number }
   } | null>(null)
   const [connected, setConnected] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [showCompleted, setShowCompleted] = useState(false)
   const [collapsedTiers, setCollapsedTiers] = useState<Set<Tier>>(new Set())
 
   const fetchData = useCallback(async (silent = false) => {
@@ -722,14 +740,20 @@ export function AggregatedBoard() {
   const filteredData = useMemo(() => {
     if (!data || !search) return data
     const q = search.toLowerCase()
-    const filtered = { tasks: {} as Record<Tier, AggregatedTask[]>, counts: data.counts }
+    const searchFn = (t: AggregatedTask) =>
+      t.name.toLowerCase().includes(q) ||
+      t.boardName.toLowerCase().includes(q) ||
+      t.groupName.toLowerCase().includes(q) ||
+      t.assignees.some((a) => a.name.toLowerCase().includes(q))
+    const filtered = {
+      tasks: {} as Record<Tier, AggregatedTask[]> & { completed?: AggregatedTask[] },
+      counts: data.counts,
+    }
     for (const tier of ['critical', 'followup', 'building'] as Tier[]) {
-      filtered.tasks[tier] = data.tasks[tier].filter((t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.boardName.toLowerCase().includes(q) ||
-        t.groupName.toLowerCase().includes(q) ||
-        t.assignees.some((a) => a.name.toLowerCase().includes(q))
-      )
+      filtered.tasks[tier] = data.tasks[tier].filter(searchFn)
+    }
+    if (data.tasks.completed) {
+      filtered.tasks.completed = data.tasks.completed.filter(searchFn)
     }
     return filtered
   }, [data, search])
@@ -785,6 +809,19 @@ export function AggregatedBoard() {
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowCompleted(!showCompleted)}
+          className={showCompleted ? 'ring-1 ring-emerald-500/50' : ''}
+        >
+          {showCompleted ? (
+            <EyeOff className="h-3.5 w-3.5 mr-1" />
+          ) : (
+            <Eye className="h-3.5 w-3.5 mr-1" />
+          )}
+          Completed{data?.counts?.completed ? ` (${data.counts.completed})` : ''}
+        </Button>
         <Button variant="secondary" size="sm" onClick={() => fetchData(true)} disabled={refreshing}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
@@ -853,14 +890,57 @@ export function AggregatedBoard() {
       )
     })}
 
+    {/* Completed section (toggled) */}
+    {showCompleted && (() => {
+      const completedTasks = filteredData?.tasks?.completed || []
+      return (
+        <Card className="p-0 overflow-hidden">
+          <button
+            onClick={() => toggleTier('building')} // reuse collapse logic won't conflict since this is separate
+            className="w-full flex items-center gap-3 px-4 py-3 text-left border-b bg-emerald-500/5 border-emerald-500/20 hover:brightness-110 transition-all"
+          >
+            <ChevronDown className="h-4 w-4 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <div className="flex-1">
+              <span className="text-sm font-semibold text-slate-200">Completed</span>
+              <span className="text-[11px] text-slate-500 ml-2">Done and finished tasks</span>
+            </div>
+            <Badge variant="gray">{completedTasks.length}</Badge>
+          </button>
+          <div className="divide-y divide-slate-800/30">
+            {completedTasks.length === 0 && (
+              <div className="px-4 py-6 text-center">
+                <p className="text-xs text-slate-500">No completed tasks</p>
+              </div>
+            )}
+            {completedTasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                tierColor="border-l-emerald-500"
+                onStatusUpdate={handleStatusUpdate}
+                onMilestonesUpdate={() => fetchData(true)}
+              />
+            ))}
+          </div>
+        </Card>
+      )
+    })()}
+
     {/* Summary */}
     {data?.counts && (
       <div className="flex items-center justify-center gap-6 text-xs text-slate-500 py-2">
         <span>{data.counts.total} active</span>
-        <span className="text-slate-700">Â·</span>
+        <span className="text-slate-700">&middot;</span>
         <span className="text-red-400">{data.counts.critical} critical</span>
         <span className="text-amber-400">{data.counts.followup} follow-ups</span>
         <span className="text-blue-400">{data.counts.building} building</span>
+        {data.counts.completed ? (
+          <>
+            <span className="text-slate-700">&middot;</span>
+            <span className="text-emerald-400">{data.counts.completed} completed</span>
+          </>
+        ) : null}
       </div>
     )}
   </div>
