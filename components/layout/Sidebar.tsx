@@ -10,6 +10,7 @@ import {
   DollarSign,
   MessageSquare,
   Bot,
+  FolderKanban,
   Zap,
 } from 'lucide-react'
 
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Budget', href: '/budget', icon: DollarSign },
   { name: 'Comms', href: '/comms', icon: MessageSquare },
   { name: 'Agents', href: '/agents', icon: Bot },
+  { name: 'Projects', href: '/projects', icon: FolderKanban },
 ]
 
 export function Sidebar() {

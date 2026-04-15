@@ -52,6 +52,22 @@ async function seed() {
   if (eventError) console.error('Event seed error:', eventError)
   else console.log('Events seeded.')
 
+  const { error: projectError } = await supabase.from('projects').insert([
+    { name: 'Dashboard', description: 'Main KPI overview and activity feed', status: 'complete', category: 'core', progress: 100, priority: 'high', user_id: USER_ID },
+    { name: 'Tasks / Kanban', description: 'Task management with drag-and-drop Kanban board', status: 'complete', category: 'core', progress: 100, priority: 'high', user_id: USER_ID },
+    { name: 'Budget Tracking', description: 'SaaS stack cost tracking and expense management', status: 'complete', category: 'core', progress: 100, priority: 'high', user_id: USER_ID },
+    { name: 'Slack Comms', description: 'Slack message monitoring and channel management', status: 'complete', category: 'core', progress: 100, priority: 'high', user_id: USER_ID },
+    { name: 'Events / Calendar', description: 'Event tracking with Google Calendar sync', status: 'in-progress', category: 'core', progress: 70, priority: 'high', target_date: '2026-04-21', user_id: USER_ID },
+    { name: 'AI Agents', description: 'Claude-powered agent execution and log review', status: 'in-progress', category: 'ai', progress: 40, priority: 'high', target_date: '2026-04-28', user_id: USER_ID },
+    { name: 'Monday.com Integration', description: 'Sync tasks and boards from Monday.com', status: 'planned', category: 'integration', progress: 0, priority: 'medium', target_date: '2026-05-05', user_id: USER_ID },
+    { name: 'ActiveCampaign Integration', description: 'CRM contact and automation sync', status: 'planned', category: 'integration', progress: 0, priority: 'medium', target_date: '2026-05-12', user_id: USER_ID },
+    { name: 'HubSpot Integration', description: 'Marketing and sales pipeline sync', status: 'planned', category: 'integration', progress: 0, priority: 'low', target_date: '2026-05-19', user_id: USER_ID },
+    { name: 'Memory System', description: 'Claude Code persistent memory for project context', status: 'complete', category: 'infrastructure', progress: 100, priority: 'medium', target_date: '2026-04-14', user_id: USER_ID },
+    { name: 'Project Roadmap', description: 'Module progress tracking and roadmap visualization', status: 'in-progress', category: 'core', progress: 80, priority: 'medium', target_date: '2026-04-14', user_id: USER_ID },
+  ])
+  if (projectError) console.error('Project seed error:', projectError)
+  else console.log('Projects seeded.')
+
   console.log('Seed complete.')
 }
 

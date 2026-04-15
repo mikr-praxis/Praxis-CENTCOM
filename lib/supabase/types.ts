@@ -79,6 +79,20 @@ export type MessageLog = {
   created_at: string
 }
 
+export type Project = {
+  id: string
+  name: string
+  description: string | null
+  status: 'planned' | 'in-progress' | 'complete'
+  category: 'core' | 'integration' | 'infrastructure' | 'ai'
+  progress: number
+  priority: 'high' | 'medium' | 'low'
+  target_date: string | null
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -116,6 +130,12 @@ export type Database = {
         Row: MessageLog
         Insert: Partial<MessageLog> & Pick<MessageLog, 'channel_id' | 'message_text' | 'user_id'>
         Update: Partial<MessageLog>
+        Relationships: []
+      }
+      projects: {
+        Row: Project
+        Insert: Partial<Project> & Pick<Project, 'name' | 'user_id'>
+        Update: Partial<Project>
         Relationships: []
       }
     }
