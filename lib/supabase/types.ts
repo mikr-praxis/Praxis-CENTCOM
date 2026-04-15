@@ -171,6 +171,26 @@ export type MondayWebhookLog = {
   created_at: string
 }
 
+export type ProjectKPI = {
+  id: string
+  board_id: string
+  kpi_name: string
+  target_value: number | null
+  current_value: number | null
+  unit: string
+  sort_order: number
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type KPISnapshot = {
+  id: string
+  kpi_id: string
+  value: number
+  recorded_at: string
+}
+
 export type MondayColumnMapping = {
   board_id: string
   board_name: string
@@ -274,6 +294,18 @@ export type Database = {
         Row: MondayColumnMapping
         Insert: Partial<MondayColumnMapping> & Pick<MondayColumnMapping, 'board_id' | 'board_name'>
         Update: Partial<MondayColumnMapping>
+        Relationships: []
+      }
+      project_kpis: {
+        Row: ProjectKPI
+        Insert: Partial<ProjectKPI> & Pick<ProjectKPI, 'board_id' | 'kpi_name' | 'user_id'>
+        Update: Partial<ProjectKPI>
+        Relationships: []
+      }
+      kpi_snapshots: {
+        Row: KPISnapshot
+        Insert: Partial<KPISnapshot> & Pick<KPISnapshot, 'kpi_id' | 'value'>
+        Update: Partial<KPISnapshot>
         Relationships: []
       }
       task_milestones: {
