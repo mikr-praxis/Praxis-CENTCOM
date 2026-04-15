@@ -24,7 +24,7 @@ export type AggregatedTask = MondayTask & {
   } | null
 }
 
-// ── Classification logic ──────────────────────────────────────────────────
+// ââ Classification logic ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function classifyTask(task: MondayTask): { tier: TaskTier; reason: string } {
   const status = (task.status || '').toLowerCase()
@@ -93,7 +93,7 @@ function sortWithinTier(tasks: AggregatedTask[], tier: TaskTier): AggregatedTask
       return (a.dueDate || '9999').localeCompare(b.dueDate || '9999')
     }
 
-    // Building: descending by due date (furthest out first → nearest at bottom)
+    // Building: descending by due date (furthest out first â nearest at bottom)
     return (b.dueDate || '0000').localeCompare(a.dueDate || '0000')
   })
 }
@@ -108,7 +108,7 @@ function priorityWeight(p: string | null): number {
   return 0
 }
 
-// ── GET /api/tasks-aggregated ──────────────────────────────────────────────
+// ââ GET /api/tasks-aggregated ââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function GET() {
   const { userId } = await auth()
@@ -177,13 +177,12 @@ export async function GET() {
       return null
     }
 
-    // Filter out done/completed, classify, and enrich
-    const activeTasks = mondayTasks.filter(
-      (t) => !t.status?.toLowerCase().includes('done') && !t.status?.toLowerCase().includes('complete')
-    )
-
-    const aggregated: AggregatedTask[] = activeTasks.map((task) => {
-      const { tier, reason } = classifyTask(task)
+    // Classify and enrich ALL tasks (including completed)
+    const aggregated: AggregatedTask[] = mondayTasks.map((task) => {
+      const isCompleted = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
+      const { tier, reason } = isCompleted
+        ? { tier: 'building' as TaskTier, reason: `Status: ${task.status}` }
+        : classifyTask(task)
       return {
         ...task,
         tier,
@@ -200,18 +199,27 @@ export async function GET() {
       }
     })
 
+    // Separate completed from active
+    const activeTasks = aggregated.filter(
+      (t) => !t.status?.toLowerCase().includes('done') && !t.status?.toLowerCase().includes('complete')
+    )
+    const completedTasks = aggregated.filter(
+      (t) => t.status?.toLowerCase().includes('done') || t.status?.toLowerCase().includes('complete')
+    )
+
     // Sort within tiers
-    const critical = sortWithinTier(aggregated.filter((t) => t.tier === 'critical'), 'critical')
-    const followup = sortWithinTier(aggregated.filter((t) => t.tier === 'followup'), 'followup')
-    const building = sortWithinTier(aggregated.filter((t) => t.tier === 'building'), 'building')
+    const critical = sortWithinTier(activeTasks.filter((t) => t.tier === 'critical'), 'critical')
+    const followup = sortWithinTier(activeTasks.filter((t) => t.tier === 'followup'), 'followup')
+    const building = sortWithinTier(activeTasks.filter((t) => t.tier === 'building'), 'building')
 
     return NextResponse.json({
-      tasks: { critical, followup, building },
+      tasks: { critical, followup, building, completed: completedTasks },
       counts: {
         critical: critical.length,
         followup: followup.length,
         building: building.length,
-        total: aggregated.length,
+        completed: completedTasks.length,
+        total: activeTasks.length,
       },
       connected: true,
     })
