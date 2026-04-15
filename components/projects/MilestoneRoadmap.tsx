@@ -1,538 +1,429 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
-  AlertTriangle, ChevronDown, ChevronRight, Loader2, RefreshCw,
-  Calendar, GripHorizontal, ChevronLeft,
+  Plus, Loader2, Trash2, ChevronLeft, ChevronRight, User, Calendar,
+  Target, CheckCircle2, Clock, CircleDot, AlertTriangle, Pencil, X, Check,
 } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
 
-// -- Types ------------------------------------------------------------------
+// ââ Types âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-type Subitem = {
+type Milestone = {
   id: string
-  name: string
-  status: string | null
-  dueDate: string | null
+  board_id: string
+  milestone_number: number
+  title: string
+  monday_task_id: string | null
+  task_name: string | null
+  assignee_name: string | null
+  due_date: string | null
+  status: 'not_started' | 'in_progress' | 'done'
 }
 
-type RoadmapTask = {
+type BoardTask = {
   id: string
   name: string
-  boardName: string
-  boardId: string
-  groupName: string
-  status: string | null
-  dueDate: string | null
-  timelineStart: string | null
-  timelineEnd: string | null
-  priority: string | null
   assignees: { id: string; name: string }[]
-  tierReason: string
-  subitems: Subitem[]
+  dueDate: string | null
+  status: string | null
 }
 
-type ClientGroup = {
-  boardName: string
-  boardId: string
-  tasks: RoadmapTask[]
+type Props = {
+  boardId: string | null
+  tasks: BoardTask[]
 }
 
-// -- Helpers ----------------------------------------------------------------
+// ââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-function parseDate(d: string | null): Date | null {
-  if (!d) return null
-  const date = new Date(d + 'T00:00:00')
-  return isNaN(date.getTime()) ? null : date
+const STATUS_CONFIG = {
+  not_started: { label: 'Not Started', icon: CircleDot, color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-600/40', pill: 'bg-slate-600/30 text-slate-300' },
+  in_progress: { label: 'In Progress', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/5', border: 'border-amber-500/20', pill: 'bg-amber-500/20 text-amber-300' },
+  done: { label: 'Done', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/5', border: 'border-emerald-500/20', pill: 'bg-emerald-500/20 text-emerald-300' },
+} as const
+
+type StatusKey = keyof typeof STATUS_CONFIG
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+function formatDate(d: string | null): string {
+  if (!d) return 'â'
+  const dt = new Date(d + 'T00:00:00')
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function addDays(d: Date, days: number): Date {
-  const r = new Date(d)
-  r.setDate(r.getDate() + days)
-  return r
-}
-
-function diffDays(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / 86400000)
-}
-
-function formatShortDate(d: Date): string {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function subitemStatusColor(status: string | null): string {
-  if (!status) return 'bg-slate-600'
-  const s = status.toLowerCase()
-  if (s.includes('done') || s.includes('complete')) return 'bg-emerald-500'
-  if (s.includes('working') || s.includes('progress') || s.includes('active')) return 'bg-blue-500'
-  if (s.includes('stuck') || s.includes('blocked')) return 'bg-red-500'
-  if (s.includes('review')) return 'bg-amber-500'
-  return 'bg-slate-500'
-}
-
-// -- Constants --------------------------------------------------------------
-
-const DAY_WIDTH = 36 // pixels per day
-const ROW_HEIGHT = 44 // pixels per task row
-const HEADER_HEIGHT = 32 // month/day header
-
-// -- GanttBar ---------------------------------------------------------------
-
-function GanttBar({
-  task,
-  timelineOrigin,
-  onToggleExpand,
-  expanded,
-}: {
-  task: RoadmapTask
-  timelineOrigin: Date
-  onToggleExpand: () => void
-  expanded: boolean
-}) {
-  const start = parseDate(task.timelineStart) || parseDate(task.dueDate)
-  const end = parseDate(task.timelineEnd) || (start ? addDays(start, 3) : null)
-  if (!start) return null
-
-  const startOffset = diffDays(timelineOrigin, start)
-  const duration = end ? Math.max(diffDays(start, end), 1) : 3
-  const left = startOffset * DAY_WIDTH
-  const width = Math.max(duration * DAY_WIDTH, 40)
-
+function isOverdue(d: string | null): boolean {
+  if (!d) return false
+  const dt = new Date(d + 'T00:00:00')
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const isOverdue = end ? end < today : start < today
-  const isActive = start <= today && (end ? end >= today : true)
+  return dt < today
+}
 
-  const barColor = isOverdue
-    ? 'bg-red-500/80 border-red-400/60'
-    : isActive
-      ? 'bg-amber-500/60 border-amber-400/50'
-      : 'bg-blue-500/40 border-blue-400/30'
+function isDueThisMonth(d: string | null, year: number, month: number): boolean {
+  if (!d) return true
+  const dt = new Date(d + 'T00:00:00')
+  return dt.getFullYear() === year && dt.getMonth() === month
+}
 
-  const hasSubs = task.subitems.length > 0
+// ââ Milestone Card ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+function MilestoneCard({
+  milestone,
+  tasks,
+  onUpdate,
+  onDelete,
+}: {
+  milestone: Milestone
+  tasks: BoardTask[]
+  onUpdate: (id: string, data: Partial<Milestone>) => void
+  onDelete: (id: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(milestone.title)
+  const [editTaskId, setEditTaskId] = useState(milestone.monday_task_id || '')
+  const [editDate, setEditDate] = useState(milestone.due_date || '')
+  const [deleting, setDeleting] = useState(false)
+
+  const cfg = STATUS_CONFIG[milestone.status]
+  const overdue = milestone.status !== 'done' && isOverdue(milestone.due_date)
+
+  const handleSave = () => {
+    const linkedTask = tasks.find((t) => t.id === editTaskId)
+    onUpdate(milestone.id, {
+      title: editTitle,
+      monday_task_id: editTaskId || null,
+      task_name: linkedTask?.name || null,
+      assignee_name: linkedTask?.assignees?.[0]?.name || null,
+      due_date: editDate || null,
+    })
+    setEditing(false)
+  }
+
+  const handleStatusCycle = () => {
+    const order: StatusKey[] = ['not_started', 'in_progress', 'done']
+    const idx = order.indexOf(milestone.status)
+    const next = order[(idx + 1) % order.length]
+    onUpdate(milestone.id, { status: next })
+  }
+
+  const handleDelete = () => {
+    if (deleting) {
+      onDelete(milestone.id)
+    } else {
+      setDeleting(true)
+      setTimeout(() => setDeleting(false), 3000)
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-lg border border-amber-500/30 bg-slate-800/80 p-3 space-y-2">
+        <input
+          type="text"
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          placeholder="Milestone title..."
+          className="w-full rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+          autoFocus
+        />
+        <select
+          value={editTaskId}
+          onChange={(e) => setEditTaskId(e.target.value)}
+          className="w-full rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+        >
+          <option value="">â Link a task â</option>
+          {tasks.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={editDate}
+          onChange={(e) => setEditDate(e.target.value)}
+          className="w-full rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+        />
+        <div className="flex justify-end gap-1.5">
+          <button onClick={() => setEditing(false)} className="p-1 text-slate-400 hover:text-slate-200">
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={handleSave} className="p-1 text-amber-400 hover:text-amber-300">
+            <Check className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div
-      className="absolute top-1 group"
-      style={{ left: `${left}px`, width: `${width}px`, height: `${ROW_HEIGHT - 8}px` }}
-    >
-      {/* Task bar */}
-      <div
-        className={`h-full rounded-md border ${barColor} flex items-center px-2 cursor-pointer transition-all hover:brightness-125`}
-        onClick={onToggleExpand}
-        title={`${task.name}${task.dueDate ? ` â Due: ${task.dueDate}` : ''}`}
-      >
-        {hasSubs && (
-          expanded
-            ? <ChevronDown className="h-3 w-3 text-white/70 flex-shrink-0 mr-1" />
-            : <ChevronRight className="h-3 w-3 text-white/70 flex-shrink-0 mr-1" />
-        )}
-        <span className="text-[11px] font-medium text-white truncate">
-          {task.name}
+    <div className={`group rounded-lg border ${cfg.border} ${cfg.bg} p-3 transition-all hover:border-slate-500/50`}>
+      {/* Header: number + title + actions */}
+      <div className="flex items-start gap-2">
+        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${cfg.pill} flex-shrink-0 mt-0.5`}>
+          {milestone.milestone_number}
         </span>
-        {task.assignees.length > 0 && (
-          <span className="ml-auto text-[9px] text-white/50 flex-shrink-0 pl-1">
-            {task.assignees.map((a) => a.name.split(' ')[0]).join(', ')}
-          </span>
-        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-slate-200 leading-tight truncate">
+            {milestone.title || `Milestone ${milestone.milestone_number}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <button onClick={() => { setEditTitle(milestone.title); setEditTaskId(milestone.monday_task_id || ''); setEditDate(milestone.due_date || ''); setEditing(true) }} className="p-0.5 text-slate-500 hover:text-slate-300">
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button onClick={handleDelete} className={`p-0.5 ${deleting ? 'text-red-400' : 'text-slate-500 hover:text-red-400'}`}>
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
       </div>
 
-      {/* Dependency dropdown */}
-      {expanded && hasSubs && (
-        <div className="absolute top-full left-0 mt-1 z-30 w-64 bg-slate-800 border border-slate-600/50 rounded-lg shadow-xl overflow-hidden">
-          <div className="px-3 py-1.5 text-[10px] font-medium text-slate-400 border-b border-slate-700/50 flex items-center gap-1">
-            <GripHorizontal className="h-3 w-3" />
-            Dependencies ({task.subitems.length})
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {task.subitems.map((si) => (
-              <div key={si.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-700/30 transition-colors">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${subitemStatusColor(si.status)}`} />
-                <span className={`text-[11px] flex-1 min-w-0 truncate ${
-                  si.status?.toLowerCase().includes('done') ? 'text-slate-500 line-through' : 'text-slate-300'
-                }`}>
-                  {si.name}
-                </span>
-                {si.status && (
-                  <span className="text-[9px] text-slate-500 flex-shrink-0">{si.status}</span>
-                )}
-                {si.dueDate && (
-                  <span className="text-[9px] text-slate-600 flex-shrink-0">{si.dueDate}</span>
-                )}
-              </div>
-            ))}
-          </div>
+      {/* Linked task */}
+      {milestone.task_name && (
+        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-400">
+          <Target className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{milestone.task_name}</span>
         </div>
       )}
-    </div>
-  )
-}
 
-// -- TimelineHeader ---------------------------------------------------------
-
-function TimelineHeader({ origin, totalDays }: { origin: Date; totalDays: number }) {
-  const months: { label: string; startDay: number; days: number }[] = []
-  let current = new Date(origin)
-
-  for (let day = 0; day < totalDays; ) {
-    const monthStart = day
-    const monthLabel = current.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-    const daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate()
-    const remaining = daysInMonth - current.getDate() + 1
-    const span = Math.min(remaining, totalDays - day)
-    months.push({ label: monthLabel, startDay: monthStart, days: span })
-    day += span
-    current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
-  }
-
-  // Day markers (every 7 days)
-  const dayMarkers: { day: number; label: string }[] = []
-  for (let d = 0; d < totalDays; d += 7) {
-    const date = addDays(origin, d)
-    dayMarkers.push({ day: d, label: formatShortDate(date) })
-  }
-
-  return (
-    <div style={{ width: `${totalDays * DAY_WIDTH}px` }}>
-      {/* Month row */}
-      <div className="flex h-5 border-b border-slate-700/40">
-        {months.map((m, i) => (
-          <div
-            key={i}
-            className="text-[10px] font-medium text-slate-400 px-2 border-r border-slate-700/30 flex items-center"
-            style={{ width: `${m.days * DAY_WIDTH}px` }}
-          >
-            {m.label}
-          </div>
-        ))}
-      </div>
-      {/* Day row */}
-      <div className="relative h-4 border-b border-slate-700/40">
-        {dayMarkers.map((dm, i) => (
-          <span
-            key={i}
-            className="absolute text-[9px] text-slate-600"
-            style={{ left: `${dm.day * DAY_WIDTH}px` }}
-          >
-            {dm.label}
+      {/* Meta row: assignee + date + status */}
+      <div className="mt-2 flex items-center gap-2 flex-wrap">
+        {milestone.assignee_name && (
+          <span className="flex items-center gap-1 text-[10px] text-slate-400">
+            <User className="h-3 w-3" />
+            {milestone.assignee_name.split(' ')[0]}
           </span>
-        ))}
+        )}
+        {milestone.due_date && (
+          <span className={`flex items-center gap-1 text-[10px] ${overdue ? 'text-red-400' : 'text-slate-500'}`}>
+            <Calendar className="h-3 w-3" />
+            {formatDate(milestone.due_date)}
+            {overdue && <AlertTriangle className="h-2.5 w-2.5" />}
+          </span>
+        )}
+        <button
+          onClick={handleStatusCycle}
+          className={`ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${cfg.pill} hover:brightness-125`}
+          title="Click to cycle status"
+        >
+          <cfg.icon className="h-3 w-3" />
+          {cfg.label}
+        </button>
       </div>
     </div>
   )
 }
 
-// -- TodayLine --------------------------------------------------------------
+// ââ Main Component ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-function TodayLine({ origin, totalDays }: { origin: Date; totalDays: number }) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const offset = diffDays(origin, today)
-  if (offset < 0 || offset > totalDays) return null
+export function MilestoneRoadmap({ boardId, tasks }: Props) {
+  const [milestones, setMilestones] = useState<Milestone[]>([])
+  const [loading, setLoading] = useState(false)
+  const [adding, setAdding] = useState(false)
 
-  return (
-    <div
-      className="absolute top-0 bottom-0 w-px bg-red-500/60 z-20 pointer-events-none"
-      style={{ left: `${offset * DAY_WIDTH}px` }}
-    >
-      <div className="absolute -top-1 -left-1.5 w-3 h-3 rounded-full bg-red-500 border-2 border-slate-900" />
-    </div>
-  )
-}
+  // Month navigation
+  const now = new Date()
+  const [viewYear, setViewYear] = useState(now.getFullYear())
+  const [viewMonth, setViewMonth] = useState(now.getMonth())
 
-// -- Main Component ---------------------------------------------------------
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(viewYear - 1) }
+    else setViewMonth(viewMonth - 1)
+  }
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(viewYear + 1) }
+    else setViewMonth(viewMonth + 1)
+  }
 
-export function MilestoneRoadmap() {
-  const [data, setData] = useState<ClientGroup[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
-  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  const fetchData = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    else setRefreshing(true)
-
+  // Fetch milestones
+  const fetchMilestones = useCallback(async () => {
+    if (!boardId) return
+    setLoading(true)
     try {
-      const res = await fetch('/api/tasks-aggregated')
-      if (!res.ok) return
-      const json = await res.json()
-
-      // Extract critical tasks, group by client (boardName)
-      const critical: RoadmapTask[] = (json.tasks?.critical || []).map((t: RoadmapTask & { subitems?: Subitem[] }) => ({
-        id: t.id,
-        name: t.name,
-        boardName: t.boardName,
-        boardId: t.boardId,
-        groupName: t.groupName,
-        status: t.status,
-        dueDate: t.dueDate,
-        timelineStart: t.timelineStart,
-        timelineEnd: t.timelineEnd,
-        priority: t.priority,
-        assignees: t.assignees || [],
-        tierReason: t.tierReason || '',
-        subitems: t.subitems || [],
-      }))
-
-      // Group by boardName (client)
-      const grouped = new Map<string, ClientGroup>()
-      for (const task of critical) {
-        if (!grouped.has(task.boardName)) {
-          grouped.set(task.boardName, { boardName: task.boardName, boardId: task.boardId, tasks: [] })
-        }
-        grouped.get(task.boardName)!.tasks.push(task)
-      }
-
-      // Sort groups by number of tasks desc, then tasks within by dueDate
-      const groups = Array.from(grouped.values())
-      groups.sort((a, b) => b.tasks.length - a.tasks.length)
-      for (const g of groups) {
-        g.tasks.sort((a, b) => {
-          const da = parseDate(a.timelineStart) || parseDate(a.dueDate)
-          const db = parseDate(b.timelineStart) || parseDate(b.dueDate)
-          if (!da && !db) return 0
-          if (!da) return 1
-          if (!db) return -1
-          return da.getTime() - db.getTime()
-        })
-      }
-
-      setData(groups)
-    } catch { /* ignore */ }
-    finally {
+      const res = await fetch(`/api/projects/milestones?boardId=${boardId}`)
+      const data = await res.json()
+      setMilestones(data.milestones || [])
+    } catch {
+      console.error('Failed to load milestones')
+    } finally {
       setLoading(false)
-      setRefreshing(false)
     }
-  }, [])
+  }, [boardId])
 
-  useEffect(() => { fetchData() }, [fetchData])
-
-  // Compute timeline bounds
-  const { origin, totalDays } = useMemo(() => {
-    const allDates: Date[] = []
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    allDates.push(today)
-
-    for (const g of data) {
-      for (const t of g.tasks) {
-        const s = parseDate(t.timelineStart) || parseDate(t.dueDate)
-        const e = parseDate(t.timelineEnd)
-        if (s) allDates.push(s)
-        if (e) allDates.push(e)
-      }
-    }
-
-    if (allDates.length === 0) return { origin: today, totalDays: 90 }
-
-    const min = new Date(Math.min(...allDates.map((d) => d.getTime())))
-    const max = new Date(Math.max(...allDates.map((d) => d.getTime())))
-
-    // Pad 14 days before and 30 days after
-    const start = addDays(min, -14)
-    const end = addDays(max, 30)
-    const days = Math.max(diffDays(start, end), 60)
-
-    return { origin: start, totalDays: days }
-  }, [data])
-
-  const toggleTask = (id: string) => {
-    setExpandedTasks((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const toggleClient = (boardName: string) => {
-    setCollapsedClients((prev) => {
-      const next = new Set(prev)
-      if (next.has(boardName)) next.delete(boardName)
-      else next.add(boardName)
-      return next
-    })
-  }
-
-  // Scroll to today on first load
   useEffect(() => {
-    if (!loading && scrollRef.current) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const offset = diffDays(origin, today)
-      const scrollTo = Math.max(0, offset * DAY_WIDTH - 200)
-      scrollRef.current.scrollLeft = scrollTo
+    fetchMilestones()
+  }, [fetchMilestones])
+
+  // CRUD
+  const addMilestone = async () => {
+    if (!boardId) return
+    setAdding(true)
+    try {
+      const res = await fetch('/api/projects/milestones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', boardId }),
+      })
+      const data = await res.json()
+      if (data.milestone) {
+        setMilestones((prev) => [...prev, data.milestone])
+      }
+    } catch {
+      console.error('Failed to create milestone')
+    } finally {
+      setAdding(false)
     }
-  }, [loading, origin])
-
-  const scrollTimeline = (dir: 'left' | 'right') => {
-    if (!scrollRef.current) return
-    const amount = DAY_WIDTH * 14 // scroll 2 weeks
-    scrollRef.current.scrollBy({ left: dir === 'right' ? amount : -amount, behavior: 'smooth' })
   }
 
-  // Total tasks count
-  const totalTasks = data.reduce((sum, g) => sum + g.tasks.length, 0)
+  const updateMilestone = async (id: string, updates: Partial<Milestone>) => {
+    // Optimistic update
+    setMilestones((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
+    try {
+      const body: Record<string, unknown> = { action: 'update', id }
+      if (updates.title !== undefined) body.title = updates.title
+      if (updates.monday_task_id !== undefined) body.mondayTaskId = updates.monday_task_id
+      if (updates.task_name !== undefined) body.taskName = updates.task_name
+      if (updates.assignee_name !== undefined) body.assigneeName = updates.assignee_name
+      if (updates.due_date !== undefined) body.dueDate = updates.due_date
+      if (updates.status !== undefined) body.status = updates.status
 
-  if (loading) {
-    return (
-      <Card className="p-0 overflow-hidden">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/30 bg-red-500/5">
-          <AlertTriangle className="h-4 w-4 text-red-400" />
-          <span className="text-sm font-semibold text-slate-200">Critical Milestone Roadmap</span>
-        </div>
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
-          <span className="ml-2 text-sm text-slate-500">Loading roadmap...</span>
-        </div>
-      </Card>
-    )
+      await fetch('/api/projects/milestones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    } catch {
+      fetchMilestones() // revert on error
+    }
   }
 
-  if (data.length === 0) {
+  const deleteMilestone = async (id: string) => {
+    setMilestones((prev) => prev.filter((m) => m.id !== id))
+    try {
+      await fetch('/api/projects/milestones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id }),
+      })
+    } catch {
+      fetchMilestones()
+    }
+  }
+
+  // Filter by month
+  const filtered = milestones.filter((m) => isDueThisMonth(m.due_date, viewYear, viewMonth))
+
+  // Group by status lanes
+  const lanes: { key: StatusKey; items: Milestone[] }[] = [
+    { key: 'not_started', items: filtered.filter((m) => m.status === 'not_started') },
+    { key: 'in_progress', items: filtered.filter((m) => m.status === 'in_progress') },
+    { key: 'done', items: filtered.filter((m) => m.status === 'done') },
+  ]
+
+  // Empty state â no board selected
+  if (!boardId) {
     return (
-      <Card className="p-0 overflow-hidden">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/30 bg-red-500/5">
-          <AlertTriangle className="h-4 w-4 text-red-400" />
-          <span className="text-sm font-semibold text-slate-200">Critical Milestone Roadmap</span>
+      <div className="rounded-xl border border-slate-700/30 bg-slate-900/50 p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Target className="h-4 w-4 text-amber-400" />
+          <h3 className="text-sm font-semibold text-slate-200">Milestone Roadmap</h3>
         </div>
-        <div className="text-center py-12">
-          <Calendar className="h-10 w-10 text-slate-600 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No critical tasks with dates found</p>
-        </div>
-      </Card>
+        <p className="text-xs text-slate-500 text-center py-8">Select a board to manage milestones</p>
+      </div>
     )
   }
 
   return (
-    <Card className="p-0 overflow-hidden">
+    <div className="rounded-xl border border-slate-700/30 bg-slate-900/50 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/30 bg-red-500/5">
-        <AlertTriangle className="h-4 w-4 text-red-400" />
-        <span className="text-sm font-semibold text-slate-200">Critical Milestone Roadmap</span>
-        <span className="text-[11px] text-slate-500">
-          {totalTasks} critical tasks across {data.length} clients
-        </span>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30">
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-amber-400" />
+          <h3 className="text-sm font-semibold text-slate-200">Milestone Roadmap</h3>
+          <span className="text-[11px] text-slate-500">{milestones.length} total</span>
+        </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => scrollTimeline('left')}>
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => scrollTimeline('right')}>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => fetchData(true)} disabled={refreshing}>
-            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+        <div className="flex items-center gap-3">
+          {/* Month nav */}
+          <div className="flex items-center gap-1.5">
+            <button onClick={prevMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="text-xs font-medium text-slate-300 w-28 text-center">
+              {MONTHS[viewMonth]} {viewYear}
+            </span>
+            <button onClick={nextMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Add button */}
+          <button
+            onClick={addMilestone}
+            disabled={adding}
+            className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+          >
+            {adding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+            Add
+          </button>
         </div>
       </div>
 
-      {/* Gantt body */}
-      <div className="flex overflow-hidden" style={{ maxHeight: '500px' }}>
-        {/* Left sidebar: client + task names */}
-        <div className="flex-shrink-0 w-56 border-r border-slate-700/30 overflow-y-auto bg-slate-900/80">
-          {/* Spacer for header */}
-          <div style={{ height: `${HEADER_HEIGHT + 16 + 4}px` }} className="border-b border-slate-700/40" />
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+        </div>
+      )}
 
-          {data.map((group) => {
-            const isCollapsed = collapsedClients.has(group.boardName)
+      {/* Kanban lanes */}
+      {!loading && (
+        <div className="grid grid-cols-3 divide-x divide-slate-700/30 min-h-[200px]">
+          {lanes.map(({ key, items }) => {
+            const laneCfg = STATUS_CONFIG[key]
             return (
-              <div key={group.boardName}>
-                {/* Client header */}
-                <button
-                  onClick={() => toggleClient(group.boardName)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left bg-slate-800/60 border-b border-slate-700/30 hover:bg-slate-800/80 transition-colors"
-                >
-                  {isCollapsed
-                    ? <ChevronRight className="h-3 w-3 text-slate-500 flex-shrink-0" />
-                    : <ChevronDown className="h-3 w-3 text-red-400 flex-shrink-0" />
-                  }
-                  <span className="text-[11px] font-semibold text-amber-400/80 truncate">{group.boardName}</span>
-                  <Badge variant="red" className="ml-auto">{group.tasks.length}</Badge>
-                </button>
+              <div key={key} className="flex flex-col">
+                {/* Lane header */}
+                <div className={`flex items-center gap-2 px-3 py-2.5 border-b border-slate-700/30 ${laneCfg.bg}`}>
+                  <laneCfg.icon className={`h-3.5 w-3.5 ${laneCfg.color}`} />
+                  <span className={`text-xs font-semibold ${laneCfg.color}`}>{laneCfg.label}</span>
+                  <span className="ml-auto text-[10px] text-slate-500 font-medium">{items.length}</span>
+                </div>
 
-                {/* Task rows */}
-                {!isCollapsed && group.tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-2 px-3 border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors"
-                    style={{ height: `${ROW_HEIGHT}px` }}
-                  >
-                    <a
-                      href={`https://monday.com/boards/${task.boardId}/pulses/${task.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] text-slate-300 truncate hover:text-amber-400 hover:underline decoration-dotted underline-offset-2 transition-colors flex-1"
-                      title={task.name}
-                    >
-                      {task.name}
-                    </a>
-                    {task.subitems.length > 0 && (
-                      <span className="text-[9px] text-slate-600 flex-shrink-0">{task.subitems.length} deps</span>
-                    )}
-                  </div>
-                ))}
+                {/* Cards */}
+                <div className="flex-1 p-2 space-y-2 overflow-y-auto" style={{ maxHeight: '360px' }}>
+                  {items.length === 0 && (
+                    <p className="text-[11px] text-slate-600 text-center py-6">No milestones</p>
+                  )}
+                  {items.map((m) => (
+                    <MilestoneCard
+                      key={m.id}
+                      milestone={m}
+                      tasks={tasks}
+                      onUpdate={updateMilestone}
+                      onDelete={deleteMilestone}
+                    />
+                  ))}
+                </div>
               </div>
             )
           })}
         </div>
+      )}
 
-        {/* Right: scrollable Gantt chart */}
-        <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto">
-          <div className="relative" style={{ width: `${totalDays * DAY_WIDTH}px` }}>
-            {/* Timeline header */}
-            <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-sm">
-              <TimelineHeader origin={origin} totalDays={totalDays} />
-            </div>
-
-            {/* Today line */}
-            <TodayLine origin={origin} totalDays={totalDays} />
-
-            {/* Day grid lines (every 7 days) */}
-            <div className="absolute top-0 bottom-0 w-full pointer-events-none">
-              {Array.from({ length: Math.ceil(totalDays / 7) }, (_, i) => (
-                <div
-                  key={i}
-                  className="absolute top-0 bottom-0 w-px bg-slate-700/20"
-                  style={{ left: `${i * 7 * DAY_WIDTH}px` }}
-                />
-              ))}
-            </div>
-
-            {/* Task bars */}
-            {data.map((group) => {
-              const isCollapsed = collapsedClients.has(group.boardName)
-              return (
-                <div key={group.boardName}>
-                  {/* Client header spacer */}
-                  <div className="h-8 border-b border-slate-700/30" />
-
-                  {/* Task rows */}
-                  {!isCollapsed && group.tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="relative border-b border-slate-800/20"
-                      style={{ height: `${ROW_HEIGHT}px` }}
-                    >
-                      <GanttBar
-                        task={task}
-                        timelineOrigin={origin}
-                        expanded={expandedTasks.has(task.id)}
-                        onToggleExpand={() => toggleTask(task.id)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )
-            })}
-          </div>
+      {/* Empty state â no milestones at all */}
+      {!loading && milestones.length === 0 && (
+        <div className="text-center py-8 -mt-[200px] relative z-10">
+          <Target className="h-8 w-8 text-slate-600 mx-auto mb-2" />
+          <p className="text-xs text-slate-500 mb-3">No milestones yet</p>
+          <button
+            onClick={addMilestone}
+            disabled={adding}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-2 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create your first milestone
+          </button>
         </div>
-      </div>
-    </Card>
+      )}
+    </div>
   )
 }
