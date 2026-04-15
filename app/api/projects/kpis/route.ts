@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { createServerClient } from 'A/lib/supabase/server'
+import { createServerClient } from '@/lib/supabase/server'
 
 // ââ Types ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
