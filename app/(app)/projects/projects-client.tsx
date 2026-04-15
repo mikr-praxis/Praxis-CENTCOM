@@ -12,8 +12,9 @@ import {
 } from 'recharts'
 import type { BoardDetail, DetailedTask, OwnershipData, TaskTier } from '@/app/api/projects/board-detail/route'
 import type { ProjectKPI, KPISnapshot } from '@/app/api/projects/kpis/route'
+import { MilestoneRoadmap } from '@/components/projects/MilestoneRoadmap'
 
-// ââ Colors & Constants âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Colors & Constants Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 const TIER_CONFIG: Record<TaskTier, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
   critical: { label: 'Critical', color: 'text-red-400', bg: 'bg-red-500/10', icon: AlertTriangle },
@@ -28,7 +29,7 @@ const PIE_COLORS = [
 
 const UNIT_OPTIONS = ['#', '$', '%', 'days', 'hrs', 'calls', 'leads', 'rate']
 
-// ââ Board Selector Dropdown ââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Board Selector Dropdown Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 function BoardSelector({
   boards,
@@ -84,7 +85,7 @@ function BoardSelector({
   )
 }
 
-// ââ Q1: Prioritized Task List ââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Q1: Prioritized Task List Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 function TaskListQuadrant({ tasks, loading }: { tasks: DetailedTask[]; loading: boolean }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -172,7 +173,7 @@ function TaskListQuadrant({ tasks, loading }: { tasks: DetailedTask[]; loading: 
                         )}
                         {task.assignees.length > 0 && (
                           <span className="text-[10px] text-slate-500">
-                            â {task.assignees.map((a) => a.name.split(' ')[0]).join(', ')}
+                            Ã¢ÂÂ {task.assignees.map((a) => a.name.split(' ')[0]).join(', ')}
                           </span>
                         )}
                         {task.assignees.length === 0 && (
@@ -213,7 +214,7 @@ function TaskListQuadrant({ tasks, loading }: { tasks: DetailedTask[]; loading: 
   )
 }
 
-// ââ Q2: Ownership Pie Chart ââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Q2: Ownership Pie Chart Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 function OwnershipQuadrant({ ownership, loading }: { ownership: OwnershipData[]; loading: boolean }) {
   if (loading) {
@@ -306,10 +307,10 @@ function OwnershipQuadrant({ ownership, loading }: { ownership: OwnershipData[];
   )
 }
 
-// ââ Q3: Slack Communications (placeholder) âââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Q3: Slack Communications (placeholder) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 function SlackQuadrant({ boardName }: { boardName: string | null }) {
-  // Placeholder channels â will be wired to real Slack MCP later
+  // Placeholder channels Ã¢ÂÂ will be wired to real Slack MCP later
   const placeholderChannels = boardName
     ? [
         { name: `#${boardName.toLowerCase().replace(/\s+/g, '-')}`, messageCount: 0 },
@@ -343,7 +344,7 @@ function SlackQuadrant({ boardName }: { boardName: string | null }) {
                 >
                   <Hash className="h-3 w-3 text-slate-500" />
                   <span className="text-xs text-slate-400">{ch.name}</span>
-                  <span className="text-[10px] text-slate-600 ml-auto">â</span>
+                  <span className="text-[10px] text-slate-600 ml-auto">Ã¢ÂÂ</span>
                 </div>
               ))}
             </div>
@@ -358,7 +359,7 @@ function SlackQuadrant({ boardName }: { boardName: string | null }) {
   )
 }
 
-// ââ Q4: KPI Tracker ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Q4: KPI Tracker Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 function KPIQuadrant({
   boardId,
@@ -636,7 +637,7 @@ function KPIQuadrant({
                       <div className="flex items-baseline gap-1">
                         <span className="text-lg font-bold text-slate-100">
                           {kpi.unit === '$' && '$'}
-                          {kpi.current_value != null ? kpi.current_value.toLocaleString() : 'â'}
+                          {kpi.current_value != null ? kpi.current_value.toLocaleString() : 'Ã¢ÂÂ'}
                           {kpi.unit === '%' && '%'}
                         </span>
                         {kpi.target_value != null && (
@@ -699,7 +700,7 @@ function KPIQuadrant({
   )
 }
 
-// ââ Main Page Component ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Main Page Component Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 export function ProjectsClient() {
   // Board list (for dropdown)
@@ -877,6 +878,11 @@ export function ProjectsClient() {
             onRefresh={() => selectedBoardId && fetchKpis(selectedBoardId)}
           />
         </div>
+      </div>
+
+      {/* Full-width Milestone Roadmap below quadrants */}
+      <div className="mt-3">
+        <MilestoneRoadmap />
       </div>
     </div>
   )
