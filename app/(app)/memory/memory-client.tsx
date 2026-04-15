@@ -132,11 +132,9 @@ export function MemoryClient({ entries }: { entries: MemoryEntry[] }) {
                 </div>
                 <Badge variant={cfg.variant}>{cfg.label}</Badge>
               </div>
-              <div className="prose prose-invert prose-sm max-w-none">
-                <pre className="whitespace-pre-wrap break-words text-sm text-slate-300 font-sans bg-slate-900/50 rounded-lg p-4 border border-slate-700/30">
+              <pre className="whitespace-pre-wrap break-words text-sm text-slate-300 font-sans bg-slate-900/50 rounded-lg p-4 border border-slate-700/30">
 {entry.body}
-                </pre>
-              </div>
+              </pre>
               <p className="text-[11px] text-slate-600 mt-2 font-mono">{entry.slug}.md</p>
             </Card>
           )
