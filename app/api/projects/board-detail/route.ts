@@ -55,151 +55,196 @@ function classifyTask(task: MondayTask): { tier: TaskTier; reason: string } {
   if (priority.includes('critical') || priority.includes('urgent')) {
     return { tier: 'critical', reason: `Priority: ${task.priority}` }
   }
-  Id  OCTaPô]\ÈY\	ØÜ]XØ[	ËX\ÛÛÝ]\Î	Ý\ÚËÝ]\ßXBBY
-\ÚËYQ]JHÂÛÛÝYHH]È]J\ÚËYQ]H
-È	Õ	ÊBÛÛÝÙ^HH]È]J
-BÙ^KÙ]Ý\Ê
-BY
-YHÙ^JHÂY
-Ý]\Ë[ÛY\Ê	ÙÛIÊHÝ]\Ë[ÛY\Ê	ØÛÛ\]IÊJHÂ]\ÈY\	ØZ[[ÉËX\ÛÛ	ÐÛÛ\]Y
-]JIÈBBÛÛÝ^\ÓÝ\YHHX]ÙZ[
+  if (status.includes('stuck') || status.includes('blocked')) {
+    return { tier: 'critical', reason: `Status: ${task.status}` }
+  }
+  if (task.dueDate) {
+    const due = new Date(task.dueDate + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (due < today) {
+      if (status.includes('done') || status.includes('complete')) {
+        return { tier: 'building', reason: 'Completed (late)' }
+      }
+      const daysOverdue = Math.ceil((today.getTime() - due.getTime()) / 86400000)
+      return { tier: 'critical', reason: `${daysOverdue}d overdue` }
+    }
+  }
+  if (group.includes('critical') || group.includes('urgent') || group.includes('escalat')) {
+    return { tier: 'critical', reason: `Group: ${task.groupName}` }
+  }
 
-Ù^KÙ][YJ
-HHYKÙ][YJ
-JHÈ
-
-B]\ÈY\	ØÜ]XØ[	ËX\ÛÛ	Ù^\ÓÝ\Y_YÝ\YXBBBY
-ÜÝ\[ÛY\Ê	ØÜ]XØ[	ÊHÜÝ\[ÛY\Ê	Ý\Ù[	ÊHÜÝ\[ÛY\Ê	Ù\ØØ[]	ÊJHÂ]\ÈY\	ØÜ]XØ[	ËX\ÛÛÜÝ\	Ý\ÚËÜÝ\[Y_XBBY
-Ý]\Ë[ÛY\Ê	ÝØZ][ÉÊHÝ]\Ë[ÛY\Ê	Ü[[ÉÊJHÂ]\ÈY\	ÙÛÝÝ\	ËX\ÛÛÝ]\Î	Ý\ÚËÝ]\ßXBBY
-Ý]\Ë[ÛY\Ê	Ü]Y]ÉÊJHÂ]\ÈY\	ÙÛÝÝ\	ËX\ÛÛÝ]\Î	Ý\ÚËÝ]\ßXBBY
-ÜÝ\[ÛY\Ê	ÙÛÝÉÊHÜÝ\[ÛY\Ê	ÝØZ][ÉÊHÜÝ\[ÛY\Ê	Ü]Y]ÉÊJHÂ]\ÈY\	ÙÛÝÝ\	ËX\ÛÛÜÝ\	Ý\ÚËÜÝ\[Y_XBB]\ÈY\	ØZ[[ÉËX\ÛÛ	ÐXÝ]HÛÜÉÈBBËÈ8¥ 8¥ [Ü]HØÛÜ[ÈÜÛÜÜ\8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ [Ý[Û\ÚÔÛÜØÛÜJ\ÚÎ]Z[Y\ÚÊN[X\Â]ØÛÜHHËÈY\ÙZYÚ
-Ü]XØ[\Ý
-BY
-\ÚËY\OOH	ØÜ]XØ[	ÊHØÛÜH
-ÏHL[ÙHY
-\ÚËY\OOH	ÙÛÝÝ\	ÊHØÛÜH
-ÏH
-LËÈ[Ü]HÙZYÚÛÛÝH
-\ÚË[Ü]H	ÉÊKÓÝÙ\Ø\ÙJ
-BY
-[ÛY\Ê	ØÜ]XØ[	ÊJHØÛÜH
-ÏHL[ÙHY
-[ÛY\Ê	Ý\Ù[	ÊH[ÛY\Ê	ÚYÚ	ÊJHØÛÜH
-ÏH[ÙHY
-[ÛY\Ê	ÛYY][IÊJHØÛÜH
-ÏH
-ËÈÝ\YHÛÜÝ
-[ÜHÝ\YHHYÚ\BY
-\ÚËYQ]JHÂÛÛÝYHH]È]J\ÚËYQ]H
-È	Õ	ÊBÛÛÝÙ^HH]È]J
-BÙ^KÙ]Ý\Ê
-BÛÛÝ^\Õ[[HX]ÙZ[
+  if (status.includes('waiting') || status.includes('pending')) {
+    return { tier: 'followup', reason: `Status: ${task.status}` }
+  }
+  if (status.includes('review')) {
+    return { tier: 'followup', reason: `Status: ${task.status}` }
+  }
+  if (group.includes('follow') || group.includes('waiting') || group.includes('review')) {
+    return { tier: 'followup', reason: `Group: ${task.groupName}` }
+  }
 
-YKÙ][YJ
-HHÙ^KÙ][YJ
-JHÈ
-
-BY
-^\Õ[[
-HØÛÜH
-ÏHX]Z[X]XÊ^\Õ[[
-H
-L
-L
-B[ÙHY
-^\Õ[[HÊHØÛÜH
-ÏH[ÙHY
-^\Õ[[H
-ÊHØÛÜH
-ÏHLBËÈØÚÙYÜÝXÚÈÛÜÝÛÛÝÈH
-\ÚËÝ]\È	ÉÊKÓÝÙ\Ø\ÙJ
-BY
-Ë[ÛY\Ê	ÜÝXÚÉÊHË[ÛY\Ê	ØØÚÙY	ÊJHØÛÜH
-ÏHÌËÈ[\ÜÚYÛY[[H
-YYÈ][[ÛBY
-\ÚË\ÜÚYÛY\Ë[ÝOOH
-HØÛÜH
-ÏHML]\ØÛÜBBËÈ8¥ 8¥ ÑUØ\KÜÚXÝËØØ\Y]Z[ØØ\Y^8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ ^Ü\Þ[È[Ý[ÛÑU
-\]Y\Ý^\]Y\Ý
-HÂÛÛÝÈ\Ù\YHH]ØZ]]]
+  return { tier: 'building', reason: 'Active work' }
+}
 
-BY
-]\Ù\Y
-H]\^\ÜÛÙKÛÛÈ\Ü	Õ[]]Ü^Y	ÈKÈÝ]\Î
-HJBÛÛÝØ\YH\]Y\Ý^\ÙX\Ú\[\ËÙ]
-	ØØ\Y	ÊBÛÛÝÛÛXÝYH]ØZ]\ÐÛÛYÊ	ÓSÓVWÐTWÒÑVIÊBY
-XÛÛXÝY
-HÂ]\^\ÜÛÙKÛÛÈ\Ü	Ó[Û^KÛÛHÝÛÛXÝY	ÈKÈÝ]\Î
-JBBHÂËÈYÈØ\Y]\\ÝÙØ\ÈÜHÜÝÛY
-XØ\Y
-HÂÛÛÝØ\ÈH]ØZ]Ù]Ø\Ê
-B]\^\ÜÛÙKÛÛÂØ\ÎØ\ËX\
+// ââ Priority scoring for sort order ââââââââââââââââââââââââââââââââââââââââ
 
-HO
-ÈYY[YN[YHJJKJBBËÈ]Ú\ÚÜÈÜ\ÈØ\[\Ù\È[\[[ÛÛÝØ[\ÚÜË\Ù\×HH]ØZ]ÛZ\ÙK[
-ÂÙ][\ÚÜÕÚ]ÝX][\ÊØØ\YJKÙ]\Ù\Ê
-KJBËÈZ[\Ù\ÛÚÝ\ÛÛÝ\Ù\X\H]ÈX\Ý[ËÈ[YNÝ[ÎÈ]]\Ý[È[O
-BÜ
-ÛÛÝHÙ\Ù\ÊHÂ\Ù\X\Ù]
-KYÈ[YNK[YK]]\KÝ×Ý[XÜÛX[JB\Ù\X\Ù]
-K[YKÓÝÙ\Ø\ÙJ
-KÈ[YNK[YK]]\KÝ×Ý[XÜÛX[JBBËÈ[\XÝ]H\ÚÜÈ
-[XYH[Û^U\ÚÈ\HÛHÙ][\ÚÜÕÚ]ÝX][\ÊBÛÛÝXÝ]U\ÚÜÈH[\ÚÜË[\
-
-HO]Ý]\ÏËÓÝÙ\Ø\ÙJ
-K[ÛY\Ê	ÙÛIÊH	]Ý]\ÏËÓÝÙ\Ø\ÙJ
-K[ÛY\Ê	ØÛÛ\]IÊB
-BËÈÛ\ÜÚYH[[ÙÜBÛÛÝ]Z[Y\ÚÜÎ]Z[Y\ÚÖ×HHXÝ]U\ÚÜËX\
+function taskSortScore(task: DetailedTask): number {
+  let score = 0
 
-\ÚÊHOÂÛÛÝÈY\X\ÛÛHHÛ\ÜÚYU\ÚÊ\ÚÊB]\ÂY\ÚËY[YN\ÚË[YKÝ]\Î\ÚËÝ]\ËYQ]N\ÚËYQ]K[Ü]N\ÚË[Ü]KY\Y\X\ÛÛX\ÛÛ\ÜÚYÛY\Î\ÚË\ÜÚYÛY\ËX\
+  // Tier weight (critical first)
+  if (task.tier === 'critical') score += 10000
+  else if (task.tier === 'followup') score += 5000
 
-NÈYÝ[ÎÈ[YNÝ[ÈJHO
-ÈYKY[YNK[YHJJKÜÝ\[YN\ÚËÜÝ\[YK\ÔÝX][\Î
-\ÚËÝX][\ÏË[Ý
-HÝX][\Î
-\ÚËÝX][\È×JKX\
+  // Priority weight
+  const p = (task.priority || '').toLowerCase()
+  if (p.includes('critical')) score += 1000
+  else if (p.includes('urgent') || p.includes('high')) score += 800
+  else if (p.includes('medium')) score += 400
 
-ÎÈYÝ[ÎÈ[YNÝ[ÎÈÝ]\ÎÝ[È[JHO
-ÂYËY[YNË[YKÝ]\ÎËÝ]\ËJJKBJBËÈÛÜH[Ü]HØÛÜH
-YÚ\Ý\Ý
-B]Z[Y\ÚÜËÛÜ
+  // Overdue boost (more overdue = higher)
+  if (task.dueDate) {
+    const due = new Date(task.dueDate + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const daysUntil = Math.ceil((due.getTime() - today.getTime()) / 86400000)
+    if (daysUntil < 0) score += Math.min(Math.abs(daysUntil) * 10, 500)
+    else if (daysUntil <= 3) score += 200
+    else if (daysUntil <= 7) score += 100
+  }
 
-KHO\ÚÔÛÜØÛÜJHH\ÚÔÛÜØÛÜJJJBËÈZ[ÝÛ\Ú\]BÛÛÝÝÛ\X\H]ÈX\Ý[ËÝÛ\Ú\]O
-BÜ
-ÛÛÝ\ÚÈÙ]Z[Y\ÚÜÊHÂÜ
-ÛÛÝ\ÜÚYÛYHÙ\ÚË\ÜÚYÛY\ÊHÂY
-[ÝÛ\X\\Ê\ÜÚYÛYKY
-JHÂÛÛÝ\Ù\[ÈH\Ù\X\Ù]
-\ÜÚYÛYKY
-BÝÛ\X\Ù]
-\ÜÚYÛYKYÂY\ÜÚYÛYKY[YN\ÜÚYÛYK[YK]]\\Ù\[ÏË]]\[\ÚÐÛÝ[Ü]XØ[ÛÝÝ\Z[[ÎJBBÛÛÝÝÛ\HÝÛ\X\Ù]
-\ÜÚYÛYKY
-HBÝÛ\\ÚÐÛÝ[
-ÊÂÝÛ\Ý\ÚËY\JÊÂBBËÈY[\ÜÚYÛYXÚÙ]ÛÛÝ[\ÜÚYÛYÛÝ[H]Z[Y\ÚÜË[\
-
-HO\ÜÚYÛY\Ë[ÝOOH
-K[ÝY
-[\ÜÚYÛYÛÝ[
-HÂÛÛÝ[\ÜÚYÛY\ÚÜÈH]Z[Y\ÚÜË[\
-
-HO\ÜÚYÛY\Ë[ÝOOH
-BÝÛ\X\Ù]
-	Ý[\ÜÚYÛY	ËÂY	Ý[\ÜÚYÛY	Ë[YN	Õ[\ÜÚYÛY	Ë]]\[\ÚÐÛÝ[[\ÜÚYÛYÛÝ[Ü]XØ[[\ÜÚYÛY\ÚÜË[\
-
-HOY\OOH	ØÜ]XØ[	ÊK[ÝÛÝÝ\[\ÜÚYÛY\ÚÜË[\
-
-HOY\OOH	ÙÛÝÝ\	ÊK[ÝZ[[Î[\ÜÚYÛY\ÚÜË[\
-
-HOY\OOH	ØZ[[ÉÊK[ÝJBBÛÛÝÝÛ\Ú\H\^KÛJÝÛ\X\[Y\Ê
-JKÛÜ
+  // Blocked/stuck boost
+  const s = (task.status || '').toLowerCase()
+  if (s.includes('stuck') || s.includes('blocked')) score += 300
 
-KHO\ÚÐÛÝ[HK\ÚÐÛÝ[
-BÛÛÝØ\[YHH[\ÚÜÖÌOËØ\[YH	Õ[ÛÝÛØ\	Â]\^\ÜÛÙKÛÛØØ\YØ\[YK\ÚÜÎ]Z[Y\ÚÜËÝÛ\Ú\Ý[\ÚÜÎ]Z[Y\ÚÜË[ÝÛÝ[ÎØÜ]XØ[]Z[Y\ÚÜË[\
-
-OOY\OOIØÜ]XØ[	ÊK[ÝÛÝÝ\]Z[Y\ÚÜË[\
-
-OOY\OOIÙÛÝÝ\	ÊK[ÝZ[[Î]Z[Y\ÚÜË[\
-
-OOY\OOIØZ[[ÉÊK[Ý_\Ø]\ÙY\ÈØ\]Z[
-_XØ]Ú
-\^ØÛÛÛÛK\Ü	ÐØ\]Z[\ÜË\W'return NextResponse.json({error:err instanceof Error?err.message:'Failed to fetch board detail'},{status:500})}}
+  // Unassigned penalty (needs attention)
+  if (task.assignees.length === 0) score += 150
+
+  return score
+}
+
+// ââ GET /api/projects/board-detail?boardId=xxx âââââââââââââââââââââââââââââ
+
+export async function GET(request: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const boardId = request.nextUrl.searchParams.get('boardId')
+
+  const connected = await hasConfig('MONDAY_API_KEY')
+  if (!connected) {
+    return NextResponse.json({ error: 'Monday.com not connected' }, { status: 400 })
+  }
+
+  try {
+    // If no boardId, return list of boards for the dropdown
+    if (!boardId) {
+      const boards = await getBoards()
+      return NextResponse.json({
+        boards: boards.map((b) => ({ id: b.id, name: b.name })),
+      })
+    }
+
+    // Fetch tasks for this board and users in parallel
+    const [allTasks, users] = await Promise.all([
+      getAllTasksWithSubitems([boardId]),
+      getUsers(),
+    ])
+
+    // Build user lookup
+    const userMap = new Map<string, { name: string; avatar: string | null }>()
+    for (const u of users) {
+      userMap.set(u.id, { name: u.name, avatar: u.photo_thumb_small })
+      userMap.set(u.name.toLowerCase(), { name: u.name, avatar: u.photo_thumb_small })
+    }
+
+    // Filter active tasks (already MondayTask type from getAllTasksWithSubitems)
+    const activeTasks = allTasks.filter(
+      (t) => !t.status?.toLowerCase().includes('done') && !t.status?.toLowerCase().includes('complete')
+    )
+
+    // Classify and transform
+    const detailedTasks: DetailedTask[] = activeTasks.map((task) => {
+      const { tier, reason } = classifyTask(task)
+      return {
+        id: task.id,
+        name: task.name,
+        status: task.status,
+        dueDate: task.dueDate,
+        priority: task.priority,
+        tier,
+        tierReason: reason,
+        assignees: task.assignees.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })),
+        groupName: task.groupName,
+        hasSubitems: (task.subitems?.length || 0) > 0,
+        subitems: (task.subitems || []).map((s: { id: string; name: string; status: string | null }) => ({
+          id: s.id,
+          name: s.name,
+          status: s.status,
+        })),
+      }
+    })
+
+    // Sort by priority score (highest first)
+    detailedTasks.sort((a, b) => taskSortScore(b) - taskSortScore(a))
+
+    // Build ownership data
+    const ownerMap = new Map<string, OwnershipData>()
+    for (const task of detailedTasks) {
+      for (const assignee of task.assignees) {
+        if (!ownerMap.has(assignee.id)) {
+          const userInfo = userMap.get(assignee.id)
+          ownerMap.set(assignee.id, {
+            id: assignee.id,
+            name: assignee.name,
+            avatar: userInfo?.avatar || null,
+            taskCount: 0,
+            critical: 0,
+            followup: 0,
+            building: 0,
+          })
+        }
+        const owner = ownerMap.get(assignee.id)!
+        owner.taskCount++
+        owner[task.tier]++
+      }
+    }
+
+    // Add unassigned bucket
+    const unassignedCount = detailedTasks.filter((t) => t.assignees.length === 0).length
+    if (unassignedCount > 0) {
+      const unassignedTasks = detailedTasks.filter((t) => t.assignees.length === 0)
+      ownerMap.set('unassigned', {
+        id: 'unassigned',
+        name: 'Unassigned',
+        avatar: null,
+        taskCount: unassignedCount,
+        critical: unassignedTasks.filter((t) => t.tier === 'critical').length,
+        followup: unassignedTasks.filter((t) => t.tier === 'followup').length,
+        building: unassignedTasks.filter((t) => t.tier === 'building').length,
+      })
+    }
+
+    const ownership = Array.from(ownerMap.values()).sort((a, b) => b.taskCount - a.taskCount)
+
+    const boardName = allTasks[0]?.boardName || 'Unknown Board'
+
+    return NextResponse.json({
+      boardId,
+      boardName,
+      tasks: detailedTasks,
+      ownership,
+      totalTasks: detailedTasks.length,
+      counts: {
+        critical: detailedTasks.filter((t) => t.tier === 'critical').length,
+        followup: detailedTasks.filter((t) => t.tier === 'followup').length,
+        building: detailedTasks.filter((t) => t.tier === 'building').length,
+      },
+    } satisfies BoardDetail)
+  } catch (err) {
+    console.error('Board detail error:', err)
+    return NextResponse.json({
+      error: err instanceof Error ? err.message : 'Failed to fetch board detail',
+    }, { status: 500 })
+  }
+}
