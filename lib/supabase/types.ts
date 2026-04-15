@@ -215,6 +215,21 @@ export type TaskMilestone = {
   updated_at: string
 }
 
+export type BoardMilestone = {
+  id: string
+  board_id: string
+  milestone_number: number
+  title: string
+  monday_task_id: string | null
+  task_name: string | null
+  assignee_name: string | null
+  due_date: string | null
+  status: 'not_started' | 'in_progress' | 'done'
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -312,6 +327,12 @@ export type Database = {
         Row: TaskMilestone
         Insert: Partial<TaskMilestone> & Pick<TaskMilestone, 'monday_task_id' | 'title' | 'user_id'>
         Update: Partial<TaskMilestone>
+        Relationships: []
+      }
+      board_milestones: {
+        Row: BoardMilestone
+        Insert: Partial<BoardMilestone> & Pick<BoardMilestone, 'board_id' | 'milestone_number' | 'user_id'>
+        Update: Partial<BoardMilestone>
         Relationships: []
       }
     }
