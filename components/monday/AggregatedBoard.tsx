@@ -949,7 +949,3 @@ export function AggregatedBoard() {
   </div>
  )
 }
- )}
-  </div>
- )
-}
