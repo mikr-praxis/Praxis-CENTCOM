@@ -1,0 +1,55 @@
+# SessionEnd Forensic Snapshot
+
+**Timestamp (UTC):** 2026-04-16T18:14:53Z
+**Triggered by:** Claude Code SessionEnd hook (auto)
+**CWD at session end:** /Users/bakedbros/Desktop/Praxis
+**Repo root:** /Users/bakedbros/Desktop/Praxis
+
+## Branch
+```
+main
+```
+
+## git status --short
+```
+ M .context/.last-active
+?? .DS_Store
+?? .claude/mobile-ux-checklist.md
+?? .claude/worktrees/
+?? .context/last-session-snapshot-2026-04-16-111453.txt
+?? CentCom-Integration-Setup-Tasks.docx
+?? Praxis-CENTCOM-7Day-Recap.docx
+```
+
+## Unstaged changes (git diff --stat)
+```
+ .context/.last-active | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+## Staged changes (git diff --cached --stat)
+```
+```
+
+## Last 10 commits
+```
+b88710e fix: remove Comms tab from sidebar
+e9aab42 context: SessionEnd auto-save 2026-04-16T17:19:45Z
+4d7d251 context: SessionEnd auto-save 2026-04-16T17:09:47Z
+581f132 feat: add seed endpoint for Mashore sample data
+a8d987b context: SessionEnd auto-save 2026-04-16T16:49:45Z
+c4c83e8 context: SessionEnd auto-save 2026-04-16T04:56:14Z
+2c0bd29 context: SessionEnd auto-save 2026-04-16T04:41:14Z
+5b08413 fix: revert to Sonnet — user on free tier with resetting credits
+093f603 fix: switch agents to Haiku (cheaper) and reset rate limit key
+4db2857 context: SessionEnd auto-save 2026-04-16T04:31:14Z
+```
+
+## Stash list
+```
+```
+
+---
+
+This file is a mechanical snapshot. For narrative context, see
+the most recent dated save or checkpoint in this directory.
