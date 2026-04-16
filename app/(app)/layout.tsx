@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
 import { AppShell } from '@/components/layout/AppShell'
@@ -11,8 +12,15 @@ export default async function AppLayout({
   children: React.ReactNode
 }) {
   const userInfo = await getUserRole()
-  const role = userInfo?.role ?? 'cs'
-  const email = userInfo?.email ?? ''
+
+  // Authorization gate: only 'exec' users (authorized emails) may enter the app.
+  // Unauthorized signed-in users land on /unauthorized.
+  if (!userInfo || userInfo.role !== 'exec') {
+    redirect('/unauthorized')
+  }
+
+  const role = userInfo.role
+  const email = userInfo.email
 
   return (
     <RoleProvider role={role} email={email}>
