@@ -14,7 +14,7 @@ export async function GET(
   const { slug } = await params
   const url = new URL(request.url)
   const timeRange = url.searchParams.get('range') || '13w'
-  const periodType = url.searchParams.get('period') || 'week'
+  const periodType = (url.searchParams.get('period') || 'week') as 'day' | 'week' | 'month'
 
   const supabase = createServerClient()
 

@@ -8,7 +8,7 @@ import { FunnelViz } from '@/components/dashboard/client/FunnelViz'
 import { ClientTrendChart } from '@/components/dashboard/client/ClientTrendChart'
 import { DataQualityBanner } from '@/components/dashboard/client/DataQualityBanner'
 import { MappingReviewUI } from '@/components/dashboard/client/MappingReviewUI'
-import type { FunnelType, CanonicalMetric, MetricSnapshot, DataSource } from '@/lib/metrics/types'
+import type { FunnelType, CanonicalMetric, MetricSnapshot, DataSource, MapperResult, SheetTabData } from '@/lib/metrics/types'
 
 interface ClientDashboardProps {
   client: {
@@ -349,6 +349,5 @@ export function ClientDashboard({
   )
 }
 
-import type { MapperResult, SheetTabData } from '@/lib/metrics/types'
 type MapperResultType = MapperResult
 type SheetDataType = SheetTabData & { allRows?: string[][] }
