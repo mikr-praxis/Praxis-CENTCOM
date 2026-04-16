@@ -24,7 +24,7 @@ export function MetricCard({ title, value, subtitle, icon: Icon, trend, color = 
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-slate-400">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-slate-100">{value}</p>
+          <p className="mt-2 text-2xl md:text-3xl font-bold text-slate-100 break-words">{value}</p>
           {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
           {trend && (
             <p className={clsx('mt-2 text-xs font-medium', trend.value >= 0 ? 'text-emerald-400' : 'text-red-400')}>

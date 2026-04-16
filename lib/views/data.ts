@@ -1,9 +1,9 @@
 // Team members
 export const TEAM_MEMBERS = [
-  { id: 'nadeem', name: 'Nadeem', role: 'Co-Founder', group: 'exec', avatar: '🟠' },
-  { id: 'derek', name: 'Derek', role: 'Co-Founder', group: 'exec', avatar: '🔵' },
-  { id: 'kevin', name: 'Kevin', role: 'Co-Founder', group: 'exec', avatar: '🟢' },
-  { id: 'mike', name: 'Mike', role: 'Data & Ops', group: 'data-analyst', avatar: '🟣' },
+  { id: 'nadeem', name: 'Nadeem', calendarEmail: 'nadeem@builtbypraxis.com', role: 'Co-Founder', group: 'exec', avatar: '🟠' },
+  { id: 'derek', name: 'Derek', calendarEmail: 'derek@builtbypraxis.com', role: 'Co-Founder', group: 'exec', avatar: '🔵' },
+  { id: 'kevin', name: 'Kevin', calendarEmail: 'kevin@builtbypraxis.com', role: 'Co-Founder', group: 'exec', avatar: '🟢' },
+  { id: 'mike', name: 'Mike', calendarEmail: 'mscott@builtbypraxis.com', role: 'Data & Ops', group: 'data-analyst', avatar: '🟣' },
 ] as const
 
 export type TeamMemberId = typeof TEAM_MEMBERS[number]['id']

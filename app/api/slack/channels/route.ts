@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { getSlackClient } from '@/lib/slack'
+import { getSlackClient, SLACK_WRITE_CHANNEL_ID } from '@/lib/slack'
 import type { SlackChannel } from '@/lib/slack'
 
 export async function GET() {
@@ -10,9 +10,9 @@ export async function GET() {
   }
 
   try {
-    const slack = getSlackClient()
+    const slack = await getSlackClient()
     const result = await slack.conversations.list({
-      types: 'public_channel',
+      types: 'public_channel,private_channel',
       exclude_archived: true,
       limit: 100,
     })
@@ -29,7 +29,7 @@ export async function GET() {
     // Sort by name
     channels.sort((a, b) => a.name.localeCompare(b.name))
 
-    return NextResponse.json({ channels })
+    return NextResponse.json({ channels, writeChannelId: SLACK_WRITE_CHANNEL_ID })
   } catch (error) {
     console.error('Slack channels error:', error)
     const message = error instanceof Error ? error.message : 'Failed to fetch channels'

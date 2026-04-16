@@ -4,16 +4,11 @@ import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { ChevronRight, Calendar } from 'lucide-react'
 import type { Task } from '@/lib/supabase/types'
+import { priorityVariant } from '@/lib/styles/colors'
 
 type TaskCardProps = {
   task: Task
   onAdvance?: (taskId: string) => void
-}
-
-const priorityVariant: Record<string, 'red' | 'amber' | 'green'> = {
-  high: 'red',
-  medium: 'amber',
-  low: 'green',
 }
 
 export function TaskCard({ task, onAdvance }: TaskCardProps) {

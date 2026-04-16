@@ -20,7 +20,7 @@ export function WeekGrid({ events, weekStart }: WeekGridProps) {
   today.setHours(0, 0, 0, 0)
 
   return (
-    <div className="grid grid-cols-7 gap-2">
+    <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
       {days.map((day) => {
         const dateStr = day.toISOString().split('T')[0]
         const dayEvents = events.filter((e) => e.event_date === dateStr)
@@ -30,7 +30,7 @@ export function WeekGrid({ events, weekStart }: WeekGridProps) {
           <div
             key={dateStr}
             className={clsx(
-              'rounded-xl border p-3 min-h-[120px]',
+              'rounded-xl border p-2 sm:p-3 min-h-[80px] sm:min-h-[120px]',
               isToday
                 ? 'border-amber-500/50 bg-amber-500/5'
                 : 'border-slate-700/50 bg-slate-800/30'

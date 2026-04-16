@@ -4,6 +4,8 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid'
 import { TrendChart } from '@/components/dashboard/TrendChart'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { StackHealth } from '@/components/dashboard/StackHealth'
+import { SlackWidget } from '@/components/dashboard/SlackWidget'
+import { MondayWidget } from '@/components/dashboard/MondayWidget'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { AlertCircle } from 'lucide-react'
@@ -16,21 +18,40 @@ export default async function DashboardPage() {
 
   const supabase = createServerClient()
 
-  const [tasksRes, budgetRes, eventsRes] = await Promise.all([
+  const [tasksRes, budgetRes, eventsRes, agentLogsRes, workflowsRes] = await Promise.all([
     supabase.from('tasks').select('*').eq('user_id', userId),
     supabase.from('budget_items').select('*').eq('user_id', userId),
     supabase.from('events').select('*').eq('user_id', userId),
+    supabase.from('agent_logs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
+    supabase.from('workflows').select('*').eq('user_id', userId),
   ])
 
   const tasks = tasksRes.data || []
   const budgetItems = budgetRes.data || []
   const events = eventsRes.data || []
+  const agentLogs = agentLogsRes.data || []
+  const workflows = workflowsRes.data || []
 
   const activeTasks = tasks.filter((t) => t.status !== 'done').length
   const totalBurn = budgetItems.reduce((sum, i) => sum + Number(i.cost), 0)
 
-  // Events this week
+  // ── Real week-over-week trends ─────────────────────────────────────
   const now = new Date()
+  const oneWeekAgo = new Date(now)
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+  const twoWeeksAgo = new Date(now)
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
+
+  // Tasks: active tasks created this week vs last week
+  const tasksThisWeek = tasks.filter((t) => t.status !== 'done' && new Date(t.created_at) >= oneWeekAgo).length
+  const tasksLastWeek = tasks.filter(
+    (t) => t.status !== 'done' && new Date(t.created_at) >= twoWeeksAgo && new Date(t.created_at) < oneWeekAgo
+  ).length
+  const tasksTrend = tasksLastWeek > 0
+    ? Math.round(((tasksThisWeek - tasksLastWeek) / tasksLastWeek) * 100)
+    : tasksThisWeek > 0 ? 100 : 0
+
+  // Events this week
   const weekEnd = new Date(now)
   weekEnd.setDate(weekEnd.getDate() + 7)
   const eventsThisWeek = events.filter((e) => {
@@ -38,16 +59,88 @@ export default async function DashboardPage() {
     return d >= now && d <= weekEnd
   }).length
 
+  // ── Real 4-week trend data ─────────────────────────────────────────
+  const trendData = Array.from({ length: 4 }, (_, i) => {
+    const weekIdx = 3 - i // start from 4 weeks ago
+    const weekStart = new Date(now)
+    weekStart.setDate(weekStart.getDate() - (weekIdx + 1) * 7)
+    const weekEndDate = new Date(now)
+    weekEndDate.setDate(weekEndDate.getDate() - weekIdx * 7)
+
+    const weekTasks = tasks.filter((t) => {
+      const d = new Date(t.created_at)
+      return d >= weekStart && d < weekEndDate
+    }).length
+
+    // Budget burn is cumulative (doesn't change week to week) — show total
+    // This could be improved with a monthly breakdown if budget items had a date range
+    return {
+      week: `Week ${i + 1}`,
+      burn: totalBurn,
+      tasks: weekTasks,
+    }
+  })
+
+  // ── Real activity feed from DB ─────────────────────────────────────
+  type Activity = { id: string; action: string; subject: string; module: string; time: string; sortDate: Date }
+  const activities: Activity[] = []
+
+  // Recent tasks (created or completed recently)
+  const recentTasks = [...tasks]
+    .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
+    .slice(0, 5)
+
+  for (const t of recentTasks) {
+    const date = new Date(t.updated_at || t.created_at)
+    activities.push({
+      id: `task-${t.id}`,
+      action: t.status === 'done' ? 'completed' : t.status === 'inprogress' ? 'moved' : 'created',
+      subject: t.title,
+      module: 'Tasks',
+      time: formatTimeAgo(date),
+      sortDate: date,
+    })
+  }
+
+  // Recent agent runs
+  for (const log of agentLogs.slice(0, 3)) {
+    const date = new Date(log.created_at)
+    activities.push({
+      id: `agent-${log.id}`,
+      action: 'ran',
+      subject: log.agent_name || log.agent_id,
+      module: 'Agents',
+      time: formatTimeAgo(date),
+      sortDate: date,
+    })
+  }
+
+  // Recent workflow activity
+  const recentWorkflows = [...workflows]
+    .filter((w) => w.last_run)
+    .sort((a, b) => new Date(b.last_run!).getTime() - new Date(a.last_run!).getTime())
+    .slice(0, 3)
+
+  for (const w of recentWorkflows) {
+    const date = new Date(w.last_run!)
+    activities.push({
+      id: `workflow-${w.id}`,
+      action: 'ran',
+      subject: w.name,
+      module: 'Comms',
+      time: formatTimeAgo(date),
+      sortDate: date,
+    })
+  }
+
+  // Sort all activities by date, take top 6
+  const sortedActivities = activities
+    .sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime())
+    .slice(0, 6)
+    .map(({ sortDate: _sortDate, ...rest }) => rest)
+
   // High priority tasks for Today's Focus
   const focusTasks = tasks.filter((t) => t.priority === 'high' && t.status !== 'done')
-
-  // Mock activity feed
-  const activities = [
-    { id: '1', action: 'completed', subject: 'Write agent prompt templates', module: 'Tasks', time: '2 hours ago' },
-    { id: '2', action: 'created', subject: 'Budget Alert Monitor', module: 'Comms', time: '4 hours ago' },
-    { id: '3', action: 'moved', subject: 'Test Clerk auth flow', module: 'Tasks', time: '5 hours ago' },
-    { id: '4', action: 'ran', subject: 'Weekly Report Agent', module: 'Agents', time: '1 day ago' },
-  ]
 
   return (
     <div className="space-y-6">
@@ -61,13 +154,19 @@ export default async function DashboardPage() {
         activeTasks={activeTasks}
         eventsThisWeek={eventsThisWeek}
         stackTools={budgetItems.length}
+        tasksTrend={tasksTrend}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <TrendChart />
+          <TrendChart data={trendData} />
         </div>
-        <ActivityFeed activities={activities} />
+        <ActivityFeed activities={sortedActivities} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SlackWidget />
+        <MondayWidget />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -97,4 +196,13 @@ export default async function DashboardPage() {
       </div>
     </div>
   )
+}
+
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return 'Just now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
+import { getConfig } from '@/lib/config'
 
 export async function GET() {
-  const token = process.env.VERCEL_API_TOKEN
-  const projectId = process.env.VERCEL_PROJECT_ID
+  const token = await getConfig('VERCEL_API_TOKEN')
+  const projectId = await getConfig('VERCEL_PROJECT_ID')
 
   // If no Vercel token configured, return idle
   if (!token || !projectId) {

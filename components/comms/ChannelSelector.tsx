@@ -15,9 +15,10 @@ type Channel = {
 type ChannelSelectorProps = {
   selectedChannel: string | null
   onSelect: (channelId: string, channelName: string) => void
+  onWriteChannelLoaded?: (writeChannelId: string) => void
 }
 
-export function ChannelSelector({ selectedChannel, onSelect }: ChannelSelectorProps) {
+export function ChannelSelector({ selectedChannel, onSelect, onWriteChannelLoaded }: ChannelSelectorProps) {
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +35,9 @@ export function ChannelSelector({ selectedChannel, onSelect }: ChannelSelectorPr
       }
       const data = await res.json()
       setChannels(data.channels)
+      if (data.writeChannelId && onWriteChannelLoaded) {
+        onWriteChannelLoaded(data.writeChannelId)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load channels')
     } finally {

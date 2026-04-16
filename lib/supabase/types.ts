@@ -123,6 +123,157 @@ export type ClientEventRow = {
   notes: string | null
 }
 
+export type ProjectStage = 'lead' | 'discovery' | 'proposal' | 'onboarded' | 'building' | 'qa' | 'deployed'
+
+export type Project = {
+  id: string
+  name: string
+  client_tag: string | null
+  slack_tag: string | null
+  slack_channel_id: string | null
+  stage: ProjectStage
+  priority: 'high' | 'medium' | 'low'
+  owner_id: string | null
+  description: string | null
+  deadline: string | null
+  notes: string | null
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export const PROJECT_STAGES: { key: ProjectStage; label: string; color: string }[] = [
+  { key: 'lead', label: 'Lead', color: 'slate' },
+  { key: 'discovery', label: 'Discovery', color: 'purple' },
+  { key: 'proposal', label: 'Proposal', color: 'blue' },
+  { key: 'onboarded', label: 'Onboarded', color: 'cyan' },
+  { key: 'building', label: 'Building', color: 'amber' },
+  { key: 'qa', label: 'QA', color: 'orange' },
+  { key: 'deployed', label: 'Deployed', color: 'green' },
+]
+
+export type GoogleToken = {
+  id: string
+  user_id: string
+  email: string
+  access_token: string
+  refresh_token: string
+  token_expiry: string
+  created_at: string
+  updated_at: string
+}
+
+export type AppConfig = {
+  id: string
+  key: string
+  value: string
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type TeamCalendar = {
+  id: string
+  email: string
+  display_name: string
+  color: string
+  role: string | null
+  is_ops: boolean
+  enabled: boolean
+  source: string
+  created_at: string
+  updated_at: string
+}
+
+export type MondayTask = {
+  id: string
+  name: string
+  board_id: string
+  board_name: string
+  group_id: string
+  group_name: string
+  status: string | null
+  priority: string | null
+  due_date: string | null
+  timeline_start: string | null
+  timeline_end: string | null
+  assignees: unknown
+  column_values: unknown
+  state: string
+  synced_at: string
+  created_at: string
+  updated_at: string
+}
+
+export type MondayWebhookLog = {
+  id: string
+  event_type: string
+  item_id: string | null
+  board_id: string | null
+  payload: unknown
+  processed: boolean
+  created_at: string
+}
+
+export type ProjectKPI = {
+  id: string
+  board_id: string
+  kpi_name: string
+  target_value: number | null
+  current_value: number | null
+  unit: string
+  sort_order: number
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type KPISnapshot = {
+  id: string
+  kpi_id: string
+  value: number
+  recorded_at: string
+}
+
+export type MondayColumnMapping = {
+  board_id: string
+  board_name: string
+  status_column_id: string | null
+  date_column_id: string | null
+  priority_column_id: string | null
+  timeline_column_id: string | null
+  custom_mappings: unknown
+  updated_at: string
+}
+
+export type TaskMilestone = {
+  id: string
+  monday_task_id: string
+  title: string
+  description: string | null
+  status: 'pending' | 'in_progress' | 'done'
+  sort_order: number
+  due_date: string | null
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type BoardMilestone = {
+  id: string
+  board_id: string
+  milestone_number: number
+  title: string
+  monday_task_id: string | null
+  task_name: string | null
+  assignee_name: string | null
+  due_date: string | null
+  status: 'not_started' | 'in_progress' | 'done'
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -184,6 +335,72 @@ export type Database = {
         Row: MessageLog
         Insert: Partial<MessageLog> & Pick<MessageLog, 'channel_id' | 'message_text' | 'user_id'>
         Update: Partial<MessageLog>
+        Relationships: []
+      }
+      projects: {
+        Row: Project
+        Insert: Partial<Project> & Pick<Project, 'name' | 'user_id'>
+        Update: Partial<Project>
+        Relationships: []
+      }
+      app_config: {
+        Row: AppConfig
+        Insert: Partial<AppConfig> & Pick<AppConfig, 'key' | 'value'>
+        Update: Partial<AppConfig>
+        Relationships: []
+      }
+      google_tokens: {
+        Row: GoogleToken
+        Insert: Partial<GoogleToken> & Pick<GoogleToken, 'user_id' | 'email' | 'access_token' | 'refresh_token' | 'token_expiry'>
+        Update: Partial<GoogleToken>
+        Relationships: []
+      }
+      team_calendars: {
+        Row: TeamCalendar
+        Insert: Partial<TeamCalendar> & Pick<TeamCalendar, 'email' | 'display_name'>
+        Update: Partial<TeamCalendar>
+        Relationships: []
+      }
+      monday_tasks: {
+        Row: MondayTask
+        Insert: Partial<MondayTask> & Pick<MondayTask, 'id' | 'name' | 'board_id' | 'board_name' | 'group_id' | 'group_name'>
+        Update: Partial<MondayTask>
+        Relationships: []
+      }
+      monday_webhook_log: {
+        Row: MondayWebhookLog
+        Insert: Partial<MondayWebhookLog> & Pick<MondayWebhookLog, 'event_type'>
+        Update: Partial<MondayWebhookLog>
+        Relationships: []
+      }
+      monday_column_mappings: {
+        Row: MondayColumnMapping
+        Insert: Partial<MondayColumnMapping> & Pick<MondayColumnMapping, 'board_id' | 'board_name'>
+        Update: Partial<MondayColumnMapping>
+        Relationships: []
+      }
+      project_kpis: {
+        Row: ProjectKPI
+        Insert: Partial<ProjectKPI> & Pick<ProjectKPI, 'board_id' | 'kpi_name' | 'user_id'>
+        Update: Partial<ProjectKPI>
+        Relationships: []
+      }
+      kpi_snapshots: {
+        Row: KPISnapshot
+        Insert: Partial<KPISnapshot> & Pick<KPISnapshot, 'kpi_id' | 'value'>
+        Update: Partial<KPISnapshot>
+        Relationships: []
+      }
+      task_milestones: {
+        Row: TaskMilestone
+        Insert: Partial<TaskMilestone> & Pick<TaskMilestone, 'monday_task_id' | 'title' | 'user_id'>
+        Update: Partial<TaskMilestone>
+        Relationships: []
+      }
+      board_milestones: {
+        Row: BoardMilestone
+        Insert: Partial<BoardMilestone> & Pick<BoardMilestone, 'board_id' | 'milestone_number' | 'user_id'>
+        Update: Partial<BoardMilestone>
         Relationships: []
       }
     }

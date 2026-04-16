@@ -6,9 +6,10 @@ type KPIGridProps = {
   activeTasks: number
   eventsThisWeek: number
   stackTools: number
+  tasksTrend?: number
 }
 
-export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools }: KPIGridProps) {
+export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools, tasksTrend }: KPIGridProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <MetricCard
@@ -16,7 +17,6 @@ export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools }: KPIGr
         value={`$${burn}`}
         subtitle="across all stack tools"
         icon={DollarSign}
-        trend={{ value: -5, label: 'vs last month' }}
         color="red"
       />
       <MetricCard
@@ -24,7 +24,7 @@ export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools }: KPIGr
         value={activeTasks}
         subtitle="todo + in progress + review"
         icon={CheckSquare}
-        trend={{ value: 12, label: 'this week' }}
+        trend={tasksTrend !== undefined && tasksTrend !== 0 ? { value: tasksTrend, label: 'vs last week' } : undefined}
         color="blue"
       />
       <MetricCard
