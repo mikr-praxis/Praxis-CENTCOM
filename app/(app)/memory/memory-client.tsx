@@ -135,7 +135,12 @@ export function MemoryClient({ entries }: { entries: MemoryEntry[] }) {
               <pre className="whitespace-pre-wrap break-words text-sm text-slate-300 font-sans bg-slate-900/50 rounded-lg p-4 border border-slate-700/30">
 {entry.body}
               </pre>
-              <p className="text-[11px] text-slate-600 mt-2 font-mono">{entry.slug}.md</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-[11px] text-slate-600 font-mono">{entry.slug}.md</p>
+                {entry.updatedAt && (
+                  <p className="text-[11px] text-slate-600">Updated {entry.updatedAt}</p>
+                )}
+              </div>
             </Card>
           )
         })}

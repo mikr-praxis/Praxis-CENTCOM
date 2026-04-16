@@ -8,6 +8,7 @@ export type MemoryEntry = {
   description: string
   type: MemoryType
   body: string
+  updatedAt: string
 }
 
 // Default entries — kept as fallback, but runtime reads from app_config MEMORY_ENTRIES_JSON
@@ -17,6 +18,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'User — Mikr',
     description: 'Owner profile — Built by Praxis agency founder, senior developer, primary CENTCOM user',
     type: 'user',
+    updatedAt: '2026-04-16',
     body: `- Name: Mikr
 - Email: mscott@builtbypraxis.com
 - Role: Founder and operator of Built by Praxis, a full-stack marketing operations agency
@@ -30,6 +32,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'Project — CENTCOM Dashboard',
     description: 'Stack, architecture patterns, and deployment config',
     type: 'project',
+    updatedAt: '2026-04-16',
     body: `CENTCOM is the internal operations dashboard for Built by Praxis.
 
 **Stack:** Next.js 16.2.2, React 19, TypeScript, Supabase, Clerk v7, Tailwind CSS v4, Recharts, Lucide React, PostHog, Upstash Redis, Anthropic SDK
@@ -45,6 +48,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'Integrations Status',
     description: 'Which integrations are live vs pending — updated 2026-04-16',
     type: 'project',
+    updatedAt: '2026-04-16',
     body: `**Live:**
 - Slack — bot token in Vercel, channels/messages/send working
 - Gmail — MCP connector, mscott@builtbypraxis.com
@@ -69,6 +73,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'External Systems',
     description: 'URLs and identifiers for all external services',
     type: 'reference',
+    updatedAt: '2026-04-16',
     body: `- **Vercel:** project praxis-centcom, team mscott-8907s-projects, URL praxis-centcom.vercel.app
 - **GitHub:** repo mikr-praxis/Praxis-CENTCOM
 - **Supabase:** project xnbsvfjkmpzoxrdhfpwx
@@ -82,6 +87,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'Session Preferences',
     description: 'How Mikr prefers Claude to operate — autonomy, no trailing summaries',
     type: 'feedback',
+    updatedAt: '2026-04-16',
     body: `- Run /sessionstart at the beginning of sessions to bootstrap context
 - Push, deploy, and take action without asking for approval — be autonomous
 - Monitor Vercel deploys after every push — fix build errors before reporting done
@@ -94,6 +100,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'Client Performance Dashboard',
     description: 'M1 foundation deployed — internal dashboards for client funnel metrics',
     type: 'project',
+    updatedAt: '2026-04-16',
     body: `**Status:** M1 Foundation complete and deployed. Infrastructure live.
 
 **Architecture:** Ingest client data (Sheets/CSV) → AI-map to canonical funnel metrics (Opus) → store in Supabase → render Clerk-gated dashboards at /dashboard/[slug]
@@ -111,6 +118,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'Fix Builds Before Reporting Done',
     description: 'Monitor Vercel deploy after every push — fix errors until green',
     type: 'feedback',
+    updatedAt: '2026-04-16',
     body: `After pushing code, always monitor the Vercel deploy and fix any build errors immediately. Never report work as "done" with a broken preview. The user expects a working URL.
 
 **Why:** User was frustrated when M1 code was presented as complete but the preview deploy was broken from TS errors.
