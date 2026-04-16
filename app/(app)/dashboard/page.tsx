@@ -8,7 +8,8 @@ import { SlackWidget } from '@/components/dashboard/SlackWidget'
 import { MondayWidget } from '@/components/dashboard/MondayWidget'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, BarChart3, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -194,7 +195,72 @@ export default async function DashboardPage() {
         </Card>
         <StackHealth items={budgetItems} />
       </div>
+
+      <ClientPerformanceWidget />
     </div>
+  )
+}
+
+async function ClientPerformanceWidget() {
+  const supabase = createServerClient()
+  const { data: clients } = await supabase.from('clients').select('id, slug, name, funnel_type')
+
+  if (!clients || clients.length === 0) return null
+
+  // Get latest cash_collected for each client
+  const clientData = await Promise.all(
+    clients.map(async (c) => {
+      const { data: latest } = await supabase
+        .from('metric_snapshots')
+        .select('metric_value, period_date')
+        .eq('client_id', c.id)
+        .eq('metric_key', 'cash_collected')
+        .order('period_date', { ascending: false })
+        .limit(1)
+      return { ...c, latestCash: latest?.[0]?.metric_value ?? null, latestDate: latest?.[0]?.period_date ?? null }
+    })
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-indigo-400" />
+            <CardTitle>Client Performance</CardTitle>
+          </div>
+          <Link href="/clients" className="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-1">
+            View all <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+      </CardHeader>
+      <div className="space-y-2">
+        {clientData.map((c) => (
+          <Link
+            key={c.id}
+            href={`/dashboard/${c.slug}`}
+            className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
+          >
+            <div>
+              <p className="text-sm font-medium text-slate-200">{c.name}</p>
+              <p className="text-xs text-slate-500">{c.funnel_type} funnel</p>
+            </div>
+            <div className="text-right">
+              {c.latestCash !== null ? (
+                <>
+                  <p className="text-sm font-bold text-emerald-400">
+                    ${(Number(c.latestCash) / 1000).toFixed(1)}k
+                  </p>
+                  <p className="text-[10px] text-slate-600">latest week</p>
+                </>
+              ) : (
+                <p className="text-xs text-slate-600">No data</p>
+              )}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </Card>
   )
 }
 

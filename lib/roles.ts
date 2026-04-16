@@ -87,7 +87,6 @@ const DEFAULT_ROUTE_PERMISSIONS: RoutePermission[] = [
   { href: '/calendar',  roles: ['exec', 'am', 'cs'] },
   { href: '/events',    roles: ['exec', 'am', 'cs'] },
   { href: '/budget',    roles: ['exec'] },
-  { href: '/comms',     roles: ['exec', 'am', 'cs'] },
   { href: '/agents',    roles: ['exec'] },
   { href: '/memory',    roles: ['exec'] },
   { href: '/clients',   roles: ['exec'] },
