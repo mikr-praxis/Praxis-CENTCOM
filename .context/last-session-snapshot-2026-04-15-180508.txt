@@ -1,0 +1,48 @@
+# SessionEnd Forensic Snapshot
+
+**Timestamp (UTC):** 2026-04-16T01:05:08Z
+**Triggered by:** Claude Code SessionEnd hook (auto)
+**CWD at session end:** /Users/bakedbros/Desktop/Praxis
+**Repo root:** /Users/bakedbros/Desktop/Praxis
+
+## Branch
+```
+main
+```
+
+## git status --short
+```
+?? .DS_Store
+?? .claude/
+?? .context/
+?? CentCom-Integration-Setup-Tasks.docx
+?? Praxis-CENTCOM-7Day-Recap.docx
+```
+
+## Unstaged changes (git diff --stat)
+```
+```
+
+## Staged changes (git diff --cached --stat)
+```
+```
+
+## Last 10 commits
+```
+e4bcd9f fix: unblock mobile task creation — hide DeployStatus widget on small screens
+85eec9c feat: update Supabase types with assignee_id, tags[], and group_id columns
+cea0547 fix: resolve TypeScript error in getMembersByGroup readonly array type
+752c6dd feat: add view/filter system — user, group, and tag views with ViewSwitcher UI
+598604a fix: use catch-all routes for Clerk sign-in/sign-up pages
+5dd415a feat: Praxis CENTCOM Dashboard - full codebase
+91e3f09 Initial commit
+```
+
+## Stash list
+```
+```
+
+---
+
+This file is a mechanical snapshot. For narrative context, see
+the most recent dated save or checkpoint in this directory.
