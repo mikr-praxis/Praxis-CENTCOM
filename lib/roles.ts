@@ -78,7 +78,8 @@ export function getRoleFromEmail(email: string | null | undefined): Role {
 }
 
 // ââ Route permissions âââââââââââââââââââââââââââââââââââââââââââââââââââ
-export const ROUTE_PERMISSIONS: RoutePermission[] = [
+// Default route permissions — overridden by app_config ROUTE_PERMISSIONS_JSON
+const DEFAULT_ROUTE_PERMISSIONS: RoutePermission[] = [
   { href: '/dashboard', roles: ['exec', 'am', 'cs'] },
   { href: '/projects',  roles: ['exec', 'am'] },
   { href: '/tasks',     roles: ['exec', 'am', 'cs'] },
@@ -94,16 +95,49 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { href: '/config',    roles: ['exec'] },
 ]
 
+let _routePermissions: RoutePermission[] | null = null
+let _routePermsLoadedAt = 0
+
+async function loadRoutePermissions() {
+  const now = Date.now()
+  if (_routePermissions && now - _routePermsLoadedAt < AUTH_CONFIG_TTL_MS) return
+  try {
+    const { getConfig } = await import('@/lib/config')
+    const json = await getConfig('ROUTE_PERMISSIONS_JSON')
+    _routePermissions = json ? JSON.parse(json) : DEFAULT_ROUTE_PERMISSIONS
+  } catch {
+    _routePermissions = DEFAULT_ROUTE_PERMISSIONS
+  }
+  _routePermsLoadedAt = now
+}
+
+/** Sync accessor — uses cached or default permissions */
+export const ROUTE_PERMISSIONS = DEFAULT_ROUTE_PERMISSIONS
+
+/** Get route permissions (async, loads from DB) */
+export async function getRoutePermissions(): Promise<RoutePermission[]> {
+  await loadRoutePermissions()
+  return _routePermissions || DEFAULT_ROUTE_PERMISSIONS
+}
+
 /** Check if a role can access a given pathname */
 export function canAccess(role: Role, pathname: string): boolean {
-  const match = ROUTE_PERMISSIONS.find((r) => pathname.startsWith(r.href))
-  if (!match) return true // unknown routes are open (404 will handle)
+  const perms = _routePermissions || DEFAULT_ROUTE_PERMISSIONS
+  const match = perms.find((r) => pathname.startsWith(r.href))
+  if (!match) return true
   return match.roles.includes(role)
+}
+
+/** Async version — loads permissions from DB first */
+export async function canAccessAsync(role: Role, pathname: string): Promise<boolean> {
+  await loadRoutePermissions()
+  return canAccess(role, pathname)
 }
 
 /** Get all routes a role can access */
 export function getAccessibleRoutes(role: Role): string[] {
-  return ROUTE_PERMISSIONS.filter((r) => r.roles.includes(role)).map((r) => r.href)
+  const perms = _routePermissions || DEFAULT_ROUTE_PERMISSIONS
+  return perms.filter((r) => r.roles.includes(role)).map((r) => r.href)
 }
 
 /** Human-readable role labels */

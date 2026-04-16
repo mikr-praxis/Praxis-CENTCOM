@@ -30,7 +30,7 @@ const CATEGORIES: Category[] = [
     items: [
       { value: 'michael.nield7@gmail.com', file: 'lib/roles.ts', line: 25, impact: 'External user hardcoded as exec', fix: 'DONE — reads from app_config AUTHORIZED_EXTERNAL_EMAILS' },
       { value: '@builtbypraxis.com → exec', file: 'lib/roles.ts', line: 35, impact: 'Domain-based role auto-assignment', fix: 'DONE — reads from app_config AUTHORIZED_DOMAIN' },
-      { value: 'ROUTE_PERMISSIONS array', file: 'lib/roles.ts', line: 48, impact: 'All route-level access control', fix: 'Still hardcoded — move to app_config as JSON + admin UI editor' },
+      { value: 'ROUTE_PERMISSIONS array', file: 'lib/roles.ts', line: 48, impact: 'All route-level access control', fix: 'DONE — reads from app_config ROUTE_PERMISSIONS_JSON' },
     ],
   },
   {
@@ -39,9 +39,9 @@ const CATEGORIES: Category[] = [
     priority: 'critical',
     description: 'Team roster, calendar IDs, groups, tags',
     items: [
-      { value: 'nadeem@, derek@, kevin@, mscott@', file: 'lib/views/data.ts', line: 3, impact: 'Team member list for calendar, assignees', fix: 'Move to team_members table + admin UI' },
-      { value: '5 hardcoded groups (exec, am, etc.)', file: 'lib/views/data.ts', line: 12, impact: 'Team grouping & sidebar nav', fix: 'Move to team_groups table' },
-      { value: '20+ client/state/event tags', file: 'lib/views/data.ts', line: 23, impact: 'Task/project tagging system', fix: 'Move to tag_categories + tags tables' },
+      { value: 'nadeem@, derek@, kevin@, mscott@', file: 'lib/views/data.ts', line: 3, impact: 'Team member list for calendar, assignees', fix: 'DONE — reads from app_config TEAM_MEMBERS_JSON' },
+      { value: '5 hardcoded groups (exec, am, etc.)', file: 'lib/views/data.ts', line: 12, impact: 'Team grouping & sidebar nav', fix: 'DONE — reads from app_config GROUPS_JSON' },
+      { value: '20+ client/state/event tags', file: 'lib/views/data.ts', line: 23, impact: 'Task/project tagging system', fix: 'DONE — reads from app_config TAG_CATEGORIES_JSON' },
     ],
   },
   {
@@ -50,7 +50,7 @@ const CATEGORIES: Category[] = [
     priority: 'critical',
     description: 'Client names hardcoded in agent prompts and views',
     items: [
-      { value: 'Breathe for Change, ManTalks, John Wineland, Soma Plus IQ, Krista Mishore', file: 'lib/views/data.ts', line: 29, impact: 'Client tag catalog', fix: 'Still hardcoded in views — move to clients table' },
+      { value: 'Breathe for Change, ManTalks, John Wineland, Soma Plus IQ, Krista Mishore', file: 'lib/views/data.ts', line: 29, impact: 'Client tag catalog', fix: 'DONE — reads from app_config TAG_CATEGORIES_JSON (client tags category)' },
       { value: 'Same 5 clients as fallback', file: 'actions/agents.ts', line: 95, impact: 'Agent context for breathwork/wellness intel', fix: 'DONE — reads from app_config DEFAULT_CLIENT_LIST, falls back to projects table' },
     ],
   },
@@ -95,12 +95,12 @@ const CATEGORIES: Category[] = [
     priority: 'config',
     description: 'Performance thresholds for KPI card color-coding',
     items: [
-      { value: 'show_rate: 50%/70%', file: 'lib/metrics/call-funnel.ts', line: 143, impact: 'Call funnel show rate green/yellow/red thresholds', fix: 'Move to benchmark_templates table per funnel type' },
-      { value: 'close_rate: 20%/35%', file: 'lib/metrics/call-funnel.ts', line: 144, impact: 'Call funnel close rate thresholds', fix: 'Move to benchmark_templates table' },
-      { value: 'attendance_rate: 20%/40%', file: 'lib/metrics/webinar-funnel.ts', line: 30, impact: 'Webinar attendance thresholds', fix: 'Move to benchmark_templates table' },
-      { value: 'ROAS: 1.5x/3x', file: 'lib/metrics/webinar-funnel.ts', line: 33, impact: 'Webinar ROAS thresholds', fix: 'Move to benchmark_templates table' },
-      { value: 'day3_attendance: 10%/20%', file: 'lib/metrics/challenge-funnel.ts', line: 35, impact: 'Challenge pitch day attendance thresholds', fix: 'Move to benchmark_templates table' },
-      { value: 'retention D1→D3: 40%/65%', file: 'lib/metrics/challenge-funnel.ts', line: 36, impact: 'Challenge retention thresholds', fix: 'Move to benchmark_templates table' },
+      { value: 'show_rate: 50%/70%', file: 'lib/metrics/call-funnel.ts', line: 143, impact: 'Call funnel show rate green/yellow/red thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CALL_JSON' },
+      { value: 'close_rate: 20%/35%', file: 'lib/metrics/call-funnel.ts', line: 144, impact: 'Call funnel close rate thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CALL_JSON' },
+      { value: 'attendance_rate: 20%/40%', file: 'lib/metrics/webinar-funnel.ts', line: 30, impact: 'Webinar attendance thresholds', fix: 'DONE — reads from app_config BENCHMARKS_WEBINAR_JSON' },
+      { value: 'ROAS: 1.5x/3x', file: 'lib/metrics/webinar-funnel.ts', line: 33, impact: 'Webinar ROAS thresholds', fix: 'DONE — reads from app_config BENCHMARKS_WEBINAR_JSON' },
+      { value: 'day3_attendance: 10%/20%', file: 'lib/metrics/challenge-funnel.ts', line: 35, impact: 'Challenge pitch day attendance thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CHALLENGE_JSON' },
+      { value: 'retention D1→D3: 40%/65%', file: 'lib/metrics/challenge-funnel.ts', line: 36, impact: 'Challenge retention thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CHALLENGE_JSON' },
     ],
   },
   {
@@ -109,9 +109,9 @@ const CATEGORIES: Category[] = [
     priority: 'nice-to-have',
     description: 'Support contacts, calendar IDs, sharing instructions',
     items: [
-      { value: 'mscott@builtbypraxis.com', file: 'app/unauthorized/page.tsx', line: 40, impact: 'Support contact on unauthorized page', fix: 'Move to app_config (SUPPORT_EMAIL)' },
-      { value: 'ops@builtbypraxis.com', file: 'lib/google/calendar.ts', line: 43, impact: 'Default ops calendar ID', fix: 'Move to env var (OPS_CALENDAR_ID)' },
-      { value: 'mscott@builtbypraxis.com', file: 'app/(app)/calendar/calendar-client.tsx', line: 1222, impact: 'Calendar sharing instructions', fix: 'Move to app_config (CALENDAR_ADMIN_EMAIL)' },
+      { value: 'mscott@builtbypraxis.com', file: 'app/unauthorized/page.tsx', line: 40, impact: 'Support contact on unauthorized page', fix: 'DONE — reads from app_config SUPPORT_EMAIL' },
+      { value: 'ops@builtbypraxis.com', file: 'lib/google/calendar.ts', line: 43, impact: 'Default ops calendar ID', fix: 'DONE — reads from app_config OPS_CALENDAR_ID' },
+      { value: 'mscott@builtbypraxis.com', file: 'app/(app)/calendar/calendar-client.tsx', line: 1222, impact: 'Calendar sharing instructions', fix: 'Remaining — calendar-client is a client component, needs prop from server' },
     ],
   },
   {

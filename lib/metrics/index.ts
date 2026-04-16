@@ -2,6 +2,7 @@ import type { FunnelType, CanonicalMetric } from './types'
 import { CALL_FUNNEL_METRICS, CALL_FUNNEL_STAGES, CALL_FUNNEL_BENCHMARKS, CALL_FUNNEL_KPI_KEYS } from './call-funnel'
 import { WEBINAR_FUNNEL_METRICS, WEBINAR_FUNNEL_STAGES, WEBINAR_FUNNEL_BENCHMARKS, WEBINAR_FUNNEL_KPI_KEYS } from './webinar-funnel'
 import { CHALLENGE_FUNNEL_METRICS, CHALLENGE_FUNNEL_STAGES, CHALLENGE_FUNNEL_BENCHMARKS, CHALLENGE_FUNNEL_KPI_KEYS } from './challenge-funnel'
+import { getConfig } from '@/lib/config'
 
 export function getMetricsForFunnel(funnelType: FunnelType): CanonicalMetric[] {
   switch (funnelType) {
@@ -19,12 +20,24 @@ export function getStagesForFunnel(funnelType: FunnelType) {
   }
 }
 
+const DEFAULT_BENCHMARKS: Record<FunnelType, Record<string, { weak: number; strong: number }>> = {
+  call: CALL_FUNNEL_BENCHMARKS,
+  webinar: WEBINAR_FUNNEL_BENCHMARKS,
+  challenge: CHALLENGE_FUNNEL_BENCHMARKS,
+}
+
+/** Sync version — uses defaults */
 export function getBenchmarksForFunnel(funnelType: FunnelType) {
-  switch (funnelType) {
-    case 'call': return CALL_FUNNEL_BENCHMARKS
-    case 'webinar': return WEBINAR_FUNNEL_BENCHMARKS
-    case 'challenge': return CHALLENGE_FUNNEL_BENCHMARKS
-  }
+  return DEFAULT_BENCHMARKS[funnelType]
+}
+
+/** Async version — reads overrides from app_config BENCHMARKS_{FUNNEL_TYPE}_JSON */
+export async function getBenchmarksForFunnelAsync(funnelType: FunnelType): Promise<Record<string, { weak: number; strong: number }>> {
+  try {
+    const json = await getConfig(`BENCHMARKS_${funnelType.toUpperCase()}_JSON`)
+    if (json) return JSON.parse(json)
+  } catch { /* use defaults */ }
+  return DEFAULT_BENCHMARKS[funnelType]
 }
 
 export function getKPIKeysForFunnel(funnelType: FunnelType) {

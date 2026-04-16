@@ -2,12 +2,14 @@ import Link from 'next/link'
 import { SignOutButton } from '@clerk/nextjs'
 import { currentUser } from '@clerk/nextjs/server'
 import { Zap, ShieldAlert } from 'lucide-react'
+import { getConfig } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
 
 export default async function UnauthorizedPage() {
   const user = await currentUser()
   const email = user?.emailAddresses?.[0]?.emailAddress ?? 'your account'
+  const supportEmail = await getConfig('SUPPORT_EMAIL') || 'mscott@builtbypraxis.com'
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
@@ -37,10 +39,10 @@ export default async function UnauthorizedPage() {
         <p className="mt-6 text-sm text-slate-400">
           If you believe you should have access, reach out to{' '}
           <a
-            href="mailto:mscott@builtbypraxis.com"
+            href={`mailto:${supportEmail}`}
             className="text-amber-400 hover:text-amber-300 underline underline-offset-2"
           >
-            mscott@builtbypraxis.com
+            {supportEmail}
           </a>
           .
         </p>
