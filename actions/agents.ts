@@ -11,28 +11,35 @@ export async function runAgent(agentId: string) {
   if (!userId) throw new Error('Unauthorized')
 
   // Rate limit: 10 runs/hour per user (skip if Redis not configured)
-  if (await hasConfig('UPSTASH_REDIS_REST_URL')) {
-    const redis = await getRedis()
-    const key = `agent_runs:${userId}`
-    const runs = await redis.incr(key)
-    if (runs === 1) await redis.expire(key, 3600)
-    if (runs > 10) throw new Error('Rate limit reached. Try again in an hour.')
+  try {
+    if (await hasConfig('UPSTASH_REDIS_REST_URL')) {
+      const redis = await getRedis()
+      const key = `agent_runs:${userId}`
+      const runs = await redis.incr(key)
+      if (runs === 1) await redis.expire(key, 3600)
+      if (runs > 10) throw new Error('Rate limit reached. Try again in an hour.')
+    }
+  } catch (e) {
+    // If rate limit check itself fails (Redis down, table missing), skip it — don't block the agent
+    if (e instanceof Error && e.message.includes('Rate limit')) throw e
   }
 
   // Fetch context data from Supabase
   const supabase = createServerClient()
 
-  const [tasksRes, budgetRes, eventsRes, projectsRes] = await Promise.all([
+  const [tasksRes, budgetRes, eventsRes] = await Promise.all([
     supabase.from('tasks').select('*').eq('user_id', userId),
     supabase.from('budget_items').select('*').eq('user_id', userId),
     supabase.from('events').select('*').eq('user_id', userId),
-    supabase.from('projects').select('*').eq('user_id', userId),
   ])
+
+  // Projects table may not exist yet (migration 008_projects) — fail gracefully
+  const projectsRes = await supabase.from('projects').select('*').eq('user_id', userId)
+  const projects = projectsRes.error ? [] : (projectsRes.data || [])
 
   const tasks = tasksRes.data || []
   const budgetItems = budgetRes.data || []
   const events = eventsRes.data || []
-  const projects = projectsRes.data || []
 
   const activeTasks = tasks.filter((t) => t.status !== 'done').length
   const completedTasks = tasks.filter((t) => t.status === 'done').length
@@ -143,7 +150,7 @@ export async function runAgent(agentId: string) {
 
   const anthropic = await getAnthropicClient()
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-5-20241022',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   })

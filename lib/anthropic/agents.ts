@@ -14,9 +14,15 @@ let _anthropicKey: string | null = null
  * Re-creates the client if the stored key changes (e.g. after config update).
  */
 export async function getAnthropicClient(): Promise<Anthropic> {
-  const key = await getConfig('ANTHROPIC_API_KEY')
+  let key: string | undefined
+  try {
+    key = await getConfig('ANTHROPIC_API_KEY')
+  } catch {
+    // Config lookup failed (app_config table missing) — fall back to env
+    key = process.env.ANTHROPIC_API_KEY
+  }
   if (!key) {
-    throw new Error('ANTHROPIC_API_KEY is not set. Configure it at /config.')
+    throw new Error('ANTHROPIC_API_KEY is not set. Configure it at /config or add it to Vercel env vars.')
   }
 
   // Re-create client if the key changed (hot-swap after config edit)
