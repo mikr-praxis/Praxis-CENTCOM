@@ -14,7 +14,7 @@ export async function runAgent(agentId: string) {
   try {
     if (await hasConfig('UPSTASH_REDIS_REST_URL')) {
       const redis = await getRedis()
-      const key = `agent_runs:${userId}`
+      const key = `agent_runs_v2:${userId}`
       const runs = await redis.incr(key)
       if (runs === 1) await redis.expire(key, 3600)
       if (runs > 10) throw new Error('Rate limit reached. Try again in an hour.')
@@ -150,7 +150,7 @@ export async function runAgent(agentId: string) {
 
   const anthropic = await getAnthropicClient()
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20241022',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   })
