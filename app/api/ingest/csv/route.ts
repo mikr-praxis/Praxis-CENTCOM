@@ -44,8 +44,8 @@ export async function POST(request: Request) {
       .insert({
         client_id: client.id,
         source_type: 'csv',
-        column_mapping: mapperResult,
-        mapping_status: 'pending',
+        column_mapping: mapperResult as unknown as Record<string, unknown>,
+        mapping_status: 'pending' as const,
       })
       .select()
       .single()

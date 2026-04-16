@@ -122,8 +122,8 @@ export async function POST(
   await supabase
     .from('data_sources')
     .update({
-      column_mapping: { approved: approvedMappings },
-      mapping_status: 'approved',
+      column_mapping: { approved: approvedMappings } as unknown as Record<string, unknown>,
+      mapping_status: 'approved' as const,
       last_synced_at: new Date().toISOString(),
     })
     .eq('id', dataSourceId)
@@ -134,8 +134,8 @@ export async function POST(
     metric_key: string
     metric_value: number
     period_date: string
-    period_type: string
-    confidence: string
+    period_type: 'day' | 'week' | 'month'
+    confidence: 'direct' | 'derived' | 'estimated'
     source_id: string
   }> = []
 
@@ -165,7 +165,7 @@ export async function POST(
         metric_value: numericValue,
         period_date: periodDate,
         period_type: 'week',
-        confidence: mapping.confidence,
+        confidence: mapping.confidence as 'direct' | 'derived' | 'estimated',
         source_id: dataSourceId,
       })
     }
