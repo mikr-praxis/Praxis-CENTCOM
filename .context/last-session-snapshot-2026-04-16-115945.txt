@@ -1,0 +1,50 @@
+# SessionEnd Forensic Snapshot
+
+**Timestamp (UTC):** 2026-04-16T18:59:45Z
+**Triggered by:** Claude Code SessionEnd hook (auto)
+**CWD at session end:** /Users/bakedbros/Desktop/Praxis
+**Repo root:** /Users/bakedbros/Desktop/Praxis
+
+## Branch
+```
+main
+```
+
+## git status --short
+```
+ M .context/.last-active
+?? .context/last-session-snapshot-2026-04-16-115945.txt
+```
+
+## Unstaged changes (git diff --stat)
+```
+ .context/.last-active | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+## Staged changes (git diff --cached --stat)
+```
+```
+
+## Last 10 commits
+```
+edaf5f1 fix: update Memory tab with current session data + make dynamic
+ee6bb8d feat: make Hardcoded Values tab a live config editor
+3138de3 context: SessionEnd auto-save 2026-04-16T18:49:45Z
+c2304c1 feat: convert all critical hardcoded values to dynamic app_config
+84ed214 feat: make critical hardcoded values dynamic via app_config
+4131bdc context: SessionEnd auto-save 2026-04-16T18:24:45Z
+8e7afe4 feat: add Hardcoded Values tab — audit of all hardcoded config
+2aec01b context: SessionEnd auto-save 2026-04-16T18:14:53Z
+b88710e fix: remove Comms tab from sidebar
+e9aab42 context: SessionEnd auto-save 2026-04-16T17:19:45Z
+```
+
+## Stash list
+```
+```
+
+---
+
+This file is a mechanical snapshot. For narrative context, see
+the most recent dated save or checkpoint in this directory.
