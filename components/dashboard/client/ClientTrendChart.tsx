@@ -48,7 +48,7 @@ export function ClientTrendChart({ label, data, format, benchmark }: ClientTrend
               tick={{ fill: '#64748b', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(v) => formatMetricValue(v, format)}
+              tickFormatter={(v) => formatMetricValue(Number(v), format)}
             />
             <Tooltip
               contentStyle={{
@@ -57,7 +57,7 @@ export function ClientTrendChart({ label, data, format, benchmark }: ClientTrend
                 borderRadius: '8px',
                 fontSize: 12,
               }}
-              formatter={(value: number) => [formatMetricValue(value, format), label]}
+              formatter={(value) => [formatMetricValue(Number(value), format), label]}
             />
             {benchmark !== undefined && (
               <ReferenceLine
