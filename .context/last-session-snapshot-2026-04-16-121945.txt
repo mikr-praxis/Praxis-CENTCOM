@@ -1,0 +1,50 @@
+# SessionEnd Forensic Snapshot
+
+**Timestamp (UTC):** 2026-04-16T19:19:45Z
+**Triggered by:** Claude Code SessionEnd hook (auto)
+**CWD at session end:** /Users/bakedbros/Desktop/Praxis
+**Repo root:** /Users/bakedbros/Desktop/Praxis
+
+## Branch
+```
+main
+```
+
+## git status --short
+```
+ M .context/.last-active
+?? .context/last-session-snapshot-2026-04-16-121945.txt
+```
+
+## Unstaged changes (git diff --stat)
+```
+ .context/.last-active | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+## Staged changes (git diff --cached --stat)
+```
+```
+
+## Last 10 commits
+```
+19e4820 feat: auto-seed config + memory entries on first page load
+4b39a11 fix: memory entries get real timestamps from app_config.updated_at
+ae822e8 fix: set accurate per-entry dates on Memory entries
+f660dd6 fix: add updatedAt timestamps to Memory entries + display in UI
+8092b7c context: SessionEnd auto-save 2026-04-16T18:59:45Z
+edaf5f1 fix: update Memory tab with current session data + make dynamic
+ee6bb8d feat: make Hardcoded Values tab a live config editor
+3138de3 context: SessionEnd auto-save 2026-04-16T18:49:45Z
+c2304c1 feat: convert all critical hardcoded values to dynamic app_config
+84ed214 feat: make critical hardcoded values dynamic via app_config
+```
+
+## Stash list
+```
+```
+
+---
+
+This file is a mechanical snapshot. For narrative context, see
+the most recent dated save or checkpoint in this directory.
