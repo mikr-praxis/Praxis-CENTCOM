@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { getMemorySeedRows } from '@/lib/memory/loader'
 
 const DEFAULT_CONFIG: Array<{ key: string; value: string }> = [
   // Auth & Permissions
@@ -96,18 +97,18 @@ export async function POST() {
 
   const supabase = createServerClient()
 
-  const rows = DEFAULT_CONFIG.map(({ key, value }) => ({
-    key,
-    value,
-    updated_by: userId,
-    updated_at: new Date().toISOString(),
+  const configRows = DEFAULT_CONFIG.map(({ key, value }) => ({
+    key, value, updated_by: userId, updated_at: new Date().toISOString(),
   }))
+
+  const memoryRows = getMemorySeedRows(userId)
+  const allRows = [...configRows, ...memoryRows]
 
   const { error } = await supabase
     .from('app_config')
-    .upsert(rows, { onConflict: 'key' })
+    .upsert(allRows, { onConflict: 'key' })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ seeded: rows.length, keys: rows.map(r => r.key) })
+  return NextResponse.json({ seeded: allRows.length, keys: allRows.map(r => r.key) })
 }
