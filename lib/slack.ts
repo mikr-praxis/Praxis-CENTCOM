@@ -1,9 +1,19 @@
 import { WebClient } from '@slack/web-api'
 import { getConfig } from '@/lib/config'
 
-// The only channel CentCom is allowed to write to
-export const SLACK_WRITE_CHANNEL_ID = 'C0APYEU7N1M'
-export const SLACK_WRITE_CHANNEL_NAME = 'backend-progress-updates-by-task'
+// Defaults — overridden by app_config keys SLACK_WRITE_CHANNEL_ID, SLACK_WRITE_CHANNEL_NAME
+const DEFAULT_SLACK_CHANNEL_ID = 'C0APYEU7N1M'
+const DEFAULT_SLACK_CHANNEL_NAME = 'backend-progress-updates-by-task'
+
+export async function getSlackWriteChannel(): Promise<{ id: string; name: string }> {
+  const id = await getConfig('SLACK_WRITE_CHANNEL_ID') || DEFAULT_SLACK_CHANNEL_ID
+  const name = await getConfig('SLACK_WRITE_CHANNEL_NAME') || DEFAULT_SLACK_CHANNEL_NAME
+  return { id, name }
+}
+
+// Legacy exports for backward compat (sync — uses defaults until config loads)
+export const SLACK_WRITE_CHANNEL_ID = DEFAULT_SLACK_CHANNEL_ID
+export const SLACK_WRITE_CHANNEL_NAME = DEFAULT_SLACK_CHANNEL_NAME
 
 let slackClient: WebClient | null = null
 let _slackToken: string | null = null

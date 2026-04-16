@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { FunnelType, SheetTabData, MapperResult, CanonicalMetric } from '@/lib/metrics/types'
 import { getMetricsForFunnel } from '@/lib/metrics'
+import { getConfig } from '@/lib/config'
 
 const MAPPER_SYSTEM_PROMPT = `You are a data analyst working for Praxis, a marketing operations agency.
 Your job is to scan raw client spreadsheet data and map each column to a canonical
@@ -92,16 +93,19 @@ export async function runMetricMapper(
   funnelType: FunnelType,
   sheetData: SheetTabData[]
 ): Promise<MapperResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('Missing ANTHROPIC_API_KEY env var')
+  const apiKey = await getConfig('ANTHROPIC_API_KEY')
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set. Configure it at /config or Vercel env vars.')
 
   const metrics = getMetricsForFunnel(funnelType)
   const userPrompt = buildMapperPrompt(funnelType, metrics, sheetData)
 
+  const mapperModel = await getConfig('METRIC_MAPPER_MODEL') || 'claude-opus-4-6'
+  const maxTokens = Number(await getConfig('METRIC_MAPPER_MAX_TOKENS')) || 4000
+
   const client = new Anthropic({ apiKey })
   const response = await client.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 4000,
+    model: mapperModel,
+    max_tokens: maxTokens,
     system: [{ type: 'text', text: MAPPER_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt }],
   })

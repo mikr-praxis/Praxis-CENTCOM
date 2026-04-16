@@ -28,9 +28,9 @@ const CATEGORIES: Category[] = [
     priority: 'critical',
     description: 'Access control, authorized emails, route permissions',
     items: [
-      { value: 'michael.nield7@gmail.com', file: 'lib/roles.ts', line: 25, impact: 'External user hardcoded as exec', fix: 'Move to app_config table (AUTHORIZED_EXTERNAL_EMAILS)' },
-      { value: '@builtbypraxis.com → exec', file: 'lib/roles.ts', line: 35, impact: 'Domain-based role auto-assignment', fix: 'Move to app_config (AUTHORIZED_DOMAIN) + support multiple domains' },
-      { value: 'ROUTE_PERMISSIONS array', file: 'lib/roles.ts', line: 48, impact: 'All route-level access control', fix: 'Move to app_config as JSON + admin UI editor' },
+      { value: 'michael.nield7@gmail.com', file: 'lib/roles.ts', line: 25, impact: 'External user hardcoded as exec', fix: 'DONE — reads from app_config AUTHORIZED_EXTERNAL_EMAILS' },
+      { value: '@builtbypraxis.com → exec', file: 'lib/roles.ts', line: 35, impact: 'Domain-based role auto-assignment', fix: 'DONE — reads from app_config AUTHORIZED_DOMAIN' },
+      { value: 'ROUTE_PERMISSIONS array', file: 'lib/roles.ts', line: 48, impact: 'All route-level access control', fix: 'Still hardcoded — move to app_config as JSON + admin UI editor' },
     ],
   },
   {
@@ -50,8 +50,8 @@ const CATEGORIES: Category[] = [
     priority: 'critical',
     description: 'Client names hardcoded in agent prompts and views',
     items: [
-      { value: 'Breathe for Change, ManTalks, John Wineland, Soma Plus IQ, Krista Mishore', file: 'lib/views/data.ts', line: 29, impact: 'Client tag catalog', fix: 'Load from clients table dynamically' },
-      { value: 'Same 5 clients as fallback', file: 'actions/agents.ts', line: 95, impact: 'Agent context for breathwork/wellness intel', fix: 'Load from projects table dynamically' },
+      { value: 'Breathe for Change, ManTalks, John Wineland, Soma Plus IQ, Krista Mishore', file: 'lib/views/data.ts', line: 29, impact: 'Client tag catalog', fix: 'Still hardcoded in views — move to clients table' },
+      { value: 'Same 5 clients as fallback', file: 'actions/agents.ts', line: 95, impact: 'Agent context for breathwork/wellness intel', fix: 'DONE — reads from app_config DEFAULT_CLIENT_LIST, falls back to projects table' },
     ],
   },
   {
@@ -60,8 +60,8 @@ const CATEGORIES: Category[] = [
     priority: 'critical',
     description: 'Channel IDs and names baked into code',
     items: [
-      { value: 'C0APYEU7N1M', file: 'lib/slack.ts', line: 5, impact: 'Default Slack write channel ID', fix: 'Move to app_config (SLACK_WRITE_CHANNEL_ID)' },
-      { value: 'backend-progress-updates-by-task', file: 'lib/slack.ts', line: 6, impact: 'Default Slack channel name', fix: 'Move to app_config (SLACK_WRITE_CHANNEL_NAME)' },
+      { value: 'C0APYEU7N1M', file: 'lib/slack.ts', line: 5, impact: 'Default Slack write channel ID', fix: 'DONE — reads from app_config SLACK_WRITE_CHANNEL_ID' },
+      { value: 'backend-progress-updates-by-task', file: 'lib/slack.ts', line: 6, impact: 'Default Slack channel name', fix: 'DONE — reads from app_config SLACK_WRITE_CHANNEL_NAME' },
     ],
   },
   {
@@ -70,10 +70,10 @@ const CATEGORIES: Category[] = [
     priority: 'config',
     description: 'Anthropic model IDs used for agents and metric mapping',
     items: [
-      { value: 'claude-sonnet-4-5-20241022', file: 'actions/agents.ts', line: 153, impact: 'Model for all 9 agents', fix: 'Move to app_config (DEFAULT_AGENT_MODEL)' },
-      { value: 'claude-opus-4-6', file: 'lib/ingest/metric-mapper.ts', line: 103, impact: 'Model for metric column mapping', fix: 'Move to app_config (METRIC_MAPPER_MODEL)' },
-      { value: 'max_tokens: 1024', file: 'actions/agents.ts', line: 154, impact: 'Agent response length cap', fix: 'Move to app_config (DEFAULT_AGENT_MAX_TOKENS)' },
-      { value: 'max_tokens: 4000', file: 'lib/ingest/metric-mapper.ts', line: 104, impact: 'Mapper response length cap', fix: 'Move to app_config (METRIC_MAPPER_MAX_TOKENS)' },
+      { value: 'claude-sonnet-4-5-20241022', file: 'actions/agents.ts', line: 153, impact: 'Model for all 9 agents', fix: 'DONE — reads from app_config DEFAULT_AGENT_MODEL' },
+      { value: 'claude-opus-4-6', file: 'lib/ingest/metric-mapper.ts', line: 103, impact: 'Model for metric column mapping', fix: 'DONE — reads from app_config METRIC_MAPPER_MODEL' },
+      { value: 'max_tokens: 1024', file: 'actions/agents.ts', line: 154, impact: 'Agent response length cap', fix: 'DONE — reads from app_config DEFAULT_AGENT_MAX_TOKENS' },
+      { value: 'max_tokens: 4000', file: 'lib/ingest/metric-mapper.ts', line: 104, impact: 'Mapper response length cap', fix: 'DONE — reads from app_config METRIC_MAPPER_MAX_TOKENS' },
     ],
   },
   {
@@ -82,8 +82,8 @@ const CATEGORIES: Category[] = [
     priority: 'config',
     description: 'Throttling, caching, and retry configuration',
     items: [
-      { value: '10 runs/hour per user', file: 'actions/agents.ts', line: 19, impact: 'Agent execution rate limit', fix: 'Move to app_config (AGENT_RATE_LIMIT_COUNT)' },
-      { value: '3600s rate limit window', file: 'actions/agents.ts', line: 13, impact: 'Rate limit reset period', fix: 'Move to app_config (AGENT_RATE_LIMIT_WINDOW_SECONDS)' },
+      { value: '10 runs/hour per user', file: 'actions/agents.ts', line: 19, impact: 'Agent execution rate limit', fix: 'DONE — reads from app_config AGENT_RATE_LIMIT_COUNT' },
+      { value: '3600s rate limit window', file: 'actions/agents.ts', line: 13, impact: 'Rate limit reset period', fix: 'DONE — reads from app_config AGENT_RATE_LIMIT_WINDOW_SECONDS' },
       { value: '30s config cache TTL', file: 'lib/config.ts', line: 11, impact: 'How long config values are cached in memory', fix: 'Move to env var (CONFIG_CACHE_TTL_MS)' },
       { value: 'maxRetries: 3, baseDelay: 500ms', file: 'lib/monday/client.ts', line: 17, impact: 'Monday.com API retry policy', fix: 'Move to app_config (MONDAY_MAX_RETRIES, MONDAY_BASE_DELAY_MS)' },
       { value: '30s/120s/300s cache tiers', file: 'lib/monday/client.ts', line: 56, impact: 'Monday.com data cache windows', fix: 'Move to app_config (MONDAY_CACHE_*_MS)' },

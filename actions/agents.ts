@@ -3,7 +3,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { getAnthropicClient, AGENTS } from '@/lib/anthropic/agents'
 import { getRedis } from '@/lib/upstash/redis'
-import { hasConfig } from '@/lib/config'
+import { hasConfig, getConfig } from '@/lib/config'
 import { createServerClient } from '@/lib/supabase/server'
 
 export async function runAgent(agentId: string) {
@@ -14,10 +14,12 @@ export async function runAgent(agentId: string) {
   try {
     if (await hasConfig('UPSTASH_REDIS_REST_URL')) {
       const redis = await getRedis()
+      const rateLimitWindow = Number(await getConfig('AGENT_RATE_LIMIT_WINDOW_SECONDS')) || 3600
+      const rateLimitMax = Number(await getConfig('AGENT_RATE_LIMIT_COUNT')) || 10
       const key = `agent_runs_v2:${userId}`
       const runs = await redis.incr(key)
-      if (runs === 1) await redis.expire(key, 3600)
-      if (runs > 10) throw new Error('Rate limit reached. Try again in an hour.')
+      if (runs === 1) await redis.expire(key, rateLimitWindow)
+      if (runs > rateLimitMax) throw new Error(`Rate limit reached (${rateLimitMax}/hr). Try again later.`)
     }
   } catch (e) {
     // If rate limit check itself fails (Redis down, table missing), skip it — don't block the agent
@@ -92,7 +94,7 @@ export async function runAgent(agentId: string) {
           month: 'long',
           day: 'numeric',
         }),
-        clients: projects.map((p) => p.name).join(', ') || 'Breathe for Change, ManTalks, John Wineland, Soma Plus IQ, Krista Mishore',
+        clients: projects.map((p) => p.name).join(', ') || await getConfig('DEFAULT_CLIENT_LIST') || 'No clients configured',
       })
       break
 
@@ -150,8 +152,8 @@ export async function runAgent(agentId: string) {
 
   const anthropic = await getAnthropicClient()
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20241022',
-    max_tokens: 1024,
+    model: await getConfig('DEFAULT_AGENT_MODEL') || 'claude-sonnet-4-5-20241022',
+    max_tokens: Number(await getConfig('DEFAULT_AGENT_MAX_TOKENS')) || 1024,
     messages: [{ role: 'user', content: prompt }],
   })
 

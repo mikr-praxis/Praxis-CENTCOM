@@ -21,9 +21,34 @@ export type RoutePermission = {
 }
 
 // ââ Authorized individual emails (outside @builtbypraxis.com) ââââââââââ
-const AUTHORIZED_PERSONAL_EMAILS: ReadonlySet<string> = new Set([
-  'michael.nield7@gmail.com',
-])
+// Defaults — overridden at runtime by app_config keys:
+//   AUTHORIZED_EXTERNAL_EMAILS (comma-separated)
+//   AUTHORIZED_DOMAIN (default: builtbypraxis.com)
+const DEFAULT_AUTHORIZED_EMAILS = ['michael.nield7@gmail.com']
+const DEFAULT_AUTHORIZED_DOMAIN = 'builtbypraxis.com'
+
+let _authorizedEmails: Set<string> | null = null
+let _authorizedDomain: string | null = null
+let _authConfigLoadedAt = 0
+const AUTH_CONFIG_TTL_MS = 30_000
+
+async function loadAuthConfig() {
+  const now = Date.now()
+  if (_authorizedEmails && _authorizedDomain && now - _authConfigLoadedAt < AUTH_CONFIG_TTL_MS) return
+  try {
+    const { getConfig } = await import('@/lib/config')
+    const emailsCsv = await getConfig('AUTHORIZED_EXTERNAL_EMAILS')
+    const domain = await getConfig('AUTHORIZED_DOMAIN')
+    _authorizedEmails = new Set(
+      emailsCsv ? emailsCsv.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) : DEFAULT_AUTHORIZED_EMAILS
+    )
+    _authorizedDomain = domain || DEFAULT_AUTHORIZED_DOMAIN
+  } catch {
+    _authorizedEmails = new Set(DEFAULT_AUTHORIZED_EMAILS)
+    _authorizedDomain = DEFAULT_AUTHORIZED_DOMAIN
+  }
+  _authConfigLoadedAt = now
+}
 
 /**
  * Whether this email is authorized to access CENTCOM at all.
@@ -32,8 +57,16 @@ const AUTHORIZED_PERSONAL_EMAILS: ReadonlySet<string> = new Set([
 export function isAuthorizedEmail(email: string | null | undefined): boolean {
   if (!email) return false
   const normalized = email.toLowerCase().trim()
-  if (normalized.endsWith('@builtbypraxis.com')) return true
-  return AUTHORIZED_PERSONAL_EMAILS.has(normalized)
+  const domain = _authorizedDomain || DEFAULT_AUTHORIZED_DOMAIN
+  if (normalized.endsWith(`@${domain}`)) return true
+  const emails = _authorizedEmails || new Set(DEFAULT_AUTHORIZED_EMAILS)
+  return emails.has(normalized)
+}
+
+/** Async version — loads config from DB first. Use in server components. */
+export async function isAuthorizedEmailAsync(email: string | null | undefined): Promise<boolean> {
+  await loadAuthConfig()
+  return isAuthorizedEmail(email)
 }
 
 /**
