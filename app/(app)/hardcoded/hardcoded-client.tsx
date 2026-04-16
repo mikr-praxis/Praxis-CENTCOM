@@ -1,128 +1,100 @@
 'use client'
 
 import { useState } from 'react'
-import { Code2, AlertTriangle, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { Code2, Check, ChevronDown, ChevronRight, Pencil, Save, X, Loader2, RefreshCw } from 'lucide-react'
 
 type Priority = 'critical' | 'config' | 'nice-to-have'
 
-interface HardcodedItem {
-  value: string
-  file: string
-  line: number
-  impact: string
-  fix: string
+interface ConfigItem {
+  configKey: string
+  label: string
+  description: string
+  isJson?: boolean
 }
 
-interface Category {
+interface ConfigCategory {
   id: string
   title: string
   priority: Priority
   description: string
-  items: HardcodedItem[]
+  items: ConfigItem[]
 }
 
-const CATEGORIES: Category[] = [
+const CATEGORIES: ConfigCategory[] = [
   {
-    id: 'roles',
-    title: 'Roles & Permissions',
+    id: 'auth',
+    title: 'Auth & Permissions',
     priority: 'critical',
-    description: 'Access control, authorized emails, route permissions',
+    description: 'Domain authorization, external emails, route access control',
     items: [
-      { value: 'michael.nield7@gmail.com', file: 'lib/roles.ts', line: 25, impact: 'External user hardcoded as exec', fix: 'DONE — reads from app_config AUTHORIZED_EXTERNAL_EMAILS' },
-      { value: '@builtbypraxis.com → exec', file: 'lib/roles.ts', line: 35, impact: 'Domain-based role auto-assignment', fix: 'DONE — reads from app_config AUTHORIZED_DOMAIN' },
-      { value: 'ROUTE_PERMISSIONS array', file: 'lib/roles.ts', line: 48, impact: 'All route-level access control', fix: 'DONE — reads from app_config ROUTE_PERMISSIONS_JSON' },
+      { configKey: 'AUTHORIZED_DOMAIN', label: 'Authorized Domain', description: 'Email domain that auto-grants exec access' },
+      { configKey: 'AUTHORIZED_EXTERNAL_EMAILS', label: 'External Emails', description: 'Comma-separated emails outside the domain that get exec access' },
+      { configKey: 'ROUTE_PERMISSIONS_JSON', label: 'Route Permissions', description: 'JSON array of {href, roles[]} controlling page access', isJson: true },
+      { configKey: 'SUPPORT_EMAIL', label: 'Support Email', description: 'Shown on /unauthorized page as contact' },
     ],
   },
   {
     id: 'team',
-    title: 'Team Members & Groups',
+    title: 'Team & Organization',
     priority: 'critical',
-    description: 'Team roster, calendar IDs, groups, tags',
+    description: 'Team members, groups, tags — used across calendar, tasks, views',
     items: [
-      { value: 'nadeem@, derek@, kevin@, mscott@', file: 'lib/views/data.ts', line: 3, impact: 'Team member list for calendar, assignees', fix: 'DONE — reads from app_config TEAM_MEMBERS_JSON' },
-      { value: '5 hardcoded groups (exec, am, etc.)', file: 'lib/views/data.ts', line: 12, impact: 'Team grouping & sidebar nav', fix: 'DONE — reads from app_config GROUPS_JSON' },
-      { value: '20+ client/state/event tags', file: 'lib/views/data.ts', line: 23, impact: 'Task/project tagging system', fix: 'DONE — reads from app_config TAG_CATEGORIES_JSON' },
-    ],
-  },
-  {
-    id: 'clients',
-    title: 'Client & Business Names',
-    priority: 'critical',
-    description: 'Client names hardcoded in agent prompts and views',
-    items: [
-      { value: 'Breathe for Change, ManTalks, John Wineland, Soma Plus IQ, Krista Mishore', file: 'lib/views/data.ts', line: 29, impact: 'Client tag catalog', fix: 'DONE — reads from app_config TAG_CATEGORIES_JSON (client tags category)' },
-      { value: 'Same 5 clients as fallback', file: 'actions/agents.ts', line: 95, impact: 'Agent context for breathwork/wellness intel', fix: 'DONE — reads from app_config DEFAULT_CLIENT_LIST, falls back to projects table' },
+      { configKey: 'TEAM_MEMBERS_JSON', label: 'Team Members', description: 'JSON array of {id, name, calendarEmail, role, group, avatar}', isJson: true },
+      { configKey: 'GROUPS_JSON', label: 'Groups', description: 'JSON array of {id, name, description, color, members[]}', isJson: true },
+      { configKey: 'TAG_CATEGORIES_JSON', label: 'Tag Categories', description: 'JSON array of {id, name, color, tags[{id,label}]}', isJson: true },
+      { configKey: 'DEFAULT_CLIENT_LIST', label: 'Default Client List', description: 'Comma-separated client names used as fallback in agent prompts' },
     ],
   },
   {
     id: 'slack',
-    title: 'Slack References',
+    title: 'Slack',
     priority: 'critical',
-    description: 'Channel IDs and names baked into code',
+    description: 'Channel for automated messages',
     items: [
-      { value: 'C0APYEU7N1M', file: 'lib/slack.ts', line: 5, impact: 'Default Slack write channel ID', fix: 'DONE — reads from app_config SLACK_WRITE_CHANNEL_ID' },
-      { value: 'backend-progress-updates-by-task', file: 'lib/slack.ts', line: 6, impact: 'Default Slack channel name', fix: 'DONE — reads from app_config SLACK_WRITE_CHANNEL_NAME' },
+      { configKey: 'SLACK_WRITE_CHANNEL_ID', label: 'Write Channel ID', description: 'Slack channel ID for CentCom automated posts' },
+      { configKey: 'SLACK_WRITE_CHANNEL_NAME', label: 'Write Channel Name', description: 'Display name of the write channel' },
     ],
   },
   {
-    id: 'ai-models',
-    title: 'AI Model Names',
+    id: 'ai',
+    title: 'AI Models',
     priority: 'config',
-    description: 'Anthropic model IDs used for agents and metric mapping',
+    description: 'Which Claude models to use and token limits',
     items: [
-      { value: 'claude-sonnet-4-5-20241022', file: 'actions/agents.ts', line: 153, impact: 'Model for all 9 agents', fix: 'DONE — reads from app_config DEFAULT_AGENT_MODEL' },
-      { value: 'claude-opus-4-6', file: 'lib/ingest/metric-mapper.ts', line: 103, impact: 'Model for metric column mapping', fix: 'DONE — reads from app_config METRIC_MAPPER_MODEL' },
-      { value: 'max_tokens: 1024', file: 'actions/agents.ts', line: 154, impact: 'Agent response length cap', fix: 'DONE — reads from app_config DEFAULT_AGENT_MAX_TOKENS' },
-      { value: 'max_tokens: 4000', file: 'lib/ingest/metric-mapper.ts', line: 104, impact: 'Mapper response length cap', fix: 'DONE — reads from app_config METRIC_MAPPER_MAX_TOKENS' },
+      { configKey: 'DEFAULT_AGENT_MODEL', label: 'Agent Model', description: 'Claude model ID for the 9 AI agents' },
+      { configKey: 'DEFAULT_AGENT_MAX_TOKENS', label: 'Agent Max Tokens', description: 'Max response length for agents' },
+      { configKey: 'METRIC_MAPPER_MODEL', label: 'Mapper Model', description: 'Claude model for metric column mapping (needs high accuracy)' },
+      { configKey: 'METRIC_MAPPER_MAX_TOKENS', label: 'Mapper Max Tokens', description: 'Max response length for the metric mapper' },
     ],
   },
   {
-    id: 'rate-limits',
-    title: 'Rate Limits & Cache TTLs',
+    id: 'limits',
+    title: 'Rate Limits',
     priority: 'config',
-    description: 'Throttling, caching, and retry configuration',
+    description: 'Throttling for agent runs',
     items: [
-      { value: '10 runs/hour per user', file: 'actions/agents.ts', line: 19, impact: 'Agent execution rate limit', fix: 'DONE — reads from app_config AGENT_RATE_LIMIT_COUNT' },
-      { value: '3600s rate limit window', file: 'actions/agents.ts', line: 13, impact: 'Rate limit reset period', fix: 'DONE — reads from app_config AGENT_RATE_LIMIT_WINDOW_SECONDS' },
-      { value: '30s config cache TTL', file: 'lib/config.ts', line: 11, impact: 'How long config values are cached in memory', fix: 'Move to env var (CONFIG_CACHE_TTL_MS)' },
-      { value: 'maxRetries: 3, baseDelay: 500ms', file: 'lib/monday/client.ts', line: 17, impact: 'Monday.com API retry policy', fix: 'Move to app_config (MONDAY_MAX_RETRIES, MONDAY_BASE_DELAY_MS)' },
-      { value: '30s/120s/300s cache tiers', file: 'lib/monday/client.ts', line: 56, impact: 'Monday.com data cache windows', fix: 'Move to app_config (MONDAY_CACHE_*_MS)' },
+      { configKey: 'AGENT_RATE_LIMIT_COUNT', label: 'Max Runs per Window', description: 'How many agent runs per user per window' },
+      { configKey: 'AGENT_RATE_LIMIT_WINDOW_SECONDS', label: 'Window (seconds)', description: 'Rate limit reset window in seconds' },
+    ],
+  },
+  {
+    id: 'calendar',
+    title: 'Calendar',
+    priority: 'config',
+    description: 'Calendar integration settings',
+    items: [
+      { configKey: 'OPS_CALENDAR_ID', label: 'Ops Calendar ID', description: 'Google Calendar ID for the ops calendar' },
     ],
   },
   {
     id: 'benchmarks',
     title: 'Metric Benchmarks',
     priority: 'config',
-    description: 'Performance thresholds for KPI card color-coding',
+    description: 'Performance thresholds for KPI card color-coding (weak/strong per metric)',
     items: [
-      { value: 'show_rate: 50%/70%', file: 'lib/metrics/call-funnel.ts', line: 143, impact: 'Call funnel show rate green/yellow/red thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CALL_JSON' },
-      { value: 'close_rate: 20%/35%', file: 'lib/metrics/call-funnel.ts', line: 144, impact: 'Call funnel close rate thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CALL_JSON' },
-      { value: 'attendance_rate: 20%/40%', file: 'lib/metrics/webinar-funnel.ts', line: 30, impact: 'Webinar attendance thresholds', fix: 'DONE — reads from app_config BENCHMARKS_WEBINAR_JSON' },
-      { value: 'ROAS: 1.5x/3x', file: 'lib/metrics/webinar-funnel.ts', line: 33, impact: 'Webinar ROAS thresholds', fix: 'DONE — reads from app_config BENCHMARKS_WEBINAR_JSON' },
-      { value: 'day3_attendance: 10%/20%', file: 'lib/metrics/challenge-funnel.ts', line: 35, impact: 'Challenge pitch day attendance thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CHALLENGE_JSON' },
-      { value: 'retention D1→D3: 40%/65%', file: 'lib/metrics/challenge-funnel.ts', line: 36, impact: 'Challenge retention thresholds', fix: 'DONE — reads from app_config BENCHMARKS_CHALLENGE_JSON' },
-    ],
-  },
-  {
-    id: 'emails',
-    title: 'Contact & Calendar Emails',
-    priority: 'nice-to-have',
-    description: 'Support contacts, calendar IDs, sharing instructions',
-    items: [
-      { value: 'mscott@builtbypraxis.com', file: 'app/unauthorized/page.tsx', line: 40, impact: 'Support contact on unauthorized page', fix: 'DONE — reads from app_config SUPPORT_EMAIL' },
-      { value: 'ops@builtbypraxis.com', file: 'lib/google/calendar.ts', line: 43, impact: 'Default ops calendar ID', fix: 'DONE — reads from app_config OPS_CALENDAR_ID' },
-      { value: 'mscott@builtbypraxis.com', file: 'app/(app)/calendar/calendar-client.tsx', line: 1222, impact: 'Calendar sharing instructions', fix: 'Remaining — calendar-client is a client component, needs prop from server' },
-    ],
-  },
-  {
-    id: 'styling',
-    title: 'Styling & Color Tokens',
-    priority: 'nice-to-have',
-    description: 'Priority colors, stage colors, chart colors',
-    items: [
-      { value: 'priority: high→red, medium→amber, low→green', file: 'lib/styles/colors.ts', line: 7, impact: 'Priority badge colors', fix: 'Move to CSS variables or theme config' },
-      { value: '7 stage colors (slate, purple, blue, etc.)', file: 'lib/styles/colors.ts', line: 14, impact: 'Project pipeline stage colors', fix: 'Move to design token system' },
-      { value: '#6366f1 (indigo), #10b981 (emerald)', file: 'components/dashboard/client/ClientTrendChart.tsx', line: 0, impact: 'Chart line colors', fix: 'Move to theme config' },
+      { configKey: 'BENCHMARKS_CALL_JSON', label: 'Call Funnel Benchmarks', description: 'JSON: {metric_key: {weak, strong}}', isJson: true },
+      { configKey: 'BENCHMARKS_WEBINAR_JSON', label: 'Webinar Funnel Benchmarks', description: 'JSON: {metric_key: {weak, strong}}', isJson: true },
+      { configKey: 'BENCHMARKS_CHALLENGE_JSON', label: 'Challenge Funnel Benchmarks', description: 'JSON: {metric_key: {weak, strong}}', isJson: true },
     ],
   },
 ]
@@ -133,8 +105,17 @@ const priorityConfig = {
   'nice-to-have': { label: 'Nice to Have', color: 'text-slate-400', bg: 'bg-zinc-800', border: 'border-zinc-700', dot: 'bg-slate-500' },
 }
 
-export function HardcodedValuesClient() {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['roles', 'team', 'clients']))
+interface Props {
+  initialConfig: Record<string, { value: string; updated_at: string | null }>
+}
+
+export function HardcodedValuesClient({ initialConfig }: Props) {
+  const [config, setConfig] = useState(initialConfig)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['auth', 'team']))
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [seeding, setSeeding] = useState(false)
   const [filter, setFilter] = useState<Priority | 'all'>('all')
 
   const toggle = (id: string) => {
@@ -144,21 +125,86 @@ export function HardcodedValuesClient() {
     setExpanded(next)
   }
 
+  const startEdit = (key: string) => {
+    const current = config[key]?.value || ''
+    setEditing(key)
+    setEditValue(current)
+  }
+
+  const cancelEdit = () => {
+    setEditing(null)
+    setEditValue('')
+  }
+
+  const saveEdit = async () => {
+    if (!editing) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/config/values', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: editing, value: editValue }),
+      })
+      if (res.ok) {
+        setConfig(prev => ({
+          ...prev,
+          [editing]: { value: editValue, updated_at: new Date().toISOString() },
+        }))
+        setEditing(null)
+        setEditValue('')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const seedDefaults = async () => {
+    setSeeding(true)
+    try {
+      const res = await fetch('/api/seed/config', { method: 'POST' })
+      if (res.ok) {
+        window.location.reload()
+      }
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   const filtered = filter === 'all' ? CATEGORIES : CATEGORIES.filter(c => c.priority === filter)
   const totalItems = CATEGORIES.reduce((sum, c) => sum + c.items.length, 0)
+  const configuredCount = CATEGORIES.reduce((sum, c) =>
+    sum + c.items.filter(item => config[item.configKey]?.value).length, 0)
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-100">Hardcoded Values</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          {totalItems} values across {CATEGORIES.length} categories — roadmap for making them dynamic
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100">Hardcoded Values</h1>
+          <p className="text-sm text-slate-400 mt-1">
+            {configuredCount}/{totalItems} configured — edit values directly, changes take effect in ~30s
+          </p>
+        </div>
+        <button
+          onClick={seedDefaults}
+          disabled={seeding}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+        >
+          {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Seed Defaults
+        </button>
       </div>
 
-      {/* Filter chips */}
+      {/* Progress bar */}
+      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all"
+          style={{ width: `${Math.round((configuredCount / totalItems) * 100)}%` }}
+        />
+      </div>
+
+      {/* Filter */}
       <div className="flex gap-2">
-        {(['all', 'critical', 'config', 'nice-to-have'] as const).map(f => (
+        {(['all', 'critical', 'config'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -168,7 +214,7 @@ export function HardcodedValuesClient() {
                 : 'bg-zinc-800 border-zinc-700 text-slate-400 hover:border-zinc-600'
             }`}
           >
-            {f === 'all' ? `All (${totalItems})` : `${priorityConfig[f].label} (${CATEGORIES.filter(c => c.priority === f).reduce((s, c) => s + c.items.length, 0)})`}
+            {f === 'all' ? 'All' : priorityConfig[f].label}
           </button>
         ))}
       </div>
@@ -178,65 +224,110 @@ export function HardcodedValuesClient() {
         {filtered.map(cat => {
           const isOpen = expanded.has(cat.id)
           const pc = priorityConfig[cat.priority]
+          const catConfigured = cat.items.filter(i => config[i.configKey]?.value).length
 
           return (
-            <div key={cat.id} className={`rounded-xl border ${pc.border} ${pc.bg} overflow-hidden`}>
-              <button
-                onClick={() => toggle(cat.id)}
-                className="w-full flex items-center gap-3 p-4 text-left"
-              >
+            <div key={cat.id} className={`rounded-xl border ${pc.border} overflow-hidden`}>
+              <button onClick={() => toggle(cat.id)} className="w-full flex items-center gap-3 p-4 text-left bg-zinc-900/50">
                 {isOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                <div className={`h-2 w-2 rounded-full ${pc.dot}`} />
+                <div className={`h-2 w-2 rounded-full ${catConfigured === cat.items.length ? 'bg-emerald-400' : pc.dot}`} />
                 <div className="flex-1">
                   <h3 className="text-sm font-bold text-slate-200">{cat.title}</h3>
                   <p className="text-xs text-slate-500">{cat.description}</p>
                 </div>
-                <span className={`text-xs ${pc.color}`}>{cat.items.length} values</span>
+                <span className="text-xs text-slate-500">{catConfigured}/{cat.items.length}</span>
               </button>
 
               {isOpen && (
-                <div className="border-t border-zinc-800/50 divide-y divide-zinc-800/30">
-                  {cat.items.map((item, i) => (
-                    <div key={i} className="px-4 py-3 pl-12">
-                      <div className="flex items-start gap-3">
-                        <Code2 className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-mono text-slate-200 break-all">{item.value}</p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            <span className="text-slate-400">{item.file}:{item.line}</span> — {item.impact}
-                          </p>
-                          <p className="text-xs text-emerald-400/70 mt-1 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" /> {item.fix}
-                          </p>
+                <div className="divide-y divide-zinc-800/50">
+                  {cat.items.map(item => {
+                    const val = config[item.configKey]
+                    const hasValue = !!val?.value
+                    const isEditing = editing === item.configKey
+
+                    return (
+                      <div key={item.configKey} className="px-4 py-3 bg-zinc-950/30">
+                        <div className="flex items-start gap-3">
+                          {hasValue ? (
+                            <Check className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                          ) : (
+                            <X className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-200">{item.label}</span>
+                              <code className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-slate-500">{item.configKey}</code>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+
+                            {isEditing ? (
+                              <div className="mt-2 space-y-2">
+                                {item.isJson ? (
+                                  <textarea
+                                    value={editValue}
+                                    onChange={e => setEditValue(e.target.value)}
+                                    rows={6}
+                                    className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-600 text-slate-200 text-xs font-mono focus:outline-none focus:border-amber-500"
+                                  />
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={editValue}
+                                    onChange={e => setEditValue(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-600 text-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                                  />
+                                )}
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={saveEdit}
+                                    disabled={saving}
+                                    className="flex items-center gap-1 px-3 py-1 rounded bg-emerald-600 text-white text-xs hover:bg-emerald-500 disabled:opacity-50"
+                                  >
+                                    {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                    Save
+                                  </button>
+                                  <button onClick={cancelEdit} className="px-3 py-1 rounded bg-zinc-700 text-slate-300 text-xs hover:bg-zinc-600">
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : hasValue ? (
+                              <div className="mt-1 flex items-start gap-2">
+                                <pre className="text-xs text-slate-400 bg-zinc-800/50 px-2 py-1 rounded max-h-20 overflow-auto flex-1 whitespace-pre-wrap break-all">
+                                  {item.isJson ? formatJson(val.value) : val.value}
+                                </pre>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-red-400/60 mt-1">Not configured — click Edit to set a value</p>
+                            )}
+                          </div>
+                          {!isEditing && (
+                            <button
+                              onClick={() => startEdit(item.configKey)}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-slate-400 text-xs hover:border-amber-500/30 hover:text-amber-400 transition-colors"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Edit
+                            </button>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
           )
         })}
       </div>
-
-      {/* Summary */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-slate-300">Recommended New Tables</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-          {[
-            'team_members — roster + calendar IDs',
-            'team_groups — org structure',
-            'benchmark_templates — KPI thresholds per funnel',
-            'feature_flags — toggle functionality',
-            'tag_categories + tags — tagging system',
-            'app_config — already exists, use for most values',
-          ].map(t => (
-            <div key={t} className="px-2 py-1.5 rounded bg-zinc-800 text-slate-400 border border-zinc-700">
-              {t}
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
+}
+
+function formatJson(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
 }
