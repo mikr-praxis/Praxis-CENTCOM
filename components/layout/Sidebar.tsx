@@ -16,6 +16,7 @@ import {
   Settings,
   Zap,
   Columns3,
+  BarChart3,
 } from 'lucide-react'
 import { useRole } from '@/components/providers/RoleProvider'
 import { ROUTE_PERMISSIONS } from '@/lib/roles'
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Comms', href: '/comms', icon: MessageSquare },
   { name: 'Agents', href: '/agents', icon: Bot },
   { name: 'Memory', href: '/memory', icon: Brain },
+  { name: 'Clients', href: '/clients', icon: BarChart3 },
   { name: 'Config', href: '/config', icon: Settings },
 ]
 
