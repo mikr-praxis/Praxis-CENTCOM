@@ -1,13 +1,15 @@
 /**
  * Role-based permission system for Praxis CentCom.
  *
- * Three roles:
- *   exec  – full access to everything (co-founders)
- *   am    – account managers: projects, tasks, calendar, events, comms
- *   cs    – customer success: tasks, calendar, events, comms
+ * Current policy (Option A collapse): every authorized user is 'exec'.
+ * The Role type and route permissions are kept intact so we can reintroduce
+ * tiers later without re-architecting. 'am' and 'cs' are unused at runtime.
  *
- * Role is resolved from the Clerk user's primary email address.
- * Unknown emails default to 'cs' (most restricted).
+ * Authorization:
+ *   - Any @builtbypraxis.com email â exec
+ *   - michael.nield7@gmail.com     â exec
+ *   - Everything else              â 'cs' (unreachable â the (app) layout
+ *                                    redirects non-exec users to /unauthorized)
  */
 
 export type Role = 'exec' | 'am' | 'cs'
@@ -18,24 +20,31 @@ export type RoutePermission = {
   roles: Role[]
 }
 
-// ── Email → Role mapping ────────────────────────────────────────────────
-// Add new team members here when they join.
-const EMAIL_ROLE_MAP: Record<string, Role> = {
-  'mscott@builtbypraxis.com': 'exec',
-  'nadeem@builtbypraxis.com': 'exec',
-  'kevin@builtbypraxis.com': 'exec',
-  'derek@builtbypraxis.com': 'exec',
-  'hillary@builtbypraxis.com': 'am',
-  'victoria@builtbypraxis.com': 'cs',
+// ââ Authorized individual emails (outside @builtbypraxis.com) ââââââââââ
+const AUTHORIZED_PERSONAL_EMAILS: ReadonlySet<string> = new Set([
+  'michael.nield7@gmail.com',
+])
+
+/**
+ * Whether this email is authorized to access CENTCOM at all.
+ * Mirrored by the (app) layout gate.
+ */
+export function isAuthorizedEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  const normalized = email.toLowerCase().trim()
+  if (normalized.endsWith('@builtbypraxis.com')) return true
+  return AUTHORIZED_PERSONAL_EMAILS.has(normalized)
 }
 
-/** Resolve a role from an email address. Defaults to 'cs'. */
+/**
+ * Resolve a role from an email address.
+ * Authorized emails â 'exec'. Everyone else â 'cs' (blocked upstream).
+ */
 export function getRoleFromEmail(email: string | null | undefined): Role {
-  if (!email) return 'cs'
-  return EMAIL_ROLE_MAP[email.toLowerCase().trim()] ?? 'cs'
+  return isAuthorizedEmail(email) ? 'exec' : 'cs'
 }
 
-// ── Route permissions ───────────────────────────────────────────────────
+// ââ Route permissions âââââââââââââââââââââââââââââââââââââââââââââââââââ
 export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { href: '/dashboard', roles: ['exec', 'am', 'cs'] },
   { href: '/projects',  roles: ['exec', 'am'] },
