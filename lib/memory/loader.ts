@@ -130,7 +130,7 @@ export async function loadMemories(): Promise<MemoryEntry[]> {
           entries.push({
             ...parsed,
             updatedAt: row.updated_at
-              ? new Date(row.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+              ? new Date(row.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
               : 'Unknown',
           })
         } catch { /* skip malformed */ }
@@ -139,11 +139,42 @@ export async function loadMemories(): Promise<MemoryEntry[]> {
         return entries.sort((a, b) => (order[a.type] ?? 99) - (order[b.type] ?? 99) || a.name.localeCompare(b.name))
       }
     }
+
+    // No MEMORY_ rows found — auto-seed them now
+    const seedRows = DEFAULT_MEMORIES.map(entry => ({
+      key: `MEMORY_${entry.slug.replace(/-/g, '_').toUpperCase()}`,
+      value: JSON.stringify({ slug: entry.slug, name: entry.name, description: entry.description, type: entry.type, body: entry.body }),
+      updated_by: 'auto-seed',
+      updated_at: new Date().toISOString(),
+    }))
+    await supabase.from('app_config').upsert(seedRows, { onConflict: 'key' })
+
+    // Re-read after seeding
+    const { data: seeded } = await supabase
+      .from('app_config')
+      .select('key, value, updated_at')
+      .like('key', 'MEMORY_%')
+
+    if (seeded && seeded.length > 0) {
+      const entries: MemoryEntry[] = []
+      for (const row of seeded) {
+        try {
+          const parsed = JSON.parse(row.value)
+          entries.push({
+            ...parsed,
+            updatedAt: row.updated_at
+              ? new Date(row.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+              : 'Just seeded',
+          })
+        } catch { /* skip */ }
+      }
+      return entries.sort((a, b) => (order[a.type] ?? 99) - (order[b.type] ?? 99) || a.name.localeCompare(b.name))
+    }
   } catch { /* DB unavailable, use defaults */ }
 
-  // Fallback: return defaults with "Not yet saved" as timestamp
+  // Final fallback — DB completely unavailable
   return DEFAULT_MEMORIES
-    .map(m => ({ ...m, updatedAt: 'Not yet saved — run Seed Defaults on /hardcoded' }))
+    .map(m => ({ ...m, updatedAt: 'DB unavailable' }))
     .sort((a, b) => (order[a.type] ?? 99) - (order[b.type] ?? 99) || a.name.localeCompare(b.name))
 }
 
