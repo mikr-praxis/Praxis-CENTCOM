@@ -18,7 +18,7 @@ const DEFAULT_MEMORIES: MemoryEntry[] = [
     name: 'User — Mikr',
     description: 'Owner profile — Built by Praxis agency founder, senior developer, primary CENTCOM user',
     type: 'user',
-    updatedAt: '2026-04-16',
+    updatedAt: '2026-04-14',
     body: `- Name: Mikr
 - Email: mscott@builtbypraxis.com
 - Role: Founder and operator of Built by Praxis, a full-stack marketing operations agency
