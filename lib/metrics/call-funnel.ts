@@ -1,0 +1,151 @@
+import type { CanonicalMetric } from './types'
+
+export const CALL_FUNNEL_METRICS: CanonicalMetric[] = [
+  {
+    key: 'leads',
+    display_name: 'Leads / Opt-ins',
+    type: 'count',
+    description: 'Top of funnel. Ad clicks → landing page opt-ins.',
+    aliases: ['opt-ins', 'new leads', 'lead count', 'optin', 'form submissions', 'registrations'],
+  },
+  {
+    key: 'calls_booked',
+    display_name: 'Calls Booked',
+    type: 'count',
+    description: 'Total calls scheduled, regardless of qualification.',
+    aliases: ['appointments', 'appts', 'bookings', 'scheduled', 'calls scheduled', 'booked calls'],
+  },
+  {
+    key: 'qualified_calls_booked',
+    display_name: 'Qualified Calls Booked',
+    type: 'count',
+    description: 'Calls that passed a qualification step.',
+    aliases: ['qualified appts', 'qual calls', 'qualified bookings', 'qcb'],
+  },
+  {
+    key: 'calls_showed',
+    display_name: 'Calls Showed',
+    type: 'count',
+    description: 'Calls where the prospect actually showed up.',
+    aliases: ['shows', 'attended', 'completed', 'live calls', 'showed up', 'call shows'],
+  },
+  {
+    key: 'no_shows',
+    display_name: 'No-Shows',
+    type: 'count',
+    description: 'Booked calls that did not show.',
+    aliases: ['no show', 'ns', 'did not attend', 'dna', 'missed'],
+    formula: 'calls_booked - calls_showed',
+    is_derived: true,
+    required_metrics: ['calls_booked', 'calls_showed'],
+  },
+  {
+    key: 'closes',
+    display_name: 'Closes / Sales',
+    type: 'count',
+    description: 'Number of deals closed.',
+    aliases: ['sales', 'clients', 'new clients', 'closed', 'enrolled', 'paid', 'won'],
+  },
+  {
+    key: 'cash_collected',
+    display_name: 'Cash Collected',
+    type: 'currency',
+    description: 'Actual cash received in the period (not invoiced).',
+    aliases: ['cash in', 'revenue collected', 'collected', 'cash', 'revenue (collected)'],
+  },
+  {
+    key: 'average_order_value',
+    display_name: 'Average Order Value (AOV)',
+    type: 'currency',
+    description: 'Average revenue per close.',
+    aliases: ['aov', 'avg deal size', 'average deal', 'price point'],
+    formula: 'cash_collected / closes',
+    is_derived: true,
+    required_metrics: ['cash_collected', 'closes'],
+  },
+  {
+    key: 'show_rate',
+    display_name: 'Show Rate',
+    type: 'percent',
+    description: 'Percentage of booked calls that showed.',
+    aliases: ['show %', 'attendance rate', 'show ratio'],
+    formula: 'calls_showed / calls_booked',
+    is_derived: true,
+    required_metrics: ['calls_showed', 'calls_booked'],
+  },
+  {
+    key: 'close_rate',
+    display_name: 'Close Rate',
+    type: 'percent',
+    description: 'Percentage of shows that closed.',
+    aliases: ['close %', 'conversion rate', 'sales rate', 'win rate'],
+    formula: 'closes / calls_showed',
+    is_derived: true,
+    required_metrics: ['closes', 'calls_showed'],
+  },
+  {
+    key: 'cash_per_call_booked',
+    display_name: 'Cash per Call Booked',
+    type: 'currency',
+    description: 'Revenue efficiency per call booked.',
+    aliases: [],
+    formula: 'cash_collected / calls_booked',
+    is_derived: true,
+    required_metrics: ['cash_collected', 'calls_booked'],
+  },
+  {
+    key: 'cost_per_lead',
+    display_name: 'Cost per Lead (CPL)',
+    type: 'currency',
+    description: 'Cost to acquire one lead.',
+    aliases: ['cpl'],
+    formula: 'ad_spend / leads',
+    is_derived: true,
+    required_metrics: ['ad_spend', 'leads'],
+  },
+  // Additional metrics
+  {
+    key: 'ad_spend',
+    display_name: 'Ad Spend',
+    type: 'currency',
+    description: 'Total paid media spend in period.',
+    aliases: ['spend', 'paid media', 'ad budget', 'media spend', 'meta spend', 'fb spend'],
+  },
+  {
+    key: 'roas',
+    display_name: 'ROAS',
+    type: 'ratio',
+    description: 'Return on ad spend.',
+    aliases: ['return on ad spend', 'revenue/spend'],
+    formula: 'cash_collected / ad_spend',
+    is_derived: true,
+    required_metrics: ['cash_collected', 'ad_spend'],
+  },
+  {
+    key: 'lead_to_book_rate',
+    display_name: 'Lead → Book Rate',
+    type: 'percent',
+    description: 'Percentage of leads that book a call.',
+    aliases: ['booking rate', 'lead to call rate'],
+    formula: 'calls_booked / leads',
+    is_derived: true,
+    required_metrics: ['calls_booked', 'leads'],
+  },
+]
+
+export const CALL_FUNNEL_STAGES = [
+  { label: 'Leads', metricKey: 'leads' },
+  { label: 'Calls Booked', metricKey: 'calls_booked' },
+  { label: 'Shows', metricKey: 'calls_showed' },
+  { label: 'Closes', metricKey: 'closes' },
+]
+
+export const CALL_FUNNEL_BENCHMARKS: Record<string, { weak: number; strong: number }> = {
+  show_rate: { weak: 0.5, strong: 0.7 },
+  close_rate: { weak: 0.2, strong: 0.35 },
+  lead_to_book_rate: { weak: 0.05, strong: 0.15 },
+}
+
+export const CALL_FUNNEL_KPI_KEYS = [
+  'leads', 'calls_booked', 'calls_showed', 'closes', 'cash_collected', 'show_rate',
+]

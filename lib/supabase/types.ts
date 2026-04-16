@@ -79,9 +79,77 @@ export type MessageLog = {
   created_at: string
 }
 
+// Client Performance Dashboard types
+export type Client = {
+  id: string
+  slug: string
+  name: string
+  funnel_type: 'call' | 'webinar' | 'challenge'
+  funnel_config: Record<string, unknown>
+  created_at: string
+}
+
+export type DataSourceRow = {
+  id: string
+  client_id: string
+  source_type: 'google_sheet' | 'csv' | 'manual'
+  source_url: string | null
+  sheet_name: string | null
+  last_synced_at: string | null
+  column_mapping: Record<string, unknown>
+  mapping_status: 'pending' | 'approved' | 'active'
+  created_at: string
+}
+
+export type MetricSnapshotRow = {
+  id: string
+  client_id: string
+  metric_key: string
+  metric_value: number | null
+  period_date: string
+  period_type: 'day' | 'week' | 'month'
+  confidence: 'direct' | 'derived' | 'estimated'
+  derivation_notes: string | null
+  source_id: string | null
+  created_at: string
+}
+
+export type ClientEventRow = {
+  id: string
+  client_id: string
+  event_name: string
+  event_date: string
+  event_type: 'launch' | 'challenge' | 'webinar' | 'sale' | null
+  notes: string | null
+}
+
 export type Database = {
   public: {
     Tables: {
+      clients: {
+        Row: Client
+        Insert: Partial<Client> & Pick<Client, 'slug' | 'name' | 'funnel_type'>
+        Update: Partial<Client>
+        Relationships: []
+      }
+      data_sources: {
+        Row: DataSourceRow
+        Insert: Partial<DataSourceRow> & Pick<DataSourceRow, 'client_id' | 'source_type'>
+        Update: Partial<DataSourceRow>
+        Relationships: []
+      }
+      metric_snapshots: {
+        Row: MetricSnapshotRow
+        Insert: Partial<MetricSnapshotRow> & Pick<MetricSnapshotRow, 'client_id' | 'metric_key' | 'period_date'>
+        Update: Partial<MetricSnapshotRow>
+        Relationships: []
+      }
+      client_events: {
+        Row: ClientEventRow
+        Insert: Partial<ClientEventRow> & Pick<ClientEventRow, 'client_id' | 'event_name' | 'event_date'>
+        Update: Partial<ClientEventRow>
+        Relationships: []
+      }
       tasks: {
         Row: Task
         Insert: Partial<Task> & Pick<Task, 'title' | 'user_id'>
