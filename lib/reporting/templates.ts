@@ -10,7 +10,7 @@
  * (BuildModal in clients-home) handles templates without any UI plumbing.
  */
 
-import type { Formula, AggOp } from './types'
+import type { Formula, AggOp, Filter } from './types'
 import type { AISuggestion, FileForSuggester } from './ai-suggest'
 
 /* ───────────────────────────── Types ───────────────────────────── */
@@ -160,18 +160,28 @@ function dateColumn(role: ResolvedRole | null): string | undefined {
   return role?.columns.timestamp ?? role?.columns.date ?? undefined
 }
 
-function attendedFilter(role: ResolvedRole): { column: string; op: 'eq' | 'in'; value: string | string[] } | null {
+function attendedFilter(role: ResolvedRole): Filter | null {
   const col = role.columns.attended
   if (!col) return null
-  // Best-effort eq filter against common positive values; engine compares
+  // Best-effort filter against common positive values; engine compares
   // case-insensitively, so this catches "Yes", "true", "Attended" etc.
-  return { column: col, op: 'in', value: ['true', 'yes', 'y', '1', 'attended', 'live'] }
+  const f: Filter = {
+    column: col,
+    op: 'in',
+    value: ['true', 'yes', 'y', '1', 'attended', 'live'],
+  }
+  return f
 }
 
-function purchaseFilter(role: ResolvedRole): { column: string; op: 'eq' | 'in'; value: string | string[] } | null {
+function purchaseFilter(role: ResolvedRole): Filter | null {
   const col = role.columns.status
   if (!col) return null
-  return { column: col, op: 'in', value: ['paid', 'completed', 'success', 'won', 'closed', 'closed_won'] }
+  const f: Filter = {
+    column: col,
+    op: 'in',
+    value: ['paid', 'completed', 'success', 'won', 'closed', 'closed_won'],
+  }
+  return f
 }
 
 /* ───────────────────────────── Template: Marketing Webinar ───────────────────────────── */
