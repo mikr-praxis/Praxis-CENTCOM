@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Target, AlertCircle, ArrowDown, ArrowUp, ChevronRight, Database } from 'lucide-react'
+import { Target, AlertCircle, ArrowDown, ArrowUp, ChevronRight, Database, Info } from 'lucide-react'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
 import { DrillDownModal } from './DrillDownModal'
@@ -56,6 +56,7 @@ export function KPICardGrid({ results, loading, slug, timeframe }: Props) {
 }
 
 function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () => void }) {
+  const [infoOpen, setInfoOpen] = useState(false)
   const display = formatKPIValue(result.value, result.format)
   const meetingTarget =
     result.target != null && result.value != null && result.value >= result.target
@@ -73,13 +74,32 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
   const deltaNeg = cmp?.delta_absolute != null && cmp.delta_absolute < 0
 
   return (
-    <div className={`p-4 rounded-xl border bg-slate-900 ${borderClass}`}>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs uppercase tracking-wide text-slate-500 truncate">{result.display_name}</span>
-        {result.error && <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />}
-        {!result.error && result.target != null && (
-          <Target className={`h-4 w-4 flex-shrink-0 ${meetingTarget ? 'text-emerald-400' : 'text-amber-400'}`} />
-        )}
+    <div className={`p-4 rounded-xl border bg-slate-900 ${borderClass} relative`}>
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <span
+          className="text-xs uppercase tracking-wide text-slate-500 truncate flex-1 min-w-0"
+          title={result.display_name}
+        >
+          {result.display_name}
+        </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {result.error && <AlertCircle className="h-3.5 w-3.5 text-red-400" />}
+          {!result.error && result.target != null && (
+            <Target className={`h-3.5 w-3.5 ${meetingTarget ? 'text-emerald-400' : 'text-amber-400'}`} />
+          )}
+          <button
+            onClick={() => setInfoOpen((o) => !o)}
+            className={
+              infoOpen
+                ? 'p-0.5 rounded text-amber-400 hover:bg-slate-800'
+                : 'p-0.5 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-800'
+            }
+            title="Source + formula"
+            aria-label="Toggle KPI details"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       <button
         onClick={onDrillDown}
@@ -103,9 +123,7 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
         >
           {deltaPos && <ArrowUp className="h-3 w-3" />}
           {deltaNeg && <ArrowDown className="h-3 w-3" />}
-          <span>
-            {(cmp.delta_percent * 100).toFixed(1)}%
-          </span>
+          <span>{(cmp.delta_percent * 100).toFixed(1)}%</span>
           <span className="text-slate-500 ml-1">
             (was {formatKPIValue(cmp.previous_value, result.format)})
           </span>
@@ -119,9 +137,9 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
             <Database className="h-3 w-3" /> Top breakdown
           </span>
           {result.groups.slice(0, 5).map((g) => (
-            <div key={g.group} className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400 truncate max-w-[55%]">{g.group}</span>
-              <span className="text-slate-200 font-mono">{formatKPIValue(g.value, result.format)}</span>
+            <div key={g.group} className="flex items-center justify-between gap-2 text-[11px]" title={g.group}>
+              <span className="text-slate-400 truncate flex-1 min-w-0">{g.group}</span>
+              <span className="text-slate-200 font-mono flex-shrink-0">{formatKPIValue(g.value, result.format)}</span>
             </div>
           ))}
         </div>
@@ -134,7 +152,7 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
         )}
       </div>
       {result.error && (
-        <p className="mt-2 text-xs text-red-400 line-clamp-2">{result.error}</p>
+        <p className="mt-2 text-xs text-red-400 line-clamp-2" title={result.error}>{result.error}</p>
       )}
       {onDrillDown && result.value != null && (
         <button
@@ -143,6 +161,56 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
         >
           Drill in <ChevronRight className="h-3 w-3" />
         </button>
+      )}
+
+      {/* Expandable details — opt-in via the info button */}
+      {infoOpen && (
+        <div className="mt-3 pt-2 border-t border-slate-800 space-y-1.5">
+          <div>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-500">Name</span>
+            <span className="block text-xs text-slate-200 break-words">{result.display_name}</span>
+          </div>
+          {result.source_files.length > 0 && (
+            <div>
+              <span className="block text-[9px] uppercase tracking-wide text-slate-500">Source</span>
+              {result.source_files.map((f) => (
+                <span key={f} className="block text-xs font-mono text-slate-300 break-all">
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-1 text-[10px]">
+            <span className="text-slate-500">Format</span>
+            <span className="col-span-2 text-slate-300 font-mono">{result.format}</span>
+            <span className="text-slate-500">Viz</span>
+            <span className="col-span-2 text-slate-300 font-mono">{result.viz_type}</span>
+            <span className="text-slate-500">Rows used</span>
+            <span className="col-span-2 text-slate-300 font-mono">{result.rows_used.toLocaleString()}</span>
+            {result.target != null && (
+              <>
+                <span className="text-slate-500">Target</span>
+                <span className="col-span-2 text-slate-300 font-mono">
+                  {formatKPIValue(result.target, result.format)}
+                </span>
+              </>
+            )}
+            {cmp && cmp.previous_value != null && (
+              <>
+                <span className="text-slate-500">Prior</span>
+                <span className="col-span-2 text-slate-300 font-mono">
+                  {formatKPIValue(cmp.previous_value, result.format)}
+                </span>
+              </>
+            )}
+          </div>
+          {result.error && (
+            <div>
+              <span className="block text-[9px] uppercase tracking-wide text-red-400">Error</span>
+              <span className="block text-xs text-red-300 break-words">{result.error}</span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
