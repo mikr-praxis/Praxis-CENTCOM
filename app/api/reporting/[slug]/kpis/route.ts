@@ -92,18 +92,11 @@ export async function POST(
 
   const { slug } = await params
 
-  let body: Partial<ReportKPI>
+  let body: Partial<ReportKPI> | { kpis: Partial<ReportKPI>[] }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  if (!body.key || !body.display_name || !body.formula) {
-    return NextResponse.json(
-      { error: 'key, display_name, and formula are required' },
-      { status: 400 }
-    )
   }
 
   const supabase = createServerClient()
@@ -116,16 +109,63 @@ export async function POST(
     return NextResponse.json({ error: `Client not found: ${slug}` }, { status: 404 })
   }
 
+  // Bulk path: { kpis: [...] }
+  if ('kpis' in body && Array.isArray(body.kpis)) {
+    const seen = new Set<string>()
+    type KPIInsert = Pick<ReportKPI, 'key' | 'display_name' | 'formula'> & Partial<ReportKPI>
+    const inserts: KPIInsert[] = []
+    let order = 0
+    for (const k of body.kpis) {
+      if (!k.key || !k.display_name || !k.formula) continue
+      let key = k.key
+      // Avoid in-batch duplicates
+      let suffix = 1
+      while (seen.has(key)) {
+        key = `${k.key}_${suffix++}`
+      }
+      seen.add(key)
+      inserts.push({
+        client_id: client.id,
+        key,
+        display_name: k.display_name,
+        description: k.description ?? null,
+        formula: k.formula,
+        format: k.format ?? 'count',
+        target: k.target ?? null,
+        viz_type: k.viz_type ?? 'card',
+        display_order: k.display_order ?? order++,
+      })
+    }
+    if (inserts.length === 0) {
+      return NextResponse.json({ error: 'No valid KPIs in request' }, { status: 400 })
+    }
+    const { data, error: insErr } = await supabase
+      .from('report_kpis')
+      .insert(inserts)
+      .select()
+    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
+    return NextResponse.json({ ok: true, inserted: data?.length ?? 0, kpis: data })
+  }
+
+  // Single path
+  const single = body as Partial<ReportKPI>
+  if (!single.key || !single.display_name || !single.formula) {
+    return NextResponse.json(
+      { error: 'key, display_name, and formula are required' },
+      { status: 400 }
+    )
+  }
+
   const insert = {
     client_id: client.id,
-    key: body.key,
-    display_name: body.display_name,
-    description: body.description ?? null,
-    formula: body.formula,
-    format: body.format ?? 'count',
-    target: body.target ?? null,
-    viz_type: body.viz_type ?? 'card',
-    display_order: body.display_order ?? 0,
+    key: single.key,
+    display_name: single.display_name,
+    description: single.description ?? null,
+    formula: single.formula,
+    format: single.format ?? 'count',
+    target: single.target ?? null,
+    viz_type: single.viz_type ?? 'card',
+    display_order: single.display_order ?? 0,
   }
 
   const { data, error: insertErr } = await supabase
