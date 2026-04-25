@@ -189,14 +189,13 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
               <RefreshCw className={`h-4 w-4 ${syncingNow ? 'animate-spin' : ''}`} />
               {syncingNow ? 'Syncing...' : 'Sync Now'}
             </button>
-            <button
-              disabled
-              title="Available in M4"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-500 disabled:cursor-not-allowed"
+            <Link
+              href={`/reporting/${client.slug}/configure`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800"
             >
               <Settings2 className="h-4 w-4" />
               Configure KPIs
-            </button>
+            </Link>
           </div>
         )}
       </div>
