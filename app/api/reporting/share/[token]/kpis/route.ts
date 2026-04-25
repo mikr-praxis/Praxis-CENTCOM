@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { evaluateKPI, evaluateKPISeries, pickGranularity } from '@/lib/reporting/engine'
+import { evaluateKPI, evaluateKPISeries, pickGranularity, forecastSeries } from '@/lib/reporting/engine'
 import type { Formula, KPIDefinition, RawFileForEngine, Timeframe } from '@/lib/reporting/types'
 import type { ReportKPI, ReportRawFile } from '@/lib/supabase/types'
 
@@ -22,6 +22,11 @@ function rowToDefinition(r: ReportKPI): KPIDefinition {
     target: r.target,
     viz_type: r.viz_type,
     display_order: r.display_order,
+    group_by_column: r.group_by_column ?? null,
+    group_by_source: r.group_by_source ?? null,
+    compare_to: r.compare_to ?? null,
+    forecast_periods: r.forecast_periods ?? 0,
+    forecast_method: r.forecast_method ?? null,
   }
 }
 
@@ -78,6 +83,9 @@ export async function GET(
     const r = evaluateKPI(d, files, timeframe)
     if (d.viz_type === 'line' || d.viz_type === 'bar') {
       r.series = evaluateKPISeries(d, files, timeframe, granularity)
+      if ((d.forecast_periods ?? 0) > 0 && r.series && r.series.length > 1) {
+        r.forecast = forecastSeries(r.series, d.forecast_periods ?? 0, d.forecast_method ?? 'linear')
+      }
     }
     return r
   })

@@ -13,11 +13,14 @@ import type {
   KPIResult,
   KPIDefinition,
   RawFileForEngine,
+  Slicer,
 } from './types'
 
 interface EvalContext {
   files: RawFileForEngine[]
   timeframe: Timeframe
+  /** Optional global slicers — applied to AggOps whose source has the column. */
+  slicers?: Slicer[]
   rowsUsed: { value: number }
   sourcesUsed: Set<string>
 }
@@ -132,6 +135,22 @@ function findSource(files: RawFileForEngine[], filename: string): RawFileForEngi
   return f ?? null
 }
 
+function applySlicers(file: RawFileForEngine, slicers: Slicer[] | undefined, row: Record<string, unknown>): boolean {
+  if (!slicers || slicers.length === 0) return true
+  for (const s of slicers) {
+    // Slicers only apply to KPIs whose source file matches the slicer's filename
+    if (s.filename !== file.filename) continue
+    // ...and only if the file actually has the column
+    if (!file.columns.includes(s.column)) continue
+    if (!s.values || s.values.length === 0) continue
+    const cell = row[s.column]
+    const cellStr = cell == null ? '' : String(cell).trim().toLowerCase()
+    const allowed = new Set(s.values.map((v) => v.toLowerCase()))
+    if (!allowed.has(cellStr)) return false
+  }
+  return true
+}
+
 function evaluateAgg(node: AggOp, ctx: EvalContext): number | null {
   const file = findSource(ctx.files, node.source)
   if (!file) return null
@@ -139,7 +158,9 @@ function evaluateAgg(node: AggOp, ctx: EvalContext): number | null {
 
   const matching = file.rows.filter(
     (row) =>
-      rowMatchesFilters(row, node.filters) && isInTimeframe(row, node.timeframe_column, ctx.timeframe)
+      rowMatchesFilters(row, node.filters) &&
+      isInTimeframe(row, node.timeframe_column, ctx.timeframe) &&
+      applySlicers(file, ctx.slicers, row)
   )
   ctx.rowsUsed.value += matching.length
 
@@ -264,7 +285,8 @@ export function evaluateKPISeries(
   kpi: KPIDefinition,
   files: RawFileForEngine[],
   timeframe: Timeframe,
-  granularity: Granularity
+  granularity: Granularity,
+  options?: { slicers?: Slicer[] }
 ): SeriesPoint[] {
   const formula = kpi.formula
   // Only top-level aggregations get a series in v1
@@ -288,6 +310,7 @@ export function evaluateKPISeries(
     const ctx: EvalContext = {
       files,
       timeframe: sliceTf,
+      slicers: options?.slicers,
       rowsUsed: { value: 0 },
       sourcesUsed: new Set<string>(),
     }
@@ -299,14 +322,129 @@ export function evaluateKPISeries(
   return points
 }
 
+/** Compute the prior-period timeframe for a given timeframe + mode. */
+export function priorTimeframe(tf: Timeframe, mode: 'previous_period' | 'previous_year'): Timeframe {
+  if (!tf.start || !tf.end) return { start: null, end: null }
+  const startTs = new Date(tf.start).getTime()
+  const endTs = new Date(tf.end).getTime()
+  if (mode === 'previous_year') {
+    const offset = 365 * 24 * 60 * 60 * 1000
+    return {
+      start: new Date(startTs - offset).toISOString().slice(0, 10),
+      end: new Date(endTs - offset).toISOString().slice(0, 10),
+    }
+  }
+  const span = endTs - startTs
+  return {
+    start: new Date(startTs - span - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    end: new Date(startTs - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  }
+}
+
+/** Group-by breakdown: re-evaluate the formula once per distinct group value. */
+function evaluateGroupBy(
+  kpi: KPIDefinition,
+  files: RawFileForEngine[],
+  timeframe: Timeframe,
+  slicers: Slicer[] | undefined
+): { group: string; value: number | null; rows_used: number }[] | null {
+  if (!kpi.group_by_column) return null
+  const file = files.find((f) => f.filename === (kpi.group_by_source ?? ''))
+    || files.find((f) => f.columns.includes(kpi.group_by_column!))
+  if (!file) return null
+  const groupValues = new Set<string>()
+  for (const row of file.rows) {
+    const v = row[kpi.group_by_column!]
+    if (v != null && String(v).trim() !== '') groupValues.add(String(v).trim())
+  }
+  if (groupValues.size === 0) return null
+
+  const out: { group: string; value: number | null; rows_used: number }[] = []
+  for (const g of groupValues) {
+    // Wrap formula by injecting a filter on the group column at the AggOp level.
+    // Simplest approach: only support group-by for top-level AggOp formulas.
+    if (!isAggOp(kpi.formula)) continue
+    const augmented: AggOp = {
+      ...kpi.formula,
+      filters: [
+        ...(kpi.formula.filters ?? []),
+        { column: kpi.group_by_column!, op: 'eq', value: g },
+      ],
+    }
+    const ctx: EvalContext = {
+      files,
+      timeframe,
+      slicers,
+      rowsUsed: { value: 0 },
+      sourcesUsed: new Set<string>(),
+    }
+    const value = evaluateFormula(augmented, ctx)
+    out.push({ group: g, value, rows_used: ctx.rowsUsed.value })
+  }
+  // Sort desc by value, top 8
+  return out
+    .sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity))
+    .slice(0, 8)
+}
+
+/** Linear-regression / moving-average forecast on a series. */
+export function forecastSeries(
+  series: { bucket: string; value: number | null }[],
+  periods: number,
+  method: 'linear' | 'moving_avg' = 'linear'
+): { bucket: string; value: number | null }[] {
+  const cleaned = series.filter((p) => p.value != null) as { bucket: string; value: number }[]
+  if (cleaned.length < 2 || periods <= 0) return []
+
+  const last = cleaned[cleaned.length - 1]
+  const lastDate = new Date(last.bucket).getTime()
+  // Infer step from average gap of the last few points
+  const gaps: number[] = []
+  for (let i = 1; i < cleaned.length; i++) {
+    gaps.push(new Date(cleaned[i].bucket).getTime() - new Date(cleaned[i - 1].bucket).getTime())
+  }
+  const stepMs = gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 7 * 24 * 60 * 60 * 1000
+
+  let predict: (i: number) => number
+  if (method === 'moving_avg') {
+    const window = Math.min(4, cleaned.length)
+    const tail = cleaned.slice(-window)
+    const avg = tail.reduce((a, p) => a + p.value, 0) / tail.length
+    predict = () => avg
+  } else {
+    // Linear regression: y = mx + b on indices
+    const n = cleaned.length
+    const xs = cleaned.map((_, i) => i)
+    const ys = cleaned.map((p) => p.value)
+    const sumX = xs.reduce((a, b) => a + b, 0)
+    const sumY = ys.reduce((a, b) => a + b, 0)
+    const sumXY = xs.reduce((acc, x, i) => acc + x * ys[i], 0)
+    const sumXX = xs.reduce((acc, x) => acc + x * x, 0)
+    const denom = n * sumXX - sumX * sumX
+    const slope = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom
+    const intercept = (sumY - slope * sumX) / n
+    predict = (i: number) => slope * (n - 1 + i) + intercept
+  }
+
+  const out: { bucket: string; value: number | null }[] = []
+  for (let i = 1; i <= periods; i++) {
+    const date = new Date(lastDate + stepMs * i)
+    out.push({ bucket: date.toISOString().slice(0, 10), value: predict(i) })
+  }
+  return out
+}
+
 export function evaluateKPI(
   kpi: KPIDefinition,
   files: RawFileForEngine[],
-  timeframe: Timeframe
+  timeframe: Timeframe,
+  options?: { slicers?: Slicer[] }
 ): KPIResult {
+  const slicers = options?.slicers
   const ctx: EvalContext = {
     files,
     timeframe,
+    slicers,
     rowsUsed: { value: 0 },
     sourcesUsed: new Set<string>(),
   }
@@ -317,6 +455,36 @@ export function evaluateKPI(
   } catch (e) {
     error = e instanceof Error ? e.message : String(e)
   }
+
+  // Period-over-period
+  let compare: KPIResult['compare'] = null
+  if (kpi.compare_to) {
+    const priorTf = priorTimeframe(timeframe, kpi.compare_to)
+    const priorCtx: EvalContext = {
+      files,
+      timeframe: priorTf,
+      slicers,
+      rowsUsed: { value: 0 },
+      sourcesUsed: new Set<string>(),
+    }
+    let previous_value: number | null = null
+    try {
+      previous_value = evaluateFormula(kpi.formula, priorCtx)
+    } catch {
+      previous_value = null
+    }
+    if (previous_value != null && value != null) {
+      const delta_absolute = value - previous_value
+      const delta_percent = previous_value !== 0 ? delta_absolute / Math.abs(previous_value) : null
+      compare = { previous_value, delta_absolute, delta_percent }
+    } else {
+      compare = { previous_value, delta_absolute: null, delta_percent: null }
+    }
+  }
+
+  // Group-by
+  const groups = evaluateGroupBy(kpi, files, timeframe, slicers) ?? undefined
+
   return {
     kpi_id: kpi.id,
     key: kpi.key,
@@ -328,6 +496,8 @@ export function evaluateKPI(
     rows_used: ctx.rowsUsed.value,
     source_files: Array.from(ctx.sourcesUsed),
     error,
+    compare,
+    groups,
   }
 }
 

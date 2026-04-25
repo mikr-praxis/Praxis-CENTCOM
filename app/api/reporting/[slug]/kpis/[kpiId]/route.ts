@@ -40,6 +40,11 @@ export async function PATCH(
     ...(body.target !== undefined ? { target: body.target } : {}),
     ...(body.viz_type !== undefined ? { viz_type: body.viz_type } : {}),
     ...(body.display_order !== undefined ? { display_order: body.display_order } : {}),
+    ...(body.group_by_column !== undefined ? { group_by_column: body.group_by_column } : {}),
+    ...(body.group_by_source !== undefined ? { group_by_source: body.group_by_source } : {}),
+    ...(body.compare_to !== undefined ? { compare_to: body.compare_to } : {}),
+    ...(body.forecast_periods !== undefined ? { forecast_periods: body.forecast_periods } : {}),
+    ...(body.forecast_method !== undefined ? { forecast_method: body.forecast_method } : {}),
     updated_at: new Date().toISOString(),
   }
 

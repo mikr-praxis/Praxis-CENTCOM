@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { evaluateKPI, evaluateKPISeries, pickGranularity } from '@/lib/reporting/engine'
-import type { Formula, KPIDefinition, RawFileForEngine, Timeframe } from '@/lib/reporting/types'
+import { evaluateKPI, evaluateKPISeries, pickGranularity, forecastSeries } from '@/lib/reporting/engine'
+import type { Formula, KPIDefinition, RawFileForEngine, Timeframe, Slicer } from '@/lib/reporting/types'
 import type { ReportKPI, ReportRawFile } from '@/lib/supabase/types'
 
 function rowToDefinition(r: ReportKPI): KPIDefinition {
@@ -17,6 +17,11 @@ function rowToDefinition(r: ReportKPI): KPIDefinition {
     target: r.target,
     viz_type: r.viz_type,
     display_order: r.display_order,
+    group_by_column: r.group_by_column ?? null,
+    group_by_source: r.group_by_source ?? null,
+    compare_to: r.compare_to ?? null,
+    forecast_periods: r.forecast_periods ?? 0,
+    forecast_method: r.forecast_method ?? null,
   }
 }
 
@@ -39,7 +44,22 @@ export async function GET(
   const url = new URL(request.url)
   const start = url.searchParams.get('start')
   const end = url.searchParams.get('end')
+  const slicersRaw = url.searchParams.get('slicers')
   const timeframe: Timeframe = { start: start || null, end: end || null }
+  let slicers: Slicer[] = []
+  if (slicersRaw) {
+    try {
+      const parsed = JSON.parse(slicersRaw)
+      if (Array.isArray(parsed)) {
+        slicers = parsed.filter(
+          (s): s is Slicer =>
+            typeof s.filename === 'string' && typeof s.column === 'string' && Array.isArray(s.values)
+        )
+      }
+    } catch {
+      /* ignore bad slicers */
+    }
+  }
 
   const supabase = createServerClient()
   const { data: client, error } = await supabase
@@ -67,9 +87,16 @@ export async function GET(
 
   const granularity = pickGranularity(timeframe)
   const results = definitions.map((d) => {
-    const r = evaluateKPI(d, files, timeframe)
+    const r = evaluateKPI(d, files, timeframe, { slicers })
     if (d.viz_type === 'line' || d.viz_type === 'bar') {
-      r.series = evaluateKPISeries(d, files, timeframe, granularity)
+      r.series = evaluateKPISeries(d, files, timeframe, granularity, { slicers })
+      if ((d.forecast_periods ?? 0) > 0 && r.series && r.series.length > 1) {
+        r.forecast = forecastSeries(
+          r.series,
+          d.forecast_periods ?? 0,
+          d.forecast_method ?? 'linear'
+        )
+      }
     }
     return r
   })
@@ -77,6 +104,7 @@ export async function GET(
   return NextResponse.json({
     timeframe,
     granularity,
+    slicers,
     kpi_count: definitions.length,
     file_count: files.length,
     results,
@@ -134,6 +162,11 @@ export async function POST(
         target: k.target ?? null,
         viz_type: k.viz_type ?? 'card',
         display_order: k.display_order ?? order++,
+        group_by_column: k.group_by_column ?? null,
+        group_by_source: k.group_by_source ?? null,
+        compare_to: k.compare_to ?? null,
+        forecast_periods: k.forecast_periods ?? 0,
+        forecast_method: k.forecast_method ?? null,
       })
     }
     if (inserts.length === 0) {
@@ -166,6 +199,11 @@ export async function POST(
     target: single.target ?? null,
     viz_type: single.viz_type ?? 'card',
     display_order: single.display_order ?? 0,
+    group_by_column: single.group_by_column ?? null,
+    group_by_source: single.group_by_source ?? null,
+    compare_to: single.compare_to ?? null,
+    forecast_periods: single.forecast_periods ?? 0,
+    forecast_method: single.forecast_method ?? null,
   }
 
   const { data, error: insertErr } = await supabase

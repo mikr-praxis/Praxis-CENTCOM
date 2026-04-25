@@ -73,6 +73,11 @@ export async function POST(
     target: null,
     viz_type: body.viz_type ?? 'card',
     display_order: 0,
+    group_by_column: null,
+    group_by_source: null,
+    compare_to: null,
+    forecast_periods: 0,
+    forecast_method: null,
   }
 
   const result = evaluateKPI(fakeKpi, files, timeframe)

@@ -118,6 +118,24 @@ export type ReportKPI = {
   target: number | null
   viz_type: KPIVizType
   display_order: number
+  group_by_column: string | null
+  group_by_source: string | null
+  compare_to: 'previous_period' | 'previous_year' | null
+  forecast_periods: number
+  forecast_method: 'linear' | 'moving_avg' | null
+  created_at: string
+  updated_at: string
+}
+
+export type ReportView = {
+  id: string
+  client_id: string
+  name: string
+  timeframe: Record<string, unknown> | null
+  slicers: Record<string, unknown>[]
+  selected_filenames: string[]
+  is_default: boolean
+  created_by: string | null
   created_at: string
   updated_at: string
 }
@@ -463,6 +481,12 @@ export type Database = {
         Row: ReportShareToken
         Insert: Partial<ReportShareToken> & Pick<ReportShareToken, 'client_id' | 'token'>
         Update: Partial<ReportShareToken>
+        Relationships: []
+      }
+      report_views: {
+        Row: ReportView
+        Insert: Partial<ReportView> & Pick<ReportView, 'client_id' | 'name'>
+        Update: Partial<ReportView>
         Relationships: []
       }
     }

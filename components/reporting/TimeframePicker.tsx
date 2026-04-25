@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Calendar, Database, Flag, Plus, Trash2, X } from 'lucide-react'
+import { Calendar, Database, Flag } from 'lucide-react'
 
 export type TimeframePreset =
   | '7d'
@@ -27,13 +27,13 @@ export interface TimeframeValue {
   end: string | null
   /** Optional event metadata when preset === 'event' */
   event?: {
-    id: string
-    name: string
-    relation: 'since' | 'around' | 'between' | 'before'
-    /** Days before/after when relation === 'around' */
-    around_days?: number
-    /** Second event ID when relation === 'between' */
-    second_event_id?: string
+    /** Source filename + column the event came from */
+    filename: string
+    column: string
+    /** The selected value in that column */
+    value: string
+    /** Date range derived from rows where column = value */
+    date_column?: string | null
   } | null
 }
 
@@ -59,12 +59,16 @@ interface DateRange {
   span_days: number | null
 }
 
-interface ClientEvent {
-  id: string
-  event_name: string
-  event_date: string
-  event_type: string | null
-  notes: string | null
+interface FileColumn {
+  filename: string
+  columns: string[]
+}
+
+interface EventValue {
+  value: string
+  count: number
+  min_date: string | null
+  max_date: string | null
 }
 
 interface Props {
@@ -142,55 +146,19 @@ function resolveDataRelative(preset: TimeframePreset, range: DateRange): Timefra
   return { preset, start: isoDate(start), end }
 }
 
-function resolveEvent(
-  events: ClientEvent[],
-  eventId: string | undefined,
-  relation: 'since' | 'around' | 'between' | 'before',
-  aroundDays: number,
-  secondEventId: string | undefined
+function resolveEventValue(
+  filename: string,
+  column: string,
+  evt: EventValue,
+  dateColumn: string | null
 ): TimeframeValue {
-  const evt = events.find((e) => e.id === eventId)
-  if (!evt) return { preset: 'event', start: null, end: null, event: null }
-  const evtDate = new Date(evt.event_date)
-  const today = todayDate()
-  if (relation === 'since') {
-    return {
-      preset: 'event',
-      start: isoDate(evtDate),
-      end: isoDate(today),
-      event: { id: evt.id, name: evt.event_name, relation: 'since' },
-    }
-  }
-  if (relation === 'before') {
-    return {
-      preset: 'event',
-      start: null,
-      end: isoDate(evtDate),
-      event: { id: evt.id, name: evt.event_name, relation: 'before' },
-    }
-  }
-  if (relation === 'around') {
-    const start = new Date(evtDate.getTime() - aroundDays * 24 * 60 * 60 * 1000)
-    const end = new Date(evtDate.getTime() + aroundDays * 24 * 60 * 60 * 1000)
-    return {
-      preset: 'event',
-      start: isoDate(start),
-      end: isoDate(end),
-      event: { id: evt.id, name: evt.event_name, relation: 'around', around_days: aroundDays },
-    }
-  }
-  // between
-  const evt2 = events.find((e) => e.id === secondEventId)
-  if (!evt2) return { preset: 'event', start: null, end: null, event: null }
-  const d1 = new Date(evt.event_date).getTime()
-  const d2 = new Date(evt2.event_date).getTime()
-  const startD = isoDate(new Date(Math.min(d1, d2)))
-  const endD = isoDate(new Date(Math.max(d1, d2)))
+  const start = evt.min_date ? isoDate(new Date(evt.min_date)) : null
+  const end = evt.max_date ? isoDate(new Date(evt.max_date)) : null
   return {
     preset: 'event',
-    start: startD,
-    end: endD,
-    event: { id: evt.id, name: evt.event_name, relation: 'between', second_event_id: evt2.id },
+    start,
+    end,
+    event: { filename, column, value: evt.value, date_column: dateColumn },
   }
 }
 
@@ -199,36 +167,38 @@ export function TimeframePicker({ value, onChange, slug }: Props) {
     value.preset.startsWith('data_') ? 'data' : value.preset === 'event' ? 'event' : 'calendar'
   )
   const [dataRange, setDataRange] = useState<DateRange | null>(null)
-  const [events, setEvents] = useState<ClientEvent[]>([])
   const [showCustom, setShowCustom] = useState(value.preset === 'custom')
   const [customStart, setCustomStart] = useState(value.start ?? '')
   const [customEnd, setCustomEnd] = useState(value.end ?? '')
 
-  // Event-mode local state
-  const [eventId, setEventId] = useState<string>(value.event?.id ?? '')
-  const [relation, setRelation] = useState<'since' | 'around' | 'between' | 'before'>(
-    (value.event?.relation as 'since' | 'around' | 'between' | 'before' | undefined) ?? 'since'
-  )
-  const [aroundDays, setAroundDays] = useState<number>(value.event?.around_days ?? 7)
-  const [secondEventId, setSecondEventId] = useState<string>(value.event?.second_event_id ?? '')
+  // Event-mode (column-driven) state
+  const [files, setFiles] = useState<FileColumn[]>([])
+  const [evtFile, setEvtFile] = useState<string>(value.event?.filename ?? '')
+  const [evtColumn, setEvtColumn] = useState<string>(value.event?.column ?? '')
+  const [evtValues, setEvtValues] = useState<EventValue[]>([])
+  const [evtDateColumn, setEvtDateColumn] = useState<string | null>(value.event?.date_column ?? null)
+  const [evtValuesLoading, setEvtValuesLoading] = useState(false)
+  const [evtError, setEvtError] = useState<string | null>(null)
 
-  // Add-event state
-  const [addOpen, setAddOpen] = useState(false)
-  const [newEventName, setNewEventName] = useState('')
-  const [newEventDate, setNewEventDate] = useState('')
-  const [newEventType, setNewEventType] = useState<'launch' | 'challenge' | 'webinar' | 'sale' | ''>('')
-  const [savingEvent, setSavingEvent] = useState(false)
-
-  // Fetch data range + events when slug provided
+  // Fetch data range + file columns when slug provided
   useEffect(() => {
     if (!slug) return
     fetch(`/api/reporting/${slug}/date-range`)
       .then((r) => r.json())
       .then((b) => setDataRange(b))
       .catch(() => {})
-    fetch(`/api/reporting/${slug}/events`)
-      .then((r) => r.json())
-      .then((b) => setEvents(b.events ?? []))
+    // Load each file's columns from the inspect-friendly endpoint via report_raw_files
+    fetch(`/api/reporting/${slug}/kpis`)
+      .then(async () => {
+        // Use date-range endpoint's per-file output to drive file list (already shape-compatible with FileColumn-ish)
+        const res = await fetch(`/api/reporting/${slug}/date-range`)
+        const body = await res.json()
+        const list: FileColumn[] = (body.files ?? []).map((f: { filename: string; date_columns: { column: string }[] }) => ({
+          filename: f.filename,
+          columns: [], // filled lazily when user selects a file
+        }))
+        setFiles(list)
+      })
       .catch(() => {})
   }, [slug])
 
@@ -241,6 +211,48 @@ export function TimeframePicker({ value, onChange, slug }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataRange])
 
+  // Load all columns of selected file
+  useEffect(() => {
+    if (!slug || !evtFile) return
+    fetch(`/api/reporting/${slug}/files/inspect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: evtFile }),
+    })
+      .then((r) => r.json())
+      .then((b) => {
+        const cols = (b.columns ?? []).map((c: { name: string }) => c.name)
+        setFiles((prev) => prev.map((f) => (f.filename === evtFile ? { ...f, columns: cols } : f)))
+      })
+      .catch(() => {})
+  }, [slug, evtFile])
+
+  // Load distinct values when file+column chosen
+  useEffect(() => {
+    if (!slug || !evtFile || !evtColumn) {
+      setEvtValues([])
+      return
+    }
+    setEvtValuesLoading(true)
+    setEvtError(null)
+    fetch(`/api/reporting/${slug}/event-column/values`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: evtFile, column: evtColumn }),
+    })
+      .then(async (r) => {
+        const b = await r.json()
+        if (!r.ok) throw new Error(b.error || 'Load failed')
+        setEvtValues(b.values ?? [])
+        setEvtDateColumn(b.date_column ?? null)
+      })
+      .catch((e) => {
+        setEvtError(e instanceof Error ? e.message : 'Load failed')
+        setEvtValues([])
+      })
+      .finally(() => setEvtValuesLoading(false))
+  }, [slug, evtFile, evtColumn])
+
   function pickCalendar(p: TimeframePreset) {
     setMode('calendar')
     setShowCustom(false)
@@ -251,51 +263,18 @@ export function TimeframePicker({ value, onChange, slug }: Props) {
     if (dataRange) onChange(resolveDataRelative(p, dataRange))
     else onChange(computeTimeframe(p, null, null))
   }
-  function applyEvent(rel = relation, ad = aroundDays, sid = secondEventId, eid = eventId) {
+  function pickEventValue(value: string) {
+    const evt = evtValues.find((v) => v.value === value)
+    if (!evt) return
     setMode('event')
-    onChange(resolveEvent(events, eid, rel, ad, sid))
-  }
-  async function addEvent() {
-    if (!slug || !newEventName.trim() || !newEventDate) return
-    setSavingEvent(true)
-    try {
-      const res = await fetch(`/api/reporting/${slug}/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_name: newEventName.trim(),
-          event_date: newEventDate,
-          event_type: newEventType || null,
-        }),
-      })
-      const body = await res.json()
-      if (res.ok && body.event) {
-        setEvents((prev) => [body.event, ...prev])
-        setEventId(body.event.id)
-        setAddOpen(false)
-        setNewEventName('')
-        setNewEventDate('')
-        setNewEventType('')
-      }
-    } finally {
-      setSavingEvent(false)
-    }
-  }
-  async function removeEvent(id: string) {
-    if (!slug) return
-    if (!confirm('Delete this event?')) return
-    const res = await fetch(`/api/reporting/${slug}/events/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      setEvents((prev) => prev.filter((e) => e.id !== id))
-      if (eventId === id) setEventId('')
-      if (secondEventId === id) setSecondEventId('')
-    }
+    onChange(resolveEventValue(evtFile, evtColumn, evt, evtDateColumn))
   }
 
   const hasData = dataRange && dataRange.global_min && dataRange.global_max
   const dataSpanLabel = hasData
     ? `${new Date(dataRange.global_min!).toLocaleDateString()} → ${new Date(dataRange.global_max!).toLocaleDateString()} (${dataRange.span_days} days)`
     : null
+  const selectedFile = files.find((f) => f.filename === evtFile) ?? null
 
   return (
     <div className="space-y-2">
@@ -391,181 +370,68 @@ export function TimeframePicker({ value, onChange, slug }: Props) {
         </div>
       )}
 
-      {/* Event mode */}
+      {/* Event mode (column-driven) */}
       {mode === 'event' && (
         <div className="rounded-lg border border-slate-700 p-3 bg-slate-900 space-y-2">
-          {events.length === 0 ? (
-            <div className="text-xs text-slate-400">
-              No events for this client yet.
-              <button
-                onClick={() => setAddOpen(true)}
-                className="ml-2 inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
-              >
-                <Plus className="h-3 w-3" /> Add an event
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <select
-                  value={eventId}
-                  onChange={(e) => {
-                    setEventId(e.target.value)
-                    applyEvent(relation, aroundDays, secondEventId, e.target.value)
-                  }}
-                  className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200"
-                >
-                  <option value="">— pick an event —</option>
-                  {events.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.event_name} ({new Date(e.event_date).toLocaleDateString()})
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={relation}
-                  onChange={(e) => {
-                    const r = e.target.value as 'since' | 'around' | 'between' | 'before'
-                    setRelation(r)
-                    applyEvent(r, aroundDays, secondEventId, eventId)
-                  }}
-                  className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200"
-                >
-                  <option value="since">Since this event</option>
-                  <option value="before">Up to this event</option>
-                  <option value="around">Around (± days)</option>
-                  <option value="between">Between two events</option>
-                </select>
-                {relation === 'around' && (
-                  <input
-                    type="number"
-                    min={1}
-                    value={aroundDays}
-                    onChange={(e) => {
-                      const n = Number(e.target.value) || 1
-                      setAroundDays(n)
-                      applyEvent(relation, n, secondEventId, eventId)
-                    }}
-                    placeholder="±days"
-                    className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200"
-                  />
-                )}
-                {relation === 'between' && (
-                  <select
-                    value={secondEventId}
-                    onChange={(e) => {
-                      setSecondEventId(e.target.value)
-                      applyEvent(relation, aroundDays, e.target.value, eventId)
-                    }}
-                    className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200"
-                  >
-                    <option value="">— and this event —</option>
-                    {events
-                      .filter((ev) => ev.id !== eventId)
-                      .map((ev) => (
-                        <option key={ev.id} value={ev.id}>
-                          {ev.event_name} ({new Date(ev.event_date).toLocaleDateString()})
-                        </option>
-                      ))}
-                  </select>
-                )}
-              </div>
-
-              <details className="text-[11px] text-slate-500">
-                <summary className="cursor-pointer hover:text-slate-300">Manage events ({events.length})</summary>
-                <div className="mt-2 space-y-1">
-                  {events.map((e) => (
-                    <div key={e.id} className="flex items-center justify-between gap-2 px-2 py-1 rounded bg-slate-950/50">
-                      <span className="text-slate-300 truncate">
-                        {e.event_name}{' '}
-                        <span className="text-slate-500">
-                          · {new Date(e.event_date).toLocaleDateString()}
-                          {e.event_type ? ` · ${e.event_type}` : ''}
-                        </span>
-                      </span>
-                      <button
-                        onClick={() => removeEvent(e.id)}
-                        className="p-1 rounded hover:bg-red-500/10 text-red-400"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setAddOpen(true)}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-400 hover:text-amber-300"
-                  >
-                    <Plus className="h-3 w-3" /> Add event
-                  </button>
-                </div>
-              </details>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Add event modal */}
-      {addOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={() => !savingEvent && setAddOpen(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-white">Add event</h2>
-              <button
-                onClick={() => !savingEvent && setAddOpen(false)}
-                className="text-slate-400 hover:text-slate-200"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={newEventName}
-                onChange={(e) => setNewEventName(e.target.value)}
-                placeholder="Name (e.g. April challenge)"
-                className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700 text-sm text-slate-200"
-                autoFocus
-              />
-              <input
-                type="date"
-                value={newEventDate}
-                onChange={(e) => setNewEventDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700 text-sm text-slate-200"
-              />
-              <select
-                value={newEventType}
-                onChange={(e) => setNewEventType(e.target.value as 'launch' | 'challenge' | 'webinar' | 'sale' | '')}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700 text-sm text-slate-200"
-              >
-                <option value="">— optional type —</option>
-                <option value="launch">Launch</option>
-                <option value="challenge">Challenge</option>
-                <option value="webinar">Webinar</option>
-                <option value="sale">Sale</option>
-              </select>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  onClick={() => !savingEvent && setAddOpen(false)}
-                  className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 border border-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={addEvent}
-                  disabled={savingEvent || !newEventName.trim() || !newEventDate}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
-                >
-                  {savingEvent ? 'Saving…' : 'Save'}
-                </button>
-              </div>
-            </div>
+          <p className="text-[11px] text-slate-400">
+            Pick a column from your data — its distinct values become event options. Selecting one filters to its date range.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <select
+              value={evtFile}
+              onChange={(e) => {
+                setEvtFile(e.target.value)
+                setEvtColumn('')
+              }}
+              className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200"
+            >
+              <option value="">— file —</option>
+              {files.map((f) => (
+                <option key={f.filename} value={f.filename}>
+                  {f.filename}
+                </option>
+              ))}
+            </select>
+            <select
+              value={evtColumn}
+              onChange={(e) => setEvtColumn(e.target.value)}
+              disabled={!selectedFile || selectedFile.columns.length === 0}
+              className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200 disabled:opacity-50"
+            >
+              <option value="">— column —</option>
+              {selectedFile?.columns.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <select
+              value={value.event?.value ?? ''}
+              onChange={(e) => pickEventValue(e.target.value)}
+              disabled={!evtColumn || evtValuesLoading || evtValues.length === 0}
+              className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200 disabled:opacity-50"
+            >
+              <option value="">
+                {evtValuesLoading ? 'Loading…' : evtValues.length === 0 ? '— event —' : '— pick event —'}
+              </option>
+              {evtValues.map((v) => (
+                <option key={v.value} value={v.value}>
+                  {v.value} ({v.count} rows{v.max_date ? ` · ${new Date(v.max_date).toLocaleDateString()}` : ''})
+                </option>
+              ))}
+            </select>
           </div>
+          {evtError && <p className="text-[11px] text-red-400">{evtError}</p>}
+          {evtColumn && !evtError && evtValues.length === 0 && !evtValuesLoading && (
+            <p className="text-[11px] text-slate-500">
+              No values in that column.
+            </p>
+          )}
+          {evtDateColumn && (
+            <p className="text-[11px] text-slate-500">
+              Date column: <span className="font-mono text-slate-400">{evtDateColumn}</span>
+            </p>
+          )}
         </div>
       )}
     </div>
