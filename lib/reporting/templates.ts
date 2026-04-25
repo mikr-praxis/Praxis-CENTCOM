@@ -263,7 +263,7 @@ const marketingWebinar: KPITemplate = {
         const sameFile = att && att.filename === reg.filename
         const attendedFlag = att ? attendedFilter(att) : null
 
-        const numerator: AggOp = sameFile && attendedFlag
+        const numerator: AggOp | null = sameFile && attendedFlag
           ? {
               op: 'count',
               source: reg.filename,
