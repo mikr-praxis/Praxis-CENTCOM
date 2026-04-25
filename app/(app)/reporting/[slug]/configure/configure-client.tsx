@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Plus, Trash2, Save } from 'lucide-react'
-import type { AggOp, Formula, Filter } from '@/lib/reporting/types'
+import { ChevronLeft, Plus, Trash2, Save, Activity } from 'lucide-react'
+import type { AggOp, Formula, Filter, CompositeOp, ConstOp } from '@/lib/reporting/types'
+import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
 interface FileColumns {
@@ -33,10 +34,31 @@ interface Props {
 const FORMAT_OPTIONS: KPIFormat[] = ['count', 'currency', 'percent', 'ratio']
 const VIZ_OPTIONS: KPIVizType[] = ['card', 'line', 'bar', 'pie', 'table']
 const AGG_OPS: AggOp['op'][] = ['count', 'count_distinct', 'sum', 'avg', 'min', 'max']
+const COMPOSITE_OPS: CompositeOp['op'][] = ['divide', 'multiply', 'add', 'subtract']
 const FILTER_OPS: Filter['op'][] = ['eq', 'neq', 'in', 'not_in', 'contains', 'gt', 'gte', 'lt', 'lte', 'not_empty', 'empty']
+
+type FormulaKind = 'agg' | 'composite' | 'const'
 
 function emptyAgg(filename: string): AggOp {
   return { op: 'count', source: filename, filters: [] }
+}
+
+function emptyComposite(filename: string): CompositeOp {
+  return {
+    op: 'divide',
+    numerator: emptyAgg(filename),
+    denominator: emptyAgg(filename),
+  }
+}
+
+function emptyConst(): ConstOp {
+  return { op: 'const', value: 1 }
+}
+
+function detectKind(f: Formula): FormulaKind {
+  if (['divide', 'multiply', 'add', 'subtract'].includes((f as CompositeOp).op)) return 'composite'
+  if ((f as ConstOp).op === 'const') return 'const'
+  return 'agg'
 }
 
 function emptyKPI(filename: string): Omit<KPIRow, 'id' | 'client_id'> {
@@ -50,6 +72,33 @@ function emptyKPI(filename: string): Omit<KPIRow, 'id' | 'client_id'> {
     viz_type: 'card',
     display_order: 0,
   }
+}
+
+/** Render a formula as a readable, plain-English-ish string. */
+function formulaSummary(f: Formula): string {
+  const kind = detectKind(f)
+  if (kind === 'const') return String((f as ConstOp).value)
+  if (kind === 'composite') {
+    const c = f as CompositeOp
+    if (c.op === 'divide') {
+      return `(${formulaSummary(c.numerator || emptyConst())}) / (${formulaSummary(c.denominator || emptyConst())})`
+    }
+    const symbol = c.op === 'multiply' ? '×' : c.op === 'add' ? '+' : '−'
+    return `(${formulaSummary(c.left || emptyConst())}) ${symbol} (${formulaSummary(c.right || emptyConst())})`
+  }
+  const a = f as AggOp
+  let s = a.column ? `${a.op.toUpperCase()}(${a.column})` : `${a.op.toUpperCase()}(*)`
+  s += ` from "${a.source}"`
+  if (a.filters && a.filters.length > 0) {
+    const parts = a.filters.map((flt) => {
+      const v = Array.isArray(flt.value) ? flt.value.join('|') : flt.value
+      if (flt.op === 'empty' || flt.op === 'not_empty') return `${flt.column} ${flt.op.replace('_', ' ')}`
+      return `${flt.column} ${flt.op} ${v ?? ''}`
+    })
+    s += ` WHERE ${parts.join(' AND ')}`
+  }
+  if (a.timeframe_column) s += ` · TF:${a.timeframe_column}`
+  return s
 }
 
 export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
@@ -154,9 +203,10 @@ export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
 
       {adding && (
         <KPIEditor
+          slug={client.slug}
           value={draft}
           files={files}
-          onChange={(d) => setDraft(d)}
+          onChange={(d) => setDraft(d as Omit<KPIRow, 'id' | 'client_id'>)}
           onCancel={() => {
             setAdding(false)
             setDraft(emptyKPI(defaultFile))
@@ -175,9 +225,10 @@ export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
           kpis.map((kpi) => (
             <KPIEditor
               key={kpi.id}
+              slug={client.slug}
               value={kpi}
               files={files}
-              onChange={(patch) => updateKpi(kpi.id, patch)}
+              onChange={(patch) => updateKpi(kpi.id, patch as KPIRow)}
               onSave={() => saveKPI(kpi)}
               onDelete={() => deleteKPI(kpi.id)}
               saving={savingId === kpi.id}
@@ -190,6 +241,7 @@ export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
 }
 
 interface KPIEditorProps {
+  slug: string
   value: Omit<KPIRow, 'id' | 'client_id'> & Partial<Pick<KPIRow, 'id' | 'client_id'>>
   files: FileColumns[]
   onChange: (patch: KPIRow | Omit<KPIRow, 'id' | 'client_id'>) => void
@@ -200,18 +252,14 @@ interface KPIEditorProps {
   saving?: boolean
 }
 
-function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, saving }: KPIEditorProps) {
+const inputCls = 'w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50'
+
+function KPIEditor({ slug, value, files, onChange, onSave, onCancel, onDelete, isNew, saving }: KPIEditorProps) {
   function setField<K extends keyof typeof value>(field: K, v: (typeof value)[K]) {
     onChange({ ...value, [field]: v } as KPIRow)
   }
 
-  // Only AggOp formulas are editable in v1 (composite ops are stored but not editable in this UI yet)
-  const formula = value.formula
-  const isAgg = ['sum', 'count', 'count_distinct', 'avg', 'min', 'max'].includes((formula as AggOp).op)
-  const agg = isAgg ? (formula as AggOp) : null
-  const sourceFile = files.find((f) => f.filename === agg?.source) ?? null
-
-  function setFormula(next: AggOp) {
+  function setFormula(next: Formula) {
     onChange({ ...value, formula: next } as KPIRow)
   }
 
@@ -223,7 +271,7 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
             type="text"
             value={value.display_name}
             onChange={(e) => setField('display_name', e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className={inputCls}
             placeholder="Total revenue"
           />
         </Field>
@@ -232,7 +280,7 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
             type="text"
             value={value.key}
             onChange={(e) => setField('key', e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className={inputCls}
             placeholder="total_revenue"
           />
         </Field>
@@ -240,7 +288,7 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
           <select
             value={value.format}
             onChange={(e) => setField('format', e.target.value as KPIFormat)}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className={inputCls}
           >
             {FORMAT_OPTIONS.map((f) => (
               <option key={f} value={f}>{f}</option>
@@ -251,7 +299,7 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
           <select
             value={value.viz_type}
             onChange={(e) => setField('viz_type', e.target.value as KPIVizType)}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className={inputCls}
           >
             {VIZ_OPTIONS.map((v) => (
               <option key={v} value={v}>{v}</option>
@@ -263,7 +311,7 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
             type="number"
             value={value.target ?? ''}
             onChange={(e) => setField('target', e.target.value === '' ? null : Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className={inputCls}
             placeholder="e.g. 50000"
           />
         </Field>
@@ -272,7 +320,7 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
             type="number"
             value={value.display_order}
             onChange={(e) => setField('display_order', Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className={inputCls}
           />
         </Field>
       </div>
@@ -282,25 +330,21 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
           value={value.description ?? ''}
           onChange={(e) => setField('description', e.target.value || null)}
           rows={2}
-          className="input"
+          className={inputCls}
           placeholder="What this KPI measures."
         />
       </Field>
 
       <div className="mt-4 p-3 rounded-lg border border-slate-700 bg-slate-950/40">
         <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Formula</div>
-        {agg ? (
-          <FormulaEditor
-            agg={agg}
-            files={files}
-            sourceFile={sourceFile}
-            onChange={setFormula}
-          />
-        ) : (
-          <p className="text-sm text-slate-400">
-            This KPI uses a composite formula (e.g. divide). Composite editing will land in M5.
-          </p>
-        )}
+        <FormulaEditor formula={value.formula} files={files} onChange={setFormula} />
+
+        <div className="mt-3 pt-3 border-t border-slate-800">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">Reads as</div>
+          <p className="text-xs font-mono text-slate-400 break-all">{formulaSummary(value.formula)}</p>
+        </div>
+
+        <FormulaPreview slug={slug} formula={value.formula} format={value.format} viz={value.viz_type} />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
@@ -337,23 +381,190 @@ function KPIEditor({ value, files, onChange, onSave, onCancel, onDelete, isNew, 
   )
 }
 
+/** Top-level dispatcher. Lets the user switch the formula KIND (agg/composite/const). */
 function FormulaEditor({
+  formula,
+  files,
+  onChange,
+}: {
+  formula: Formula
+  files: FileColumns[]
+  onChange: (next: Formula) => void
+}) {
+  const kind = detectKind(formula)
+  const defaultFile = files[0]?.filename ?? ''
+
+  function changeKind(next: FormulaKind) {
+    if (next === kind) return
+    if (next === 'agg') onChange(emptyAgg(defaultFile))
+    else if (next === 'composite') onChange(emptyComposite(defaultFile))
+    else onChange(emptyConst())
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1 rounded-lg border border-slate-700 p-1 bg-slate-900 w-fit">
+        {(['agg', 'composite', 'const'] as FormulaKind[]).map((k) => (
+          <button
+            key={k}
+            onClick={() => changeKind(k)}
+            className={
+              kind === k
+                ? 'px-3 py-1 text-xs rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'px-3 py-1 text-xs rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent'
+            }
+          >
+            {k === 'agg' ? 'Aggregation' : k === 'composite' ? 'Composite' : 'Constant'}
+          </button>
+        ))}
+      </div>
+
+      {kind === 'agg' && (
+        <AggEditor agg={formula as AggOp} files={files} onChange={onChange} />
+      )}
+      {kind === 'composite' && (
+        <CompositeEditor composite={formula as CompositeOp} files={files} onChange={onChange} />
+      )}
+      {kind === 'const' && (
+        <Field label="Constant value">
+          <input
+            type="number"
+            value={(formula as ConstOp).value ?? 0}
+            onChange={(e) => onChange({ op: 'const', value: Number(e.target.value) })}
+            className={inputCls}
+          />
+        </Field>
+      )}
+    </div>
+  )
+}
+
+function CompositeEditor({
+  composite,
+  files,
+  onChange,
+}: {
+  composite: CompositeOp
+  files: FileColumns[]
+  onChange: (next: Formula) => void
+}) {
+  const op = composite.op
+  const isDivide = op === 'divide'
+  const leftLabel = isDivide ? 'Numerator' : 'Left'
+  const rightLabel = isDivide ? 'Denominator' : 'Right'
+  const leftFormula = (isDivide ? composite.numerator : composite.left) ?? emptyAgg(files[0]?.filename ?? '')
+  const rightFormula = (isDivide ? composite.denominator : composite.right) ?? emptyAgg(files[0]?.filename ?? '')
+
+  function setOp(next: CompositeOp['op']) {
+    // Convert existing left/right between divide- and non-divide shapes
+    const l = leftFormula
+    const r = rightFormula
+    if (next === 'divide') onChange({ op: 'divide', numerator: l, denominator: r })
+    else onChange({ op: next, left: l, right: r })
+  }
+  function setLeft(next: Formula) {
+    if (isDivide) onChange({ ...composite, numerator: next })
+    else onChange({ ...composite, left: next })
+  }
+  function setRight(next: Formula) {
+    if (isDivide) onChange({ ...composite, denominator: next })
+    else onChange({ ...composite, right: next })
+  }
+
+  return (
+    <div className="space-y-3">
+      <Field label="Operation">
+        <select
+          value={op}
+          onChange={(e) => setOp(e.target.value as CompositeOp['op'])}
+          className={inputCls}
+        >
+          {COMPOSITE_OPS.map((o) => (
+            <option key={o} value={o}>
+              {o === 'divide' ? 'divide (a / b)' : o === 'subtract' ? 'subtract (a − b)' : o === 'multiply' ? 'multiply (a × b)' : 'add (a + b)'}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="p-3 rounded-lg border border-slate-700 bg-slate-900/40">
+          <div className="text-xs text-slate-400 mb-2">{leftLabel}</div>
+          <NestedFormulaEditor formula={leftFormula} files={files} onChange={setLeft} />
+        </div>
+        <div className="p-3 rounded-lg border border-slate-700 bg-slate-900/40">
+          <div className="text-xs text-slate-400 mb-2">{rightLabel}</div>
+          <NestedFormulaEditor formula={rightFormula} files={files} onChange={setRight} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** A simpler nested editor — only Aggregation or Constant. No nested composites in v1 to keep UI sane. */
+function NestedFormulaEditor({
+  formula,
+  files,
+  onChange,
+}: {
+  formula: Formula
+  files: FileColumns[]
+  onChange: (next: Formula) => void
+}) {
+  const kind = detectKind(formula)
+  const defaultFile = files[0]?.filename ?? ''
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1 rounded-lg border border-slate-700 p-1 bg-slate-900 w-fit">
+        {(['agg', 'const'] as FormulaKind[]).map((k) => (
+          <button
+            key={k}
+            onClick={() => {
+              if (k === kind) return
+              onChange(k === 'agg' ? emptyAgg(defaultFile) : emptyConst())
+            }}
+            className={
+              kind === k
+                ? 'px-2 py-0.5 text-[11px] rounded bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'px-2 py-0.5 text-[11px] rounded text-slate-400 hover:text-slate-200'
+            }
+          >
+            {k === 'agg' ? 'Aggregation' : 'Constant'}
+          </button>
+        ))}
+      </div>
+      {kind === 'agg' ? (
+        <AggEditor agg={formula as AggOp} files={files} onChange={onChange} />
+      ) : (
+        <Field label="Value">
+          <input
+            type="number"
+            value={(formula as ConstOp).value ?? 0}
+            onChange={(e) => onChange({ op: 'const', value: Number(e.target.value) })}
+            className={inputCls}
+          />
+        </Field>
+      )}
+    </div>
+  )
+}
+
+function AggEditor({
   agg,
   files,
-  sourceFile,
   onChange,
 }: {
   agg: AggOp
   files: FileColumns[]
-  sourceFile: FileColumns | null
   onChange: (next: AggOp) => void
 }) {
+  const sourceFile = files.find((f) => f.filename === agg.source) ?? null
+  const filters = agg.filters ?? []
+
   function patch(p: Partial<AggOp>) {
     onChange({ ...agg, ...p })
   }
-
-  const filters = agg.filters ?? []
-
   function addFilter() {
     patch({ filters: [...filters, { column: sourceFile?.columns[0] ?? '', op: 'eq', value: '' }] })
   }
@@ -361,9 +572,7 @@ function FormulaEditor({
     patch({ filters: filters.filter((_, idx) => idx !== i) })
   }
   function updateFilter(i: number, p: Partial<Filter>) {
-    patch({
-      filters: filters.map((f, idx) => (idx === i ? { ...f, ...p } : f)),
-    })
+    patch({ filters: filters.map((f, idx) => (idx === i ? { ...f, ...p } : f)) })
   }
 
   const dateColumns = sourceFile?.columns.filter((c) =>
@@ -374,22 +583,14 @@ function FormulaEditor({
     <div className="space-y-2">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         <Field label="Op">
-          <select
-            value={agg.op}
-            onChange={(e) => patch({ op: e.target.value as AggOp['op'] })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
-          >
+          <select value={agg.op} onChange={(e) => patch({ op: e.target.value as AggOp['op'] })} className={inputCls}>
             {AGG_OPS.map((o) => (
               <option key={o} value={o}>{o}</option>
             ))}
           </select>
         </Field>
         <Field label="Source file">
-          <select
-            value={agg.source}
-            onChange={(e) => patch({ source: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
-          >
+          <select value={agg.source} onChange={(e) => patch({ source: e.target.value })} className={inputCls}>
             {files.length === 0 && <option value="">— no files —</option>}
             {files.map((f) => (
               <option key={f.filename} value={f.filename}>{f.filename}</option>
@@ -400,7 +601,7 @@ function FormulaEditor({
           <select
             value={agg.column ?? ''}
             onChange={(e) => patch({ column: e.target.value || undefined })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className={inputCls}
             disabled={agg.op === 'count'}
           >
             <option value="">— none —</option>
@@ -411,11 +612,11 @@ function FormulaEditor({
         </Field>
       </div>
 
-      <Field label="Timeframe column">
+      <Field label="Timeframe column (optional)">
         <select
           value={agg.timeframe_column ?? ''}
           onChange={(e) => patch({ timeframe_column: e.target.value || undefined })}
-          className="input"
+          className={inputCls}
         >
           <option value="">— none (timeframe filter ignored) —</option>
           {(dateColumns.length > 0 ? dateColumns : sourceFile?.columns ?? []).map((c) => (
@@ -427,11 +628,7 @@ function FormulaEditor({
       <div>
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-slate-400">Filters (AND)</span>
-          <button
-            onClick={addFilter}
-            className="text-xs text-amber-400 hover:text-amber-300"
-            disabled={!sourceFile}
-          >
+          <button onClick={addFilter} className="text-xs text-amber-400 hover:text-amber-300" disabled={!sourceFile}>
             + Add filter
           </button>
         </div>
@@ -442,22 +639,14 @@ function FormulaEditor({
             {filters.map((f, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-end">
                 <div className="col-span-4">
-                  <select
-                    value={f.column}
-                    onChange={(e) => updateFilter(i, { column: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
-                  >
+                  <select value={f.column} onChange={(e) => updateFilter(i, { column: e.target.value })} className={inputCls}>
                     {sourceFile?.columns.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
                 <div className="col-span-3">
-                  <select
-                    value={f.op}
-                    onChange={(e) => updateFilter(i, { op: e.target.value as Filter['op'] })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
-                  >
+                  <select value={f.op} onChange={(e) => updateFilter(i, { op: e.target.value as Filter['op'] })} className={inputCls}>
                     {FILTER_OPS.map((o) => (
                       <option key={o} value={o}>{o}</option>
                     ))}
@@ -476,21 +665,96 @@ function FormulaEditor({
                           updateFilter(i, { value: v })
                         }
                       }}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700/60 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+                      className={inputCls}
                       placeholder={f.op === 'in' || f.op === 'not_in' ? 'comma, separated' : 'value'}
                     />
                   )}
                 </div>
                 <div className="col-span-1 flex justify-end">
-                  <button
-                    onClick={() => removeFilter(i)}
-                    className="p-1.5 rounded hover:bg-red-500/10 text-red-400"
-                  >
+                  <button onClick={() => removeFilter(i)} className="p-1.5 rounded hover:bg-red-500/10 text-red-400">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Live formula preview — debounced fetch to /preview, shows current value + row count + warnings. */
+function FormulaPreview({
+  slug,
+  formula,
+  format,
+  viz,
+}: {
+  slug: string
+  formula: Formula
+  format: KPIFormat
+  viz: KPIVizType
+}) {
+  const [loading, setLoading] = useState(false)
+  const [value, setValue] = useState<number | null>(null)
+  const [rowsUsed, setRowsUsed] = useState<number>(0)
+  const [sources, setSources] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  // Debounce
+  const formulaJSON = useMemo(() => JSON.stringify(formula), [formula])
+
+  useEffect(() => {
+    let cancelled = false
+    const handle = setTimeout(async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/reporting/${slug}/kpis/preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formula, format, viz_type: viz }),
+        })
+        const body = await res.json()
+        if (cancelled) return
+        if (!res.ok) {
+          setError(body.error || 'Preview failed')
+          setValue(null)
+        } else {
+          const r = body.result
+          setValue(r?.value ?? null)
+          setRowsUsed(r?.rows_used ?? 0)
+          setSources(r?.source_files ?? [])
+          setError(r?.error ?? null)
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Preview failed')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
+    }
+  }, [slug, formulaJSON, formula, format, viz])
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-800 flex items-start gap-3">
+      <Activity className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">Live preview</div>
+        {error ? (
+          <p className="text-xs text-red-400">{error}</p>
+        ) : (
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-semibold text-white">
+              {loading ? '…' : formatKPIValue(value, format)}
+            </span>
+            <span className="text-[11px] text-slate-500">
+              {rowsUsed.toLocaleString()} rows · {sources.length > 0 ? sources.join(', ') : 'no source matched'}
+            </span>
           </div>
         )}
       </div>
