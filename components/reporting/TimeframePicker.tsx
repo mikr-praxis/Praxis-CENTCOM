@@ -82,8 +82,26 @@ function todayDate(): Date {
   return new Date()
 }
 
+/**
+ * Format a Date as YYYY-MM-DD using LOCAL date components (not UTC). This
+ * ensures the date string the engine receives matches what the user sees in
+ * the picker, regardless of timezone.
+ */
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  const yr = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const dy = String(d.getDate()).padStart(2, '0')
+  return `${yr}-${mo}-${dy}`
+}
+
+/** Render a YYYY-MM-DD string as a local date without TZ shift. */
+function displayDate(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return iso
+  const yr = parseInt(m[1], 10)
+  const mo = parseInt(m[2], 10) - 1
+  const dy = parseInt(m[3], 10)
+  return new Date(yr, mo, dy).toLocaleDateString()
 }
 
 export function computeTimeframe(
@@ -272,7 +290,7 @@ export function TimeframePicker({ value, onChange, slug }: Props) {
 
   const hasData = dataRange && dataRange.global_min && dataRange.global_max
   const dataSpanLabel = hasData
-    ? `${new Date(dataRange.global_min!).toLocaleDateString()} → ${new Date(dataRange.global_max!).toLocaleDateString()} (${dataRange.span_days} days)`
+    ? `${displayDate(dataRange.global_min!.slice(0, 10))} → ${displayDate(dataRange.global_max!.slice(0, 10))} (${dataRange.span_days} days)`
     : null
   const selectedFile = files.find((f) => f.filename === evtFile) ?? null
 
@@ -310,7 +328,7 @@ export function TimeframePicker({ value, onChange, slug }: Props) {
         )}
         {value.start && value.end && (
           <span className="text-[10px] text-slate-400">
-            {new Date(value.start).toLocaleDateString()} → {new Date(value.end).toLocaleDateString()}
+            {displayDate(value.start)} → {displayDate(value.end)}
           </span>
         )}
       </div>

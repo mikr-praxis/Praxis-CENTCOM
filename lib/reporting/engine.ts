@@ -111,10 +111,22 @@ function isInTimeframe(row: Record<string, unknown>, column: string | undefined,
 
 function parseLooseDate(s: string): Date | null {
   if (!s) return null
-  // Try ISO first
+  // Bare YYYY-MM-DD → parse as LOCAL midnight (not UTC). This keeps timeframe
+  // boundaries consistent with how the user sees dates in the picker, and
+  // with how MM/DD/YYYY values get parsed (also local).
+  const dateOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnly) {
+    const dt = new Date(
+      parseInt(dateOnly[1], 10),
+      parseInt(dateOnly[2], 10) - 1,
+      parseInt(dateOnly[3], 10)
+    )
+    if (!Number.isNaN(dt.getTime())) return dt
+  }
+  // Anything else with timezone info / time component → use the JS parser
   const iso = new Date(s)
   if (!Number.isNaN(iso.getTime())) return iso
-  // Try MM/DD/YYYY and similar
+  // MM/DD/YYYY and DD-MM-YYYY style
   const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/)
   if (m) {
     let yr = parseInt(m[3], 10)
@@ -263,7 +275,12 @@ function bucketStart(date: Date, granularity: Granularity): Date {
 }
 
 function bucketKey(date: Date): string {
-  return date.toISOString().slice(0, 10)
+  // Local-time YYYY-MM-DD (matches how the picker emits dates and how
+  // parseLooseDate now interprets them).
+  const yr = date.getFullYear()
+  const mo = String(date.getMonth() + 1).padStart(2, '0')
+  const dy = String(date.getDate()).padStart(2, '0')
+  return `${yr}-${mo}-${dy}`
 }
 
 function nextBucket(date: Date, granularity: Granularity): Date {
@@ -304,8 +321,8 @@ export function evaluateKPISeries(
   while (cursor.getTime() <= endTs) {
     const bucketEnd = nextBucket(cursor, granularity)
     const sliceTf: Timeframe = {
-      start: cursor.toISOString().slice(0, 10),
-      end: new Date(bucketEnd.getTime() - 1).toISOString().slice(0, 10),
+      start: bucketKey(cursor),
+      end: bucketKey(new Date(bucketEnd.getTime() - 1)),
     }
     const ctx: EvalContext = {
       files,
@@ -325,19 +342,22 @@ export function evaluateKPISeries(
 /** Compute the prior-period timeframe for a given timeframe + mode. */
 export function priorTimeframe(tf: Timeframe, mode: 'previous_period' | 'previous_year'): Timeframe {
   if (!tf.start || !tf.end) return { start: null, end: null }
-  const startTs = new Date(tf.start).getTime()
-  const endTs = new Date(tf.end).getTime()
+  const startD = parseLooseDate(tf.start)
+  const endD = parseLooseDate(tf.end)
+  if (!startD || !endD) return { start: null, end: null }
+  const startTs = startD.getTime()
+  const endTs = endD.getTime()
   if (mode === 'previous_year') {
     const offset = 365 * 24 * 60 * 60 * 1000
     return {
-      start: new Date(startTs - offset).toISOString().slice(0, 10),
-      end: new Date(endTs - offset).toISOString().slice(0, 10),
+      start: bucketKey(new Date(startTs - offset)),
+      end: bucketKey(new Date(endTs - offset)),
     }
   }
   const span = endTs - startTs
   return {
-    start: new Date(startTs - span - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    end: new Date(startTs - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    start: bucketKey(new Date(startTs - span - 24 * 60 * 60 * 1000)),
+    end: bucketKey(new Date(startTs - 24 * 60 * 60 * 1000)),
   }
 }
 
@@ -429,7 +449,7 @@ export function forecastSeries(
   const out: { bucket: string; value: number | null }[] = []
   for (let i = 1; i <= periods; i++) {
     const date = new Date(lastDate + stepMs * i)
-    out.push({ bucket: date.toISOString().slice(0, 10), value: predict(i) })
+    out.push({ bucket: bucketKey(date), value: predict(i) })
   }
   return out
 }

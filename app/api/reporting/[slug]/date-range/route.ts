@@ -22,6 +22,16 @@ function looksLikeDateColumn(name: string): boolean {
 
 function parseLooseDate(s: string): number | null {
   if (!s) return null
+  // Bare YYYY-MM-DD → local midnight (consistent with the engine + picker)
+  const dateOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnly) {
+    const dt = new Date(
+      parseInt(dateOnly[1], 10),
+      parseInt(dateOnly[2], 10) - 1,
+      parseInt(dateOnly[3], 10)
+    )
+    if (!Number.isNaN(dt.getTime())) return dt.getTime()
+  }
   const t = new Date(s).getTime()
   if (!Number.isNaN(t)) return t
   const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/)
