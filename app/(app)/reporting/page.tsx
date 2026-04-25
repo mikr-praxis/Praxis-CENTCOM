@@ -34,6 +34,18 @@ export default async function ReportingIndexPage() {
     migrationRun = false
   }
 
+  // Auto-seed Breathe for Change on first visit (idempotent — slug is unique)
+  if (migrationRun && !clients.find((c) => c.slug === 'breathe-for-change')) {
+    await supabase
+      .from('clients')
+      .insert({ slug: 'breathe-for-change', name: 'Breathe for Change', funnel_type: 'call' })
+    const refreshed = await supabase
+      .from('clients')
+      .select('id, slug, name, drive_folder_id')
+      .order('name')
+    clients = refreshed.data ?? clients
+  }
+
   // Get sync stats per client
   let fileCounts: Record<string, { count: number; lastSynced: string | null }> = {}
   if (migrationRun) {
