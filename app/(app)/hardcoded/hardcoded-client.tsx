@@ -115,6 +115,7 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'REPORTING_SYNC_NOTIFY_CHANNEL_ID', label: 'Sync Notify Channel ID', description: 'Slack channel ID (e.g. C0ABC1234) to post a summary after every sync (manual + weekly cron). Leave blank to disable. Requires SLACK_BOT_TOKEN.' },
       { configKey: 'SHARE_TOKEN_DEFAULT_EXPIRY_DAYS', label: 'Share Link Default Expiry (days)', description: 'New share links auto-expire after this many days unless the user picks "Never" or a custom date. Set to 0 for "no default expiry" (always permanent unless overridden). Default 30.' },
       { configKey: 'REPORTING_DEFAULT_FUNNEL_TYPE', label: 'Default Funnel Type', description: 'Pre-fills the dropdown when adding a new client: call | webinar | challenge. Default call.' },
+      { configKey: 'REPORTING_DATE_PARSE_THRESHOLD', label: 'Date Detection Threshold', description: 'Minimum ratio (0–1) of parseable-date values a column needs to qualify as a date column. Lower (e.g. 0.1) accepts sparse-date columns; higher (e.g. 0.5) requires dense ones. Default 0.3.' },
     ],
   },
 ]

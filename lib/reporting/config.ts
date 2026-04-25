@@ -19,6 +19,7 @@ export const REPORTING_CONFIG_DEFAULTS = {
   REPORTING_SYNC_NOTIFY_CHANNEL_ID: '',
   SHARE_TOKEN_DEFAULT_EXPIRY_DAYS: '30',
   REPORTING_DEFAULT_FUNNEL_TYPE: 'call',
+  REPORTING_DATE_PARSE_THRESHOLD: '0.3',
 } as const
 
 export type ReportingConfigKey = keyof typeof REPORTING_CONFIG_DEFAULTS
@@ -93,6 +94,19 @@ export async function getReportingDefaultFunnelType(): Promise<FunnelType> {
   const v = (await getConfig('REPORTING_DEFAULT_FUNNEL_TYPE'))?.trim().toLowerCase()
   if (v === 'webinar' || v === 'challenge') return v
   return 'call'
+}
+
+/**
+ * Minimum ratio of parseable-date values a column needs to qualify as the
+ * primary date column for a file. 0.3 (30%) by default — lower if you have
+ * sparse data (lots of optional dates), higher to require dense date columns.
+ * Clamped to [0, 1].
+ */
+export async function getReportingDateParseThreshold(): Promise<number> {
+  const v = await getConfig('REPORTING_DATE_PARSE_THRESHOLD')
+  const n = Number(v ?? '')
+  if (!Number.isFinite(n) || n < 0 || n > 1) return 0.3
+  return n
 }
 
 export interface GranularityThresholds {

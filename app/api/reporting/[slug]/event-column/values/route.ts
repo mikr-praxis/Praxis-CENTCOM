@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { getReportingDateParseThreshold } from '@/lib/reporting/config'
 
 const DATE_COL_PATTERNS = [
   /\b(date|time|created|modified|updated|when|ts|timestamp)\b/i,
@@ -46,7 +47,11 @@ function parseLooseDate(s: string): number | null {
   return null
 }
 
-function pickPrimaryDateColumn(columns: string[], rows: Record<string, unknown>[]): string | null {
+function pickPrimaryDateColumn(
+  columns: string[],
+  rows: Record<string, unknown>[],
+  threshold: number
+): string | null {
   const candidates = columns.filter((c) => looksLikeDateColumn(c))
   const scanCols = candidates.length > 0 ? candidates : columns
   let best: string | null = null
@@ -59,7 +64,7 @@ function pickPrimaryDateColumn(columns: string[], rows: Record<string, unknown>[
       if (parseLooseDate(String(v)) != null) parsed += 1
     }
     const ratio = rows.length > 0 ? parsed / rows.length : 0
-    if (ratio > 0.3 && ratio > bestRatio) {
+    if (ratio > threshold && ratio > bestRatio) {
       best = col
       bestRatio = ratio
     }
@@ -113,7 +118,8 @@ export async function POST(
     return NextResponse.json({ error: `Column not found: ${body.column}` }, { status: 400 })
   }
 
-  const dateCol = pickPrimaryDateColumn(columns, rows)
+  const threshold = await getReportingDateParseThreshold()
+  const dateCol = pickPrimaryDateColumn(columns, rows, threshold)
 
   // Group rows by the chosen column's value
   const groups = new Map<string, { count: number; minTs: number | null; maxTs: number | null }>()

@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { getReportingDateParseThreshold } from '@/lib/reporting/config'
 
 const DATE_COL_PATTERNS = [
   /\b(date|time|created|modified|updated|when|ts|timestamp)\b/i,
@@ -89,6 +90,7 @@ export async function GET(
   const fileRanges: FileRange[] = []
   let globalMinTs: number | null = null
   let globalMaxTs: number | null = null
+  const dateThreshold = await getReportingDateParseThreshold()
 
   for (const f of rawFiles ?? []) {
     const columns = Array.isArray(f.columns) ? (f.columns as string[]) : []
@@ -119,7 +121,7 @@ export async function GET(
         if (maxTs == null || ts > maxTs) maxTs = ts
       }
       const ratio = rows.length > 0 ? parsed / rows.length : 0
-      if (parsed > 0 && minTs != null && maxTs != null && ratio > 0.3) {
+      if (parsed > 0 && minTs != null && maxTs != null && ratio > dateThreshold) {
         ranges.push({
           column: col,
           min: new Date(minTs).toISOString(),
