@@ -59,7 +59,7 @@ export function ChartBlock({ result }: Props) {
               <Tooltip
                 contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6 }}
                 labelStyle={{ color: '#cbd5e1' }}
-                formatter={(v: number) => formatKPIValue(v, result.format)}
+                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format)}
               />
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -74,7 +74,7 @@ export function ChartBlock({ result }: Props) {
               <Tooltip
                 contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6 }}
                 labelStyle={{ color: '#cbd5e1' }}
-                formatter={(v: number) => formatKPIValue(v, result.format)}
+                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format)}
               />
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />

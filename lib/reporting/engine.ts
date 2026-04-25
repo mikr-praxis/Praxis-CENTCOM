@@ -277,8 +277,9 @@ export function evaluateKPISeries(
   if (!startDate || !endDate) return []
 
   const points: SeriesPoint[] = []
+  const endTs = endDate.getTime()
   let cursor = bucketStart(startDate, granularity)
-  while (cursor <= endDate) {
+  while (cursor.getTime() <= endTs) {
     const bucketEnd = nextBucket(cursor, granularity)
     const sliceTf: Timeframe = {
       start: cursor.toISOString().slice(0, 10),
