@@ -124,8 +124,8 @@ export async function listFilesInFolder(folderId: string): Promise<DriveFile[]> 
 
 /**
  * Download a file's content as text. Native Google file types (Sheets, Docs)
- * are exported to CSV / plain text. Other files (CSV uploads, etc.) use raw
- * download. Returns null for binary types we can't parse.
+ * are exported to CSV / plain text. Other text-like files use raw download.
+ * Binary types (Excel, etc.) return null — use downloadFileBytes for those.
  */
 export async function downloadFileText(fileId: string, mimeType: string): Promise<string | null> {
   const drive = getDriveClient()
@@ -146,12 +146,13 @@ export async function downloadFileText(fileId: string, mimeType: string): Promis
     return typeof res.data === 'string' ? res.data : null
   }
 
-  // Raw download for CSV / plain text
+  // Raw download for CSV / TSV / plain text
   if (
     mimeType === 'text/csv' ||
     mimeType === 'text/plain' ||
     mimeType === 'application/csv' ||
-    mimeType === 'application/octet-stream'
+    mimeType === 'text/tab-separated-values' ||
+    mimeType === 'text/tsv'
   ) {
     const res = await drive.files.get(
       { fileId, alt: 'media', supportsAllDrives: true },
@@ -160,7 +161,24 @@ export async function downloadFileText(fileId: string, mimeType: string): Promis
     return typeof res.data === 'string' ? res.data : String(res.data ?? '')
   }
 
-  // Excel and other binary types — not supported in v1
+  return null
+}
+
+/**
+ * Download raw bytes for binary file types (Excel etc.). Returns null if Drive
+ * refused or returned non-binary. Caller is responsible for parsing.
+ */
+export async function downloadFileBytes(fileId: string): Promise<Buffer | null> {
+  const drive = getDriveClient()
+  const res = await drive.files.get(
+    { fileId, alt: 'media', supportsAllDrives: true },
+    { responseType: 'arraybuffer' }
+  )
+  if (!res.data) return null
+  if (res.data instanceof Buffer) return res.data
+  if (res.data instanceof ArrayBuffer) return Buffer.from(res.data)
+  // googleapis sometimes returns a Node stream Uint8Array-like
+  if (ArrayBuffer.isView(res.data)) return Buffer.from(res.data.buffer as ArrayBuffer)
   return null
 }
 

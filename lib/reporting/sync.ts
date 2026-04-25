@@ -9,9 +9,32 @@
  *  - Files removed from Drive are NOT deleted from Supabase (manual decision)
  */
 
-import { listFilesInFolder, downloadFileText, type DriveFile } from '@/lib/google/drive'
-import { parseCsvFull, MAX_CACHED_ROWS } from '@/lib/reporting/parse'
+import {
+  listFilesInFolder,
+  downloadFileText,
+  downloadFileBytes,
+  type DriveFile,
+} from '@/lib/google/drive'
+import { parseFileByType, MAX_CACHED_ROWS } from '@/lib/reporting/parse'
 import { createServerClient } from '@/lib/supabase/server'
+
+/** File types we know how to fetch + parse. Filenames are checked too as fallback. */
+const BINARY_MIMES = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-excel.sheet.macroenabled.12',
+])
+const TEXT_MIMES = new Set([
+  'text/csv',
+  'application/csv',
+  'text/plain',
+  'text/tab-separated-values',
+  'text/tsv',
+  'application/vnd.google-apps.spreadsheet',
+  'application/vnd.google-apps.document',
+])
+const BINARY_EXTS = ['.xlsx', '.xls', '.xlsm']
+const TEXT_EXTS = ['.csv', '.tsv', '.txt']
 
 export interface SyncResult {
   client_id: string
@@ -76,9 +99,27 @@ export async function syncClientFolder(args: {
       continue
     }
 
+    const lower = file.name.toLowerCase()
+    const wantsBinary =
+      BINARY_MIMES.has(file.mimeType) || BINARY_EXTS.some((ext) => lower.endsWith(ext))
+    const wantsText =
+      TEXT_MIMES.has(file.mimeType) ||
+      file.mimeType.startsWith('text/') ||
+      TEXT_EXTS.some((ext) => lower.endsWith(ext))
+
     let text: string | null = null
+    let bytes: Buffer | null = null
     try {
-      text = await downloadFileText(file.id, file.mimeType)
+      if (wantsBinary) {
+        bytes = await downloadFileBytes(file.id)
+      } else if (wantsText) {
+        text = await downloadFileText(file.id, file.mimeType)
+      } else {
+        // Unknown mime + unknown extension. Try text first; if that fails (returns null),
+        // try bytes — covers files Drive misreports as octet-stream.
+        text = await downloadFileText(file.id, file.mimeType)
+        if (text === null) bytes = await downloadFileBytes(file.id)
+      }
     } catch (e) {
       result.errors.push({
         file: file.name,
@@ -87,12 +128,32 @@ export async function syncClientFolder(args: {
       continue
     }
 
-    if (text === null) {
+    if (text === null && bytes === null) {
       result.files_unsupported += 1
       continue
     }
 
-    const parsed = parseCsvFull(text)
+    let parsed
+    try {
+      parsed = await parseFileByType({
+        filename: file.name,
+        mimeType: file.mimeType,
+        text,
+        bytes,
+      })
+    } catch (e) {
+      result.errors.push({
+        file: file.name,
+        error: e instanceof Error ? e.message : String(e),
+      })
+      continue
+    }
+
+    if (!parsed) {
+      result.files_unsupported += 1
+      continue
+    }
+
     const truncatedRows = parsed.rows.slice(0, MAX_CACHED_ROWS)
 
     const { error: upsertErr } = await supabase
