@@ -5,6 +5,7 @@ import {
   getReportingDefaultKPICount,
   getReportingDriveParentFolderId,
   getReportingDefaultTimeframe,
+  getReportingDefaultFunnelType,
   seedReportingConfigDefaults,
 } from '@/lib/reporting/config'
 import { listChildFolders } from '@/lib/google/drive'
@@ -21,6 +22,7 @@ export default async function ClientsPage() {
   await seedReportingConfigDefaults(userId)
   const defaultKpiCount = await getReportingDefaultKPICount()
   const defaultTimeframe = await getReportingDefaultTimeframe()
+  const defaultFunnelType = await getReportingDefaultFunnelType()
 
   // Fetch clients
   let rawClientsResult = await supabase
@@ -76,7 +78,14 @@ export default async function ClientsPage() {
 
   const clientList = finalClients
   if (clientList.length === 0) {
-    return <ClientsHome clients={[]} defaultKpiCount={defaultKpiCount} defaultTimeframe={defaultTimeframe} />
+    return (
+      <ClientsHome
+        clients={[]}
+        defaultKpiCount={defaultKpiCount}
+        defaultTimeframe={defaultTimeframe}
+        defaultFunnelType={defaultFunnelType}
+      />
+    )
   }
 
   // Aggregate file + KPI counts per client
@@ -129,5 +138,12 @@ export default async function ClientsPage() {
     }
   })
 
-  return <ClientsHome clients={clients} defaultKpiCount={defaultKpiCount} defaultTimeframe={defaultTimeframe} />
+  return (
+    <ClientsHome
+      clients={clients}
+      defaultKpiCount={defaultKpiCount}
+      defaultTimeframe={defaultTimeframe}
+      defaultFunnelType={defaultFunnelType}
+    />
+  )
 }

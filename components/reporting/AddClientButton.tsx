@@ -13,12 +13,17 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-export function AddClientButton() {
+interface Props {
+  /** Default funnel type for new clients (from REPORTING_DEFAULT_FUNNEL_TYPE config). */
+  defaultFunnelType?: 'call' | 'webinar' | 'challenge'
+}
+
+export function AddClientButton({ defaultFunnelType = 'call' }: Props = {}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
-  const [funnel, setFunnel] = useState<'call' | 'webinar' | 'challenge'>('call')
+  const [funnel, setFunnel] = useState<'call' | 'webinar' | 'challenge'>(defaultFunnelType)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,7 +55,7 @@ export function AddClientButton() {
       setOpen(false)
       setName('')
       setSlug('')
-      setFunnel('call')
+      setFunnel(defaultFunnelType)
       // Navigate straight to the new client's report
       router.push(`/reporting/${body.client.slug}`)
     } catch (e) {

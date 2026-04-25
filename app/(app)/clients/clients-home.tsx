@@ -65,9 +65,16 @@ interface Props {
   defaultKpiCount?: number
   /** From app_config REPORTING_DEFAULT_TIMEFRAME (Hardcoded tab). Defaults to '30d'. */
   defaultTimeframe?: string
+  /** From app_config REPORTING_DEFAULT_FUNNEL_TYPE. Defaults to 'call'. */
+  defaultFunnelType?: 'call' | 'webinar' | 'challenge'
 }
 
-export function ClientsHome({ clients, defaultKpiCount = 6, defaultTimeframe = '30d' }: Props) {
+export function ClientsHome({
+  clients,
+  defaultKpiCount = 6,
+  defaultTimeframe = '30d',
+  defaultFunnelType = 'call',
+}: Props) {
   const [activeId, setActiveId] = useState<string | null>(clients[0]?.id ?? null)
   const active = clients.find((c) => c.id === activeId) ?? null
 
@@ -81,7 +88,7 @@ export function ClientsHome({ clients, defaultKpiCount = 6, defaultTimeframe = '
             </h1>
             <p className="text-slate-400 mt-1 text-sm">No clients yet — add your first one.</p>
           </div>
-          <AddClientButton />
+          <AddClientButton defaultFunnelType={defaultFunnelType} />
         </div>
       </div>
     )
@@ -93,6 +100,7 @@ export function ClientsHome({ clients, defaultKpiCount = 6, defaultTimeframe = '
         clients={clients}
         active={active}
         onPick={setActiveId}
+        defaultFunnelType={defaultFunnelType}
       />
       {active && (
         <Workspace
@@ -112,10 +120,12 @@ function ClientHeaderBar({
   clients,
   active,
   onPick,
+  defaultFunnelType,
 }: {
   clients: ClientSummary[]
   active: ClientSummary | null
   onPick: (id: string) => void
+  defaultFunnelType: 'call' | 'webinar' | 'challenge'
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -191,7 +201,7 @@ function ClientHeaderBar({
                   )}
                 </div>
                 <div className="p-2 border-t border-slate-800">
-                  <AddClientButton />
+                  <AddClientButton defaultFunnelType={defaultFunnelType} />
                 </div>
               </div>
             </>

@@ -18,6 +18,7 @@ export const REPORTING_CONFIG_DEFAULTS = {
   REPORTING_GRANULARITY_THRESHOLDS_JSON: '{"day_max":14,"week_max":120}',
   REPORTING_SYNC_NOTIFY_CHANNEL_ID: '',
   SHARE_TOKEN_DEFAULT_EXPIRY_DAYS: '30',
+  REPORTING_DEFAULT_FUNNEL_TYPE: 'call',
 } as const
 
 export type ReportingConfigKey = keyof typeof REPORTING_CONFIG_DEFAULTS
@@ -84,6 +85,14 @@ export async function getShareTokenDefaultExpiryDays(): Promise<number> {
   const n = Number(v ?? '')
   if (!Number.isFinite(n) || n < 0) return 30
   return n
+}
+
+export type FunnelType = 'call' | 'webinar' | 'challenge'
+
+export async function getReportingDefaultFunnelType(): Promise<FunnelType> {
+  const v = (await getConfig('REPORTING_DEFAULT_FUNNEL_TYPE'))?.trim().toLowerCase()
+  if (v === 'webinar' || v === 'challenge') return v
+  return 'call'
 }
 
 export interface GranularityThresholds {
