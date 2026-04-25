@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { evaluateKPI, evaluateKPISeries, pickGranularity, forecastSeries } from '@/lib/reporting/engine'
+import { getReportingGranularityThresholds } from '@/lib/reporting/config'
 import type { Formula, KPIDefinition, RawFileForEngine, Timeframe } from '@/lib/reporting/types'
 import type { ReportKPI, ReportRawFile } from '@/lib/supabase/types'
 
@@ -78,7 +79,8 @@ export async function GET(
   const files = (fileRows ?? []).map(rowToFileForEngine)
   const definitions = (kpiRows ?? []).map(rowToDefinition)
 
-  const granularity = pickGranularity(timeframe)
+  const granThresholds = await getReportingGranularityThresholds()
+  const granularity = pickGranularity(timeframe, granThresholds)
   const results = definitions.map((d) => {
     const r = evaluateKPI(d, files, timeframe)
     if (d.viz_type === 'line' || d.viz_type === 'bar') {

@@ -7,8 +7,8 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { getReportingTopValuesPerColumn } from '@/lib/reporting/config'
 
-const TOP_VALUES_PER_COLUMN = 30
 const SAMPLE_ROW_COUNT = 50
 
 type ColumnType = 'number' | 'date' | 'boolean' | 'text'
@@ -76,6 +76,7 @@ export async function POST(
 
   const columns = Array.isArray(fileRow.columns) ? (fileRow.columns as string[]) : []
   const rows = Array.isArray(fileRow.rows) ? (fileRow.rows as Record<string, unknown>[]) : []
+  const topValuesPerColumn = await getReportingTopValuesPerColumn()
 
   // Per-column: distinct value counts (top N) + inferred type
   const columnInfo = columns.map((col) => {
@@ -90,7 +91,7 @@ export async function POST(
     const sorted = [...counts.entries()]
       .filter(([v]) => v !== '')
       .sort((a, b) => b[1] - a[1])
-      .slice(0, TOP_VALUES_PER_COLUMN)
+      .slice(0, topValuesPerColumn)
       .map(([value, count]) => ({ value, count }))
     return {
       name: col,

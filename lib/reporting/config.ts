@@ -12,6 +12,10 @@ export const REPORTING_CONFIG_DEFAULTS = {
   REPORTING_AI_MAX_TOKENS: '6000',
   REPORTING_DEFAULT_KPI_COUNT: '6',
   WEEKLY_SYNC_ENABLED: 'true',
+  REPORTING_MAX_CACHED_ROWS: '50000',
+  REPORTING_TOP_VALUES_PER_COLUMN: '30',
+  REPORTING_DEFAULT_TIMEFRAME: '30d',
+  REPORTING_GRANULARITY_THRESHOLDS_JSON: '{"day_max":14,"week_max":120}',
 } as const
 
 export type ReportingConfigKey = keyof typeof REPORTING_CONFIG_DEFAULTS
@@ -43,6 +47,47 @@ export async function isWeeklySyncEnabled(): Promise<boolean> {
   const v = await getConfig('WEEKLY_SYNC_ENABLED')
   if (v == null) return REPORTING_CONFIG_DEFAULTS.WEEKLY_SYNC_ENABLED === 'true'
   return /^(true|1|yes|on)$/i.test(v.trim())
+}
+
+export async function getReportingMaxCachedRows(): Promise<number> {
+  const v = await getConfig('REPORTING_MAX_CACHED_ROWS')
+  const n = Number(v ?? '')
+  return Number.isFinite(n) && n > 0 ? n : 50_000
+}
+
+export async function getReportingTopValuesPerColumn(): Promise<number> {
+  const v = await getConfig('REPORTING_TOP_VALUES_PER_COLUMN')
+  const n = Number(v ?? '')
+  return Number.isFinite(n) && n > 0 ? n : 30
+}
+
+export async function getReportingDefaultTimeframe(): Promise<string> {
+  const v = await getConfig('REPORTING_DEFAULT_TIMEFRAME')
+  const valid = ['7d', '30d', '90d', 'qtd', 'ytd', 'all', 'data_7d', 'data_30d', 'data_90d', 'data_all']
+  if (v && valid.includes(v.trim())) return v.trim()
+  return '30d'
+}
+
+export interface GranularityThresholds {
+  /** ≤ this many days → daily buckets */
+  day_max: number
+  /** ≤ this many days → weekly buckets; > → monthly */
+  week_max: number
+}
+
+export async function getReportingGranularityThresholds(): Promise<GranularityThresholds> {
+  const v = await getConfig('REPORTING_GRANULARITY_THRESHOLDS_JSON')
+  if (v) {
+    try {
+      const parsed = JSON.parse(v)
+      if (typeof parsed.day_max === 'number' && typeof parsed.week_max === 'number') {
+        return { day_max: parsed.day_max, week_max: parsed.week_max }
+      }
+    } catch {
+      /* fall through to default */
+    }
+  }
+  return { day_max: 14, week_max: 120 }
 }
 
 /**

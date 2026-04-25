@@ -245,17 +245,19 @@ export interface SeriesPoint {
 
 /**
  * Decide a sensible default granularity based on timeframe span.
- * - Up to 14 days  → daily
- * - Up to 120 days → weekly
- * - Anything bigger → monthly
+ * Defaults: ≤14d → daily, ≤120d → weekly, > → monthly.
+ * Thresholds are configurable via app_config REPORTING_GRANULARITY_THRESHOLDS_JSON.
  */
-export function pickGranularity(tf: Timeframe): Granularity {
+export function pickGranularity(
+  tf: Timeframe,
+  thresholds: { day_max: number; week_max: number } = { day_max: 14, week_max: 120 }
+): Granularity {
   if (!tf.start || !tf.end) return 'week'
   const start = new Date(tf.start).getTime()
   const end = new Date(tf.end).getTime()
   const days = Math.max(1, (end - start) / (24 * 60 * 60 * 1000))
-  if (days <= 14) return 'day'
-  if (days <= 120) return 'week'
+  if (days <= thresholds.day_max) return 'day'
+  if (days <= thresholds.week_max) return 'week'
   return 'month'
 }
 

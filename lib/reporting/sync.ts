@@ -15,8 +15,9 @@ import {
   downloadFileBytes,
   type DriveFile,
 } from '@/lib/google/drive'
-import { parseFileByType, MAX_CACHED_ROWS } from '@/lib/reporting/parse'
+import { parseFileByType } from '@/lib/reporting/parse'
 import { createServerClient } from '@/lib/supabase/server'
+import { getReportingMaxCachedRows } from '@/lib/reporting/config'
 
 /** File types we know how to fetch + parse. Filenames are checked too as fallback. */
 const BINARY_MIMES = new Set([
@@ -65,6 +66,8 @@ export async function syncClientFolder(args: {
     files_unsupported: 0,
     errors: [],
   }
+
+  const maxCachedRows = await getReportingMaxCachedRows()
 
   let files: DriveFile[] = []
   try {
@@ -154,7 +157,7 @@ export async function syncClientFolder(args: {
       continue
     }
 
-    const truncatedRows = parsed.rows.slice(0, MAX_CACHED_ROWS)
+    const truncatedRows = parsed.rows.slice(0, maxCachedRows)
 
     const { error: upsertErr } = await supabase
       .from('report_raw_files')

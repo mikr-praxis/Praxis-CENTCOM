@@ -7,8 +7,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { heuristicSuggest, type FileHints, type ColumnHint } from '@/lib/reporting/heuristic-suggest'
-
-const TOP_VALUES_PER_COLUMN = 30
+import { getReportingTopValuesPerColumn } from '@/lib/reporting/config'
 
 type ColumnType = 'number' | 'date' | 'boolean' | 'text'
 
@@ -32,7 +31,7 @@ function inferType(values: string[]): ColumnType {
   return 'text'
 }
 
-function buildColumnHint(name: string, rows: Record<string, unknown>[]): ColumnHint {
+function buildColumnHint(name: string, rows: Record<string, unknown>[], topN: number): ColumnHint {
   const counts = new Map<string, number>()
   const stringVals: string[] = []
   for (const row of rows) {
@@ -44,7 +43,7 @@ function buildColumnHint(name: string, rows: Record<string, unknown>[]): ColumnH
   const top = [...counts.entries()]
     .filter(([v]) => v !== '')
     .sort((a, b) => b[1] - a[1])
-    .slice(0, TOP_VALUES_PER_COLUMN)
+    .slice(0, topN)
     .map(([value, count]) => ({ value, count }))
   return {
     name,
@@ -97,13 +96,14 @@ export async function POST(
     )
   }
 
+  const topN = await getReportingTopValuesPerColumn()
   const files: FileHints[] = rawFiles.map((f) => {
     const columns = Array.isArray(f.columns) ? (f.columns as string[]) : []
     const rows = Array.isArray(f.rows) ? (f.rows as Record<string, unknown>[]) : []
     return {
       filename: f.filename,
       row_count: f.row_count ?? rows.length,
-      columns: columns.map((c) => buildColumnHint(c, rows)),
+      columns: columns.map((c) => buildColumnHint(c, rows, topN)),
     }
   })
 

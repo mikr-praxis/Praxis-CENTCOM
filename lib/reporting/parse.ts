@@ -90,10 +90,10 @@ export function parseCsvFull(raw: string): ParsedFile {
 }
 
 /**
- * Limit on how many rows we'll cache per file to avoid runaway memory use.
- * Files larger than this are truncated; the row_count reflects the original.
+ * Default cap on rows cached per file. The actual cap is read from app_config
+ * via getReportingMaxCachedRows() at sync time.
  */
-export const MAX_CACHED_ROWS = 50_000
+export const DEFAULT_MAX_CACHED_ROWS = 50_000
 
 /**
  * TSV parser — same shape as CSV, tab-delimited, no quote handling needed for v1.

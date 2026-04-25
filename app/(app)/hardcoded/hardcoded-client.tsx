@@ -108,6 +108,10 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'REPORTING_AI_MAX_TOKENS', label: 'Reporting AI Max Tokens', description: 'Output token budget for AI dashboard recommend / single-KPI suggest. Default 6000.' },
       { configKey: 'REPORTING_DEFAULT_KPI_COUNT', label: 'Default KPI Count', description: 'How many KPIs the AI / heuristic builders propose when you click "Recommend a dashboard" (3–10).' },
       { configKey: 'WEEKLY_SYNC_ENABLED', label: 'Weekly Sync Enabled', description: 'Kill-switch for the Sunday 03:00 UTC Drive sync cron. Set to "false" to pause without redeploying.' },
+      { configKey: 'REPORTING_DEFAULT_TIMEFRAME', label: 'Default Timeframe', description: 'Initial timeframe preset on the workspace: 7d | 30d | 90d | qtd | ytd | all | data_7d | data_30d | data_90d | data_all. Default 30d.' },
+      { configKey: 'REPORTING_MAX_CACHED_ROWS', label: 'Max Cached Rows / File', description: 'Cap on rows stored per synced file in Supabase. Larger files are truncated. Default 50000. Lower if hitting jsonb size limits.' },
+      { configKey: 'REPORTING_TOP_VALUES_PER_COLUMN', label: 'Top Values Per Column', description: 'How many distinct values to keep per column for File Browser + heuristic suggester. Default 30.' },
+      { configKey: 'REPORTING_GRANULARITY_THRESHOLDS_JSON', label: 'Chart Granularity Thresholds', description: 'JSON: {"day_max":N,"week_max":N}. Timeframes ≤day_max days bucket daily, ≤week_max weekly, else monthly. Default {"day_max":14,"week_max":120}.', isJson: true },
     ],
   },
 ]

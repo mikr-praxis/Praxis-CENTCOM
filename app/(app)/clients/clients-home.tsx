@@ -63,9 +63,11 @@ interface Props {
   clients: ClientSummary[]
   /** From app_config REPORTING_DEFAULT_KPI_COUNT (Hardcoded tab). Defaults to 6. */
   defaultKpiCount?: number
+  /** From app_config REPORTING_DEFAULT_TIMEFRAME (Hardcoded tab). Defaults to '30d'. */
+  defaultTimeframe?: string
 }
 
-export function ClientsHome({ clients, defaultKpiCount = 6 }: Props) {
+export function ClientsHome({ clients, defaultKpiCount = 6, defaultTimeframe = '30d' }: Props) {
   const [activeId, setActiveId] = useState<string | null>(clients[0]?.id ?? null)
   const active = clients.find((c) => c.id === activeId) ?? null
 
@@ -92,7 +94,14 @@ export function ClientsHome({ clients, defaultKpiCount = 6 }: Props) {
         active={active}
         onPick={setActiveId}
       />
-      {active && <Workspace key={active.id} client={active} defaultKpiCount={defaultKpiCount} />}
+      {active && (
+        <Workspace
+          key={active.id}
+          client={active}
+          defaultKpiCount={defaultKpiCount}
+          defaultTimeframe={defaultTimeframe}
+        />
+      )}
     </div>
   )
 }
@@ -302,9 +311,19 @@ function ActionMenu({ client }: { client: ClientSummary }) {
 
 /* ───────────────────────────── Workspace ───────────────────────────── */
 
-function Workspace({ client, defaultKpiCount }: { client: ClientSummary; defaultKpiCount: number }) {
+function Workspace({
+  client,
+  defaultKpiCount,
+  defaultTimeframe,
+}: {
+  client: ClientSummary
+  defaultKpiCount: number
+  defaultTimeframe: string
+}) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set(client.filenames))
-  const [timeframe, setTimeframe] = useState<TimeframeValue>(() => computeTimeframe('30d', null, null))
+  const [timeframe, setTimeframe] = useState<TimeframeValue>(() =>
+    computeTimeframe(defaultTimeframe as Parameters<typeof computeTimeframe>[0], null, null)
+  )
   const [slicers, setSlicers] = useState<Slicer[]>([])
   const [results, setResults] = useState<KPIResult[]>([])
   const [kpiCount, setKpiCount] = useState(client.kpi_count)
