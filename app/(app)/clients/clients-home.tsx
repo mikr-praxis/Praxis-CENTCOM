@@ -57,9 +57,11 @@ interface AISuggestion {
 
 interface Props {
   clients: ClientSummary[]
+  /** From app_config REPORTING_DEFAULT_KPI_COUNT (Hardcoded tab). Defaults to 6. */
+  defaultKpiCount?: number
 }
 
-export function ClientsHome({ clients }: Props) {
+export function ClientsHome({ clients, defaultKpiCount = 6 }: Props) {
   const [activeId, setActiveId] = useState<string | null>(clients[0]?.id ?? null)
   const active = clients.find((c) => c.id === activeId) ?? null
 
@@ -86,7 +88,7 @@ export function ClientsHome({ clients }: Props) {
         active={active}
         onPick={setActiveId}
       />
-      {active && <Workspace key={active.id} client={active} />}
+      {active && <Workspace key={active.id} client={active} defaultKpiCount={defaultKpiCount} />}
     </div>
   )
 }
@@ -285,7 +287,7 @@ function ActionMenu({ client }: { client: ClientSummary }) {
 
 /* ───────────────────────────── Workspace ───────────────────────────── */
 
-function Workspace({ client }: { client: ClientSummary }) {
+function Workspace({ client, defaultKpiCount }: { client: ClientSummary; defaultKpiCount: number }) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set(client.filenames))
   const [timeframe, setTimeframe] = useState<TimeframeValue>(() => computeTimeframe('30d', null, null))
   const [slicers, setSlicers] = useState<Slicer[]>([])
@@ -412,7 +414,7 @@ function Workspace({ client }: { client: ClientSummary }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filenames: selectedFiles.size > 0 ? Array.from(selectedFiles) : undefined,
-          count: 6,
+          count: defaultKpiCount,
           ...extra,
         }),
       })

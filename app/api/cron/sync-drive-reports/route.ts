@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { syncClientFolder, type SyncResult } from '@/lib/reporting/sync'
+import { isWeeklySyncEnabled } from '@/lib/reporting/config'
 
 export const maxDuration = 300
 
@@ -28,6 +29,16 @@ export async function GET(req: Request) {
 
   if (headerSecret !== secret && bearerSecret !== secret) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Honor the kill-switch in app_config (Hardcoded tab)
+  if (!(await isWeeklySyncEnabled())) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: 'WEEKLY_SYNC_ENABLED is disabled in app_config',
+      ran_at: new Date().toISOString(),
+    })
   }
 
   const supabase = createServerClient()

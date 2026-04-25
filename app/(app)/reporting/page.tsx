@@ -3,12 +3,11 @@ import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { FolderOpen, FileBarChart2 } from 'lucide-react'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
-import { getConfig, setConfig } from '@/lib/config'
 import { listChildFolders } from '@/lib/google/drive'
-
-// Default parent folder ID for "Client Raw Data for AI" — used as a fallback if
-// DRIVE_REPORTS_PARENT_FOLDER_ID hasn't been set in app_config yet.
-const DEFAULT_PARENT_FOLDER_ID = '1klkR5cDPfJggoblpYNqbsky4F6l2aeMG'
+import {
+  getReportingDriveParentFolderId,
+  seedReportingConfigDefaults,
+} from '@/lib/reporting/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,34 +51,37 @@ export default async function ReportingIndexPage() {
     clients = refreshed.data ?? clients
   }
 
+  // Seed reporting config defaults on first load (idempotent — only inserts missing keys)
+  if (migrationRun) {
+    await seedReportingConfigDefaults(userId)
+  }
+
   // Auto-discover Drive folder IDs for any client missing one, by name-matching
   // against subfolders of the configured parent. Best-effort, swallows errors.
   if (migrationRun) {
     const unconnected = clients.filter((c) => !c.drive_folder_id)
     if (unconnected.length > 0) {
       try {
-        let parentId = await getConfig('DRIVE_REPORTS_PARENT_FOLDER_ID')
-        if (!parentId) {
-          parentId = DEFAULT_PARENT_FOLDER_ID
-          await setConfig('DRIVE_REPORTS_PARENT_FOLDER_ID', parentId, userId)
-        }
-        const folders = await listChildFolders(parentId)
-        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-        let matched = false
-        for (const c of unconnected) {
-          const target = norm(c.name)
-          const hit = folders.find((f) => norm(f.name) === target)
-          if (hit) {
-            await supabase.from('clients').update({ drive_folder_id: hit.id }).eq('id', c.id)
-            matched = true
+        const parentId = await getReportingDriveParentFolderId()
+        if (parentId) {
+          const folders = await listChildFolders(parentId)
+          const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+          let matched = false
+          for (const c of unconnected) {
+            const target = norm(c.name)
+            const hit = folders.find((f) => norm(f.name) === target)
+            if (hit) {
+              await supabase.from('clients').update({ drive_folder_id: hit.id }).eq('id', c.id)
+              matched = true
+            }
           }
-        }
-        if (matched) {
-          const refreshed = await supabase
-            .from('clients')
-            .select('id, slug, name, drive_folder_id')
-            .order('name')
-          clients = refreshed.data ?? clients
+          if (matched) {
+            const refreshed = await supabase
+              .from('clients')
+              .select('id, slug, name, drive_folder_id')
+              .order('name')
+            clients = refreshed.data ?? clients
+          }
         }
       } catch {
         // Drive API not enabled, parent not shared, or transient — skip silently

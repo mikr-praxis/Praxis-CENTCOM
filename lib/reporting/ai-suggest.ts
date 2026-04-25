@@ -6,6 +6,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { getConfig } from '@/lib/config'
+import { getReportingAIModel, getReportingAIMaxTokens } from '@/lib/reporting/config'
 import type { Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
@@ -121,8 +122,8 @@ export async function suggestKPI(args: {
     throw new Error('ANTHROPIC_API_KEY is not configured. Set it in /config or Vercel env vars.')
   }
 
-  const model = (await getConfig('REPORTING_AI_MODEL')) || 'claude-opus-4-6'
-  const maxTokens = Number(await getConfig('REPORTING_AI_MAX_TOKENS')) || 2000
+  const model = await getReportingAIModel()
+  const maxTokens = await getReportingAIMaxTokens(2000)
 
   const client = new Anthropic({ apiKey })
   const response = await client.messages.create({

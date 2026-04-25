@@ -97,6 +97,19 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'BENCHMARKS_CHALLENGE_JSON', label: 'Challenge Funnel Benchmarks', description: 'JSON: {metric_key: {weak, strong}}', isJson: true },
     ],
   },
+  {
+    id: 'reporting',
+    title: 'Reporting',
+    priority: 'config',
+    description: 'Per-client reporting tunables: Drive folder, AI model + cost, sync kill-switch',
+    items: [
+      { configKey: 'DRIVE_REPORTS_PARENT_FOLDER_ID', label: 'Drive Parent Folder ID', description: 'Folder ID of "Client Raw Data for AI" (the part after /folders/ in the Drive URL). Auto-discover scans this folder for client subfolders by name match.' },
+      { configKey: 'REPORTING_AI_MODEL', label: 'Reporting AI Model', description: 'Claude model used by "Build with AI" / "Polish with AI". claude-opus-4-6 (~$0.20/dashboard) | claude-sonnet-4-6 (~$0.04) | claude-haiku-4-5-20251001 (~$0.012)' },
+      { configKey: 'REPORTING_AI_MAX_TOKENS', label: 'Reporting AI Max Tokens', description: 'Output token budget for AI dashboard recommend / single-KPI suggest. Default 6000.' },
+      { configKey: 'REPORTING_DEFAULT_KPI_COUNT', label: 'Default KPI Count', description: 'How many KPIs the AI / heuristic builders propose when you click "Recommend a dashboard" (3–10).' },
+      { configKey: 'WEEKLY_SYNC_ENABLED', label: 'Weekly Sync Enabled', description: 'Kill-switch for the Sunday 03:00 UTC Drive sync cron. Set to "false" to pause without redeploying.' },
+    ],
+  },
 ]
 
 const priorityConfig = {

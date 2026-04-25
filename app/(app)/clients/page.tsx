@@ -1,6 +1,10 @@
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { ClientsHome, type ClientSummary } from './clients-home'
+import {
+  getReportingDefaultKPICount,
+  seedReportingConfigDefaults,
+} from '@/lib/reporting/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +14,10 @@ export default async function ClientsPage() {
 
   const supabase = createServerClient()
 
+  // Seed reporting config defaults on first load (idempotent)
+  await seedReportingConfigDefaults(userId)
+  const defaultKpiCount = await getReportingDefaultKPICount()
+
   // Fetch clients
   const { data: rawClients } = await supabase
     .from('clients')
@@ -18,7 +26,7 @@ export default async function ClientsPage() {
 
   const clientList = rawClients ?? []
   if (clientList.length === 0) {
-    return <ClientsHome clients={[]} />
+    return <ClientsHome clients={[]} defaultKpiCount={defaultKpiCount} />
   }
 
   // Aggregate file + KPI counts per client
@@ -71,5 +79,5 @@ export default async function ClientsPage() {
     }
   })
 
-  return <ClientsHome clients={clients} />
+  return <ClientsHome clients={clients} defaultKpiCount={defaultKpiCount} />
 }

@@ -8,6 +8,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { getConfig } from '@/lib/config'
+import { getReportingAIModel, getReportingAIMaxTokens } from './config'
 import type { AISuggestion, FileForSuggester } from './ai-suggest'
 
 const SYSTEM_PROMPT = `You design a coherent KPI dashboard for a marketing operations agency client.
@@ -111,8 +112,8 @@ export async function recommendKPISet(args: {
     throw new Error('ANTHROPIC_API_KEY is not configured.')
   }
 
-  const model = (await getConfig('REPORTING_AI_MODEL')) || 'claude-opus-4-6'
-  const maxTokens = Number(await getConfig('REPORTING_AI_MAX_TOKENS')) || 6000
+  const model = await getReportingAIModel()
+  const maxTokens = await getReportingAIMaxTokens(6000)
   const count = Math.min(Math.max(args.count ?? 6, 3), 10)
 
   const client = new Anthropic({ apiKey })
