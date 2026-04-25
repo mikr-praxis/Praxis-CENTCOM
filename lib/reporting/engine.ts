@@ -203,6 +203,101 @@ export function evaluateFormula(node: Formula, ctx: EvalContext): number | null 
   return null
 }
 
+export type Granularity = 'day' | 'week' | 'month'
+
+export interface SeriesPoint {
+  bucket: string // ISO date for the start of the bucket
+  value: number | null
+}
+
+/**
+ * Decide a sensible default granularity based on timeframe span.
+ * - Up to 14 days  → daily
+ * - Up to 120 days → weekly
+ * - Anything bigger → monthly
+ */
+export function pickGranularity(tf: Timeframe): Granularity {
+  if (!tf.start || !tf.end) return 'week'
+  const start = new Date(tf.start).getTime()
+  const end = new Date(tf.end).getTime()
+  const days = Math.max(1, (end - start) / (24 * 60 * 60 * 1000))
+  if (days <= 14) return 'day'
+  if (days <= 120) return 'week'
+  return 'month'
+}
+
+function bucketStart(date: Date, granularity: Granularity): Date {
+  const d = new Date(date)
+  if (granularity === 'day') {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
+  if (granularity === 'week') {
+    // ISO week start (Monday)
+    const day = d.getDay() || 7
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (day - 1))
+    return monday
+  }
+  // month
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+function bucketKey(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+function nextBucket(date: Date, granularity: Granularity): Date {
+  if (granularity === 'day') {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
+  }
+  if (granularity === 'week') {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 7)
+  }
+  return new Date(date.getFullYear(), date.getMonth() + 1, 1)
+}
+
+/**
+ * Compute a time series for a KPI by re-evaluating its formula bucketed by
+ * granularity. Currently supported only for top-level AggOp formulas (not
+ * composite). Returns empty if the formula doesn't have a timeframe_column.
+ */
+export function evaluateKPISeries(
+  kpi: KPIDefinition,
+  files: RawFileForEngine[],
+  timeframe: Timeframe,
+  granularity: Granularity
+): SeriesPoint[] {
+  const formula = kpi.formula
+  // Only top-level aggregations get a series in v1
+  if (!isAggOp(formula)) return []
+  if (!formula.timeframe_column) return []
+  if (!timeframe.start || !timeframe.end) return []
+
+  const startDate = parseLooseDate(timeframe.start)
+  const endDate = parseLooseDate(timeframe.end)
+  if (!startDate || !endDate) return []
+
+  const points: SeriesPoint[] = []
+  let cursor = bucketStart(startDate, granularity)
+  while (cursor <= endDate) {
+    const bucketEnd = nextBucket(cursor, granularity)
+    const sliceTf: Timeframe = {
+      start: cursor.toISOString().slice(0, 10),
+      end: new Date(bucketEnd.getTime() - 1).toISOString().slice(0, 10),
+    }
+    const ctx: EvalContext = {
+      files,
+      timeframe: sliceTf,
+      rowsUsed: { value: 0 },
+      sourcesUsed: new Set<string>(),
+    }
+    const value = evaluateFormula(formula, ctx)
+    points.push({ bucket: bucketKey(cursor), value })
+    cursor = bucketEnd
+  }
+
+  return points
+}
+
 export function evaluateKPI(
   kpi: KPIDefinition,
   files: RawFileForEngine[],

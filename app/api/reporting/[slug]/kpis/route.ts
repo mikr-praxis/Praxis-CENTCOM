@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { evaluateKPI } from '@/lib/reporting/engine'
+import { evaluateKPI, evaluateKPISeries, pickGranularity } from '@/lib/reporting/engine'
 import type { Formula, KPIDefinition, RawFileForEngine, Timeframe } from '@/lib/reporting/types'
 import type { ReportKPI, ReportRawFile } from '@/lib/supabase/types'
 
@@ -65,10 +65,18 @@ export async function GET(
   const files = (fileRows ?? []).map(rowToFileForEngine)
   const definitions = (kpiRows ?? []).map(rowToDefinition)
 
-  const results = definitions.map((d) => evaluateKPI(d, files, timeframe))
+  const granularity = pickGranularity(timeframe)
+  const results = definitions.map((d) => {
+    const r = evaluateKPI(d, files, timeframe)
+    if (d.viz_type === 'line' || d.viz_type === 'bar') {
+      r.series = evaluateKPISeries(d, files, timeframe, granularity)
+    }
+    return r
+  })
 
   return NextResponse.json({
     timeframe,
+    granularity,
     kpi_count: definitions.length,
     file_count: files.length,
     results,

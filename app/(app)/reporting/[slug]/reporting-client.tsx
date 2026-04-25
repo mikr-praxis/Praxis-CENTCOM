@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft, RefreshCw, Settings2, FolderInput, Sparkles } from 'lucide-react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
+import { ChartBlock } from '@/components/reporting/ChartBlock'
 import type { KPIResult } from '@/lib/reporting/types'
 
 interface RawFileSummary {
@@ -259,14 +260,31 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
           <div className="p-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/30">
             <p className="text-slate-400 text-sm">
               {rawFiles.length === 0
-                ? 'No KPIs yet. Sync data first, then add KPIs in the configurator (M4) or seed examples.'
-                : 'No KPIs configured for this client. Click "Seed example KPIs" to start, or add custom ones in the configurator (M4).'}
+                ? 'No KPIs yet. Sync data first, then add KPIs in the configurator or seed examples.'
+                : 'No KPIs configured for this client. Click "Seed example KPIs" to start, or add custom ones in the configurator.'}
             </p>
           </div>
         ) : (
-          <KPICardGrid results={kpiResults} loading={kpisLoading} />
+          <KPICardGrid
+            results={kpiResults.filter((r) => r.viz_type === 'card' || r.viz_type === 'pie' || r.viz_type === 'table')}
+            loading={kpisLoading}
+          />
         )}
       </section>
+
+      {/* Trend charts (line/bar) */}
+      {!kpisLoading && kpiResults.some((r) => r.viz_type === 'line' || r.viz_type === 'bar') && (
+        <section className="mb-6">
+          <h2 className="text-sm font-semibold text-white mb-3">Trends</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {kpiResults
+              .filter((r) => r.viz_type === 'line' || r.viz_type === 'bar')
+              .map((r) => (
+                <ChartBlock key={r.kpi_id} result={r} />
+              ))}
+          </div>
+        </section>
+      )}
 
       {/* Raw files table */}
       <div className="rounded-xl border border-slate-700/50 bg-slate-900 overflow-hidden">

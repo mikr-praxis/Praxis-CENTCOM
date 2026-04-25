@@ -74,6 +74,8 @@ export interface KPIResult {
   rows_used: number
   source_files: string[]
   error: string | null
+  /** Optional time series for line/bar visualizations. */
+  series?: { bucket: string; value: number | null }[]
 }
 
 export interface RawFileForEngine {
