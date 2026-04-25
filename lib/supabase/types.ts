@@ -86,7 +86,51 @@ export type Client = {
   name: string
   funnel_type: 'call' | 'webinar' | 'challenge'
   funnel_config: Record<string, unknown>
+  drive_folder_id: string | null
   created_at: string
+}
+
+// Reporting module types (migration 015)
+export type ReportRawFile = {
+  id: string
+  client_id: string
+  drive_file_id: string
+  filename: string
+  mime_type: string | null
+  modified_time: string | null
+  last_synced_at: string | null
+  columns: string[]
+  rows: Record<string, unknown>[]
+  row_count: number
+}
+
+export type KPIFormat = 'count' | 'currency' | 'percent' | 'ratio'
+export type KPIVizType = 'card' | 'line' | 'bar' | 'pie' | 'table'
+
+export type ReportKPI = {
+  id: string
+  client_id: string | null
+  key: string
+  display_name: string
+  description: string | null
+  formula: Record<string, unknown>
+  format: KPIFormat
+  target: number | null
+  viz_type: KPIVizType
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export type ReportShareToken = {
+  id: string
+  client_id: string
+  token: string
+  label: string | null
+  created_by: string | null
+  created_at: string
+  expires_at: string | null
+  revoked_at: string | null
 }
 
 export type DataSourceRow = {
@@ -401,6 +445,24 @@ export type Database = {
         Row: BoardMilestone
         Insert: Partial<BoardMilestone> & Pick<BoardMilestone, 'board_id' | 'milestone_number' | 'user_id'>
         Update: Partial<BoardMilestone>
+        Relationships: []
+      }
+      report_raw_files: {
+        Row: ReportRawFile
+        Insert: Partial<ReportRawFile> & Pick<ReportRawFile, 'client_id' | 'drive_file_id' | 'filename'>
+        Update: Partial<ReportRawFile>
+        Relationships: []
+      }
+      report_kpis: {
+        Row: ReportKPI
+        Insert: Partial<ReportKPI> & Pick<ReportKPI, 'key' | 'display_name' | 'formula'>
+        Update: Partial<ReportKPI>
+        Relationships: []
+      }
+      report_share_tokens: {
+        Row: ReportShareToken
+        Insert: Partial<ReportShareToken> & Pick<ReportShareToken, 'client_id' | 'token'>
+        Update: Partial<ReportShareToken>
         Relationships: []
       }
     }

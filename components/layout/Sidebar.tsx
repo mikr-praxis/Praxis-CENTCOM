@@ -18,6 +18,7 @@ import {
   Columns3,
   BarChart3,
   Code2,
+  FileBarChart2,
 } from 'lucide-react'
 import { useRole } from '@/components/providers/RoleProvider'
 import { ROUTE_PERMISSIONS } from '@/lib/roles'
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Agents', href: '/agents', icon: Bot },
   { name: 'Memory', href: '/memory', icon: Brain },
   { name: 'Clients', href: '/clients', icon: BarChart3 },
+  { name: 'Reporting', href: '/reporting', icon: FileBarChart2 },
   { name: 'Hardcoded', href: '/hardcoded', icon: Code2 },
   { name: 'Config', href: '/config', icon: Settings },
 ]
