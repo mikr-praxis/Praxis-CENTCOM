@@ -11,15 +11,17 @@ import {
   Wand2,
   Check,
   AlertCircle,
-  ExternalLink,
   Printer,
   Clock,
   ChevronDown,
+  ChevronRight,
   Search,
   Filter as FilterIcon,
   X,
   MoreHorizontal,
   AlertTriangle,
+  Share2,
+  FileText,
 } from 'lucide-react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
@@ -28,6 +30,8 @@ import { FileBrowser } from '@/components/reporting/FileBrowser'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
 import { SlicersBar } from '@/components/reporting/SlicersBar'
 import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViewsBar'
+import { ShareDialog } from '@/components/reporting/ShareDialog'
+import { DriveFolderConfigurator } from '@/components/reporting/DriveFolderConfigurator'
 import type { KPIResult, Slicer, Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
@@ -254,13 +258,24 @@ function ActionMenu({ client }: { client: ClientSummary }) {
               >
                 <Database className="h-3.5 w-3.5" /> Browse data
               </button>
-              <Link
-                href={`/reporting/${client.slug}`}
-                onClick={() => setMoreOpen(false)}
-                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('praxis:open-share'))
+                  setMoreOpen(false)
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 inline-flex items-center gap-2"
               >
-                <ExternalLink className="h-3.5 w-3.5" /> Full client report
-              </Link>
+                <Share2 className="h-3.5 w-3.5" /> Share with client
+              </button>
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('praxis:toggle-drive'))
+                  setMoreOpen(false)
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 inline-flex items-center gap-2"
+              >
+                <Settings2 className="h-3.5 w-3.5" /> Drive folder settings
+              </button>
               <Link
                 href={`/reporting/${client.slug}/configure`}
                 onClick={() => setMoreOpen(false)}
@@ -297,6 +312,9 @@ function Workspace({ client, defaultKpiCount }: { client: ClientSummary; default
 
   const [browserOpen, setBrowserOpen] = useState(false)
   const [buildOpen, setBuildOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [driveConfigOpen, setDriveConfigOpen] = useState(false)
+  const [rawFilesOpen, setRawFilesOpen] = useState(false)
 
   // Build modal state
   const [recLoading, setRecLoading] = useState(false)
@@ -315,13 +333,19 @@ function Workspace({ client, defaultKpiCount }: { client: ClientSummary; default
     const onSync = () => syncNow()
     const onBuild = () => setBuildOpen(true)
     const onBrowse = () => setBrowserOpen(true)
+    const onShare = () => setShareOpen(true)
+    const onToggleDrive = () => setDriveConfigOpen((o) => !o)
     window.addEventListener('praxis:sync', onSync)
     window.addEventListener('praxis:open-build', onBuild)
     window.addEventListener('praxis:open-browser', onBrowse)
+    window.addEventListener('praxis:open-share', onShare)
+    window.addEventListener('praxis:toggle-drive', onToggleDrive)
     return () => {
       window.removeEventListener('praxis:sync', onSync)
       window.removeEventListener('praxis:open-build', onBuild)
       window.removeEventListener('praxis:open-browser', onBrowse)
+      window.removeEventListener('praxis:open-share', onShare)
+      window.removeEventListener('praxis:toggle-drive', onToggleDrive)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -486,14 +510,21 @@ function Workspace({ client, defaultKpiCount }: { client: ClientSummary; default
         </div>
       )}
 
-      {/* No-Drive banner */}
-      {!client.drive_folder_id && (
-        <div className="mb-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-300 text-xs flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4" />
-          <span>No Drive folder connected for {client.name}.</span>
-          <Link href={`/reporting/${client.slug}`} className="ml-auto underline">
-            Connect →
-          </Link>
+      {/* Drive folder configurator — shows automatically if not connected, on-demand otherwise */}
+      {(!client.drive_folder_id || driveConfigOpen) && (
+        <div className="mb-3">
+          {!client.drive_folder_id && (
+            <div className="mb-2 p-2 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              <span>No Drive folder connected for {client.name}. Paste an ID below to enable sync.</span>
+            </div>
+          )}
+          <DriveFolderConfigurator
+            slug={client.slug}
+            clientName={client.name}
+            initialFolderId={client.drive_folder_id}
+            defaultOpen
+          />
         </div>
       )}
 
@@ -592,9 +623,49 @@ function Workspace({ client, defaultKpiCount }: { client: ClientSummary; default
         </>
       )}
 
+      {/* Raw files (collapsible) */}
+      {client.filenames.length > 0 && (
+        <div className="mt-4 rounded-xl border border-slate-700/50 bg-slate-900 overflow-hidden">
+          <button
+            onClick={() => setRawFilesOpen((o) => !o)}
+            className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-slate-800/40 text-left"
+          >
+            {rawFilesOpen ? (
+              <ChevronDown className="h-4 w-4 text-slate-500 flex-shrink-0" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-slate-500 flex-shrink-0" />
+            )}
+            <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
+            <span className="text-sm font-semibold text-white">Raw files</span>
+            <span className="text-[11px] text-slate-500 ml-auto">{client.filenames.length} synced</span>
+          </button>
+          {rawFilesOpen && (
+            <div className="border-t border-slate-700/50 p-3 space-y-1">
+              {client.filenames.map((fn) => (
+                <div
+                  key={fn}
+                  className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-slate-800/40 text-xs"
+                >
+                  <span className="text-slate-200 truncate font-mono">{fn}</span>
+                  <button
+                    onClick={() => setBrowserOpen(true)}
+                    className="text-amber-400 hover:text-amber-300 flex-shrink-0"
+                  >
+                    Inspect →
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Modals */}
       {browserOpen && client.filenames.length > 0 && (
         <FileBrowserModal slug={client.slug} filenames={client.filenames} onClose={() => setBrowserOpen(false)} />
+      )}
+      {shareOpen && (
+        <ShareDialog slug={client.slug} open={shareOpen} onClose={() => setShareOpen(false)} />
       )}
 
       {buildOpen && (
@@ -775,25 +846,144 @@ function FileBrowserModal({
   )
 }
 
+interface InspectColumn {
+  name: string
+  type: 'number' | 'date' | 'boolean' | 'text'
+  distinct_count: number
+  empty_count: number
+  top_values: { value: string; count: number }[]
+}
+
+interface InspectResult {
+  filename: string
+  row_count: number
+  columns: InspectColumn[]
+  sample_rows: Record<string, string>[]
+}
+
 function FileBrowserInner({ slug, filenames }: { slug: string; filenames: string[] }) {
-  // Re-use the existing FileBrowser by rendering it with always-open behavior would require a refactor.
-  // Simpler: link the user to /reporting/<slug> where the existing tool lives, until refactored.
+  const [active, setActive] = useState<string | null>(filenames[0] ?? null)
+  const [data, setData] = useState<InspectResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<'columns' | 'rows'>('columns')
+
+  useEffect(() => {
+    if (!active) return
+    setLoading(true)
+    setError(null)
+    setData(null)
+    fetch(`/api/reporting/${slug}/files/inspect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: active }),
+    })
+      .then(async (r) => {
+        const b = await r.json()
+        if (!r.ok) throw new Error(b.error || 'Inspect failed')
+        setData(b)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Inspect failed'))
+      .finally(() => setLoading(false))
+  }, [active, slug])
+
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-slate-400">
-        Inspect synced files (columns + types + sample rows).
-      </p>
-      <div className="space-y-1">
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1">
         {filenames.map((fn) => (
-          <a
+          <button
             key={fn}
-            href={`/reporting/${slug}#file=${encodeURIComponent(fn)}`}
-            className="block px-3 py-2 rounded border border-slate-700 hover:bg-slate-800/50 text-sm text-slate-200"
+            onClick={() => setActive(fn)}
+            className={
+              active === fn
+                ? 'px-3 py-1 text-xs rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'px-3 py-1 text-xs rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent'
+            }
           >
             {fn}
-          </a>
+          </button>
         ))}
       </div>
+      <div className="flex items-center gap-1">
+        {(['columns', 'rows'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={
+              tab === t
+                ? 'px-3 py-1 text-xs rounded-md bg-slate-800 text-slate-200 border border-slate-700'
+                : 'px-3 py-1 text-xs rounded-md text-slate-500 hover:text-slate-300'
+            }
+          >
+            {t === 'columns' ? 'Columns + values' : 'Sample rows'}
+          </button>
+        ))}
+        {data && (
+          <span className="ml-auto text-[11px] text-slate-500">
+            {data.row_count.toLocaleString()} rows · {data.columns.length} columns
+          </span>
+        )}
+      </div>
+      {loading && <p className="text-sm text-slate-400">Loading…</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {!loading && !error && data && tab === 'columns' && (
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+          {data.columns.map((c) => (
+            <details key={c.name} className="rounded-lg border border-slate-700/60 bg-slate-950/40">
+              <summary className="cursor-pointer px-3 py-2 flex items-center gap-2 hover:bg-slate-800/40">
+                <span className="text-sm text-slate-200 font-mono flex-1 truncate">{c.name}</span>
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">{c.type}</span>
+                <span className="text-[10px] text-slate-500">{c.distinct_count} distinct</span>
+                {c.empty_count > 0 && (
+                  <span className="text-[10px] text-amber-400">{c.empty_count} empty</span>
+                )}
+              </summary>
+              <div className="px-3 pb-3">
+                {c.top_values.length === 0 ? (
+                  <p className="text-xs text-slate-500">No values.</p>
+                ) : (
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {c.top_values.map((v) => (
+                        <tr key={v.value} className="border-t border-slate-800">
+                          <td className="py-1 pr-2 text-slate-300 truncate">{v.value}</td>
+                          <td className="py-1 text-right text-slate-500 font-mono">{v.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
+      {!loading && !error && data && tab === 'rows' && (
+        <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-800/40 sticky top-0">
+              <tr>
+                {data.columns.map((c) => (
+                  <th key={c.name} className="px-2 py-1.5 text-left text-slate-400 font-medium whitespace-nowrap">
+                    {c.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.sample_rows.map((row, i) => (
+                <tr key={i} className="border-t border-slate-800">
+                  {data.columns.map((c) => (
+                    <td key={c.name} className="px-2 py-1 text-slate-300 whitespace-nowrap max-w-[240px] truncate">
+                      {String(row[c.name] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

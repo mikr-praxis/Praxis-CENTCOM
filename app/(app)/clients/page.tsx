@@ -3,8 +3,10 @@ import { createServerClient } from '@/lib/supabase/server'
 import { ClientsHome, type ClientSummary } from './clients-home'
 import {
   getReportingDefaultKPICount,
+  getReportingDriveParentFolderId,
   seedReportingConfigDefaults,
 } from '@/lib/reporting/config'
+import { listChildFolders } from '@/lib/google/drive'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,12 +21,58 @@ export default async function ClientsPage() {
   const defaultKpiCount = await getReportingDefaultKPICount()
 
   // Fetch clients
-  const { data: rawClients } = await supabase
+  let rawClientsResult = await supabase
     .from('clients')
     .select('id, slug, name, drive_folder_id, funnel_type')
     .order('name')
 
-  const clientList = rawClients ?? []
+  // Auto-seed Breathe for Change on first visit (idempotent — slug is unique)
+  if (rawClientsResult.data && !rawClientsResult.data.find((c) => c.slug === 'breathe-for-change')) {
+    await supabase
+      .from('clients')
+      .insert({ slug: 'breathe-for-change', name: 'Breathe for Change', funnel_type: 'call' })
+    rawClientsResult = await supabase
+      .from('clients')
+      .select('id, slug, name, drive_folder_id, funnel_type')
+      .order('name')
+  }
+  const { data: rawClients } = rawClientsResult
+
+  // Auto-discover Drive folder IDs for any client missing one, by name-matching
+  // against subfolders of the configured parent. Best-effort, swallows errors.
+  if (rawClients) {
+    const unconnected = rawClients.filter((c) => !c.drive_folder_id)
+    if (unconnected.length > 0) {
+      try {
+        const parentId = await getReportingDriveParentFolderId()
+        if (parentId) {
+          const folders = await listChildFolders(parentId)
+          const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+          let matched = false
+          for (const c of unconnected) {
+            const target = norm(c.name)
+            const hit = folders.find((f) => norm(f.name) === target)
+            if (hit) {
+              await supabase.from('clients').update({ drive_folder_id: hit.id }).eq('id', c.id)
+              matched = true
+            }
+          }
+          if (matched) {
+            const refreshed = await supabase
+              .from('clients')
+              .select('id, slug, name, drive_folder_id, funnel_type')
+              .order('name')
+            if (refreshed.data) rawClientsResult = refreshed
+          }
+        }
+      } catch {
+        // Drive API not enabled, parent not shared, or transient — skip silently
+      }
+    }
+  }
+  const finalClients = rawClientsResult.data ?? rawClients ?? []
+
+  const clientList = finalClients
   if (clientList.length === 0) {
     return <ClientsHome clients={[]} defaultKpiCount={defaultKpiCount} />
   }
