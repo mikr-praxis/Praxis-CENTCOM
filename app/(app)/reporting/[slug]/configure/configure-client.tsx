@@ -6,6 +6,8 @@ import { ChevronLeft, Plus, Trash2, Save, Activity } from 'lucide-react'
 import type { AggOp, Formula, Filter, CompositeOp, ConstOp } from '@/lib/reporting/types'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
+import { AIKPIBuilder, type AIDraft } from '@/components/reporting/AIKPIBuilder'
+import { FileBrowser } from '@/components/reporting/FileBrowser'
 
 interface FileColumns {
   filename: string
@@ -173,18 +175,38 @@ export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
         <ChevronLeft className="h-4 w-4 mr-1" /> Back to {client.name} report
       </Link>
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Configure KPIs — {client.name}</h1>
           <p className="text-slate-400 text-sm mt-1">Define metrics computed from synced raw files.</p>
         </div>
-        <button
-          onClick={() => setAdding(true)}
-          disabled={adding || files.length === 0}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" /> Add KPI
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <FileBrowser slug={client.slug} filenames={files.map((f) => f.filename)} />
+          <AIKPIBuilder
+            slug={client.slug}
+            filenames={files.map((f) => f.filename)}
+            onAccept={(d: AIDraft) => {
+              setDraft({
+                key: d.key,
+                display_name: d.display_name,
+                description: d.description,
+                formula: d.formula,
+                format: d.format,
+                target: d.target,
+                viz_type: d.viz_type,
+                display_order: kpis.length,
+              })
+              setAdding(true)
+            }}
+          />
+          <button
+            onClick={() => setAdding(true)}
+            disabled={adding || files.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" /> Add KPI
+          </button>
+        </div>
       </div>
 
       {files.length === 0 && (
