@@ -405,7 +405,7 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
       <div className="rounded-xl border border-slate-700/50 bg-slate-900 p-4">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-sm font-semibold text-white">Live KPIs</h3>
-          <TimeframePicker value={timeframe} onChange={setTimeframe} />
+          <TimeframePicker value={timeframe} onChange={setTimeframe} slug={client.slug} />
         </div>
         {kpiCount === 0 ? (
           <div className="p-6 rounded-lg border border-dashed border-slate-700 bg-slate-900/30 text-slate-400 text-sm">

@@ -253,7 +253,7 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
 
       {/* Timeframe picker */}
       <div className="mb-4">
-        <TimeframePicker value={timeframe} onChange={setTimeframe} />
+        <TimeframePicker value={timeframe} onChange={setTimeframe} slug={client.slug} />
       </div>
 
       {/* Drive folder configuration */}
