@@ -35,6 +35,8 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
   const [folderSaved, setFolderSaved] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncingNow, setSyncingNow] = useState(false)
+  const [syncSummary, setSyncSummary] = useState<string | null>(null)
 
   async function saveFolder() {
     setSavingFolder(true)
@@ -82,6 +84,27 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
     }
   }
 
+  async function syncNow() {
+    setSyncingNow(true)
+    setSyncError(null)
+    setSyncSummary(null)
+    try {
+      const res = await fetch(`/api/reporting/${client.slug}/sync`, { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `Sync failed (${res.status})`)
+      const r = body.result || {}
+      setSyncSummary(
+        `Sync done. Seen ${r.files_seen ?? 0}, synced ${r.files_synced ?? 0}, skipped ${r.files_skipped ?? 0}, unsupported ${r.files_unsupported ?? 0}.`
+      )
+      // refresh page to show new files in the table
+      setTimeout(() => window.location.reload(), 1200)
+    } catch (e) {
+      setSyncError(e instanceof Error ? e.message : 'Sync failed')
+    } finally {
+      setSyncingNow(false)
+    }
+  }
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
       {!readOnly && (
@@ -107,6 +130,14 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
             >
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Checking...' : 'Test Drive'}
+            </button>
+            <button
+              disabled={!client.drive_folder_id || syncingNow}
+              onClick={syncNow}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncingNow ? 'animate-spin' : ''}`} />
+              {syncingNow ? 'Syncing...' : 'Sync Now'}
             </button>
             <button
               disabled
@@ -151,6 +182,7 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
           {folderError && <p className="text-red-400 text-xs mt-2">{folderError}</p>}
           {folderSaved && <p className="text-emerald-400 text-xs mt-2">Saved.</p>}
           {syncError && <p className="text-red-400 text-xs mt-2">{syncError}</p>}
+          {syncSummary && <p className="text-emerald-400 text-xs mt-2">{syncSummary}</p>}
         </div>
       )}
 
