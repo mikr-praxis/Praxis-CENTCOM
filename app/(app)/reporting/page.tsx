@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { FolderOpen, FileBarChart2 } from 'lucide-react'
+import { AddClientButton } from '@/components/reporting/AddClientButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,14 +56,17 @@ export default async function ReportingIndexPage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <FileBarChart2 className="h-6 w-6 text-amber-400" />
-          Reporting
-        </h1>
-        <p className="text-slate-400 mt-1 text-sm">
-          Per-client reports computed from raw data files in Google Drive.
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <FileBarChart2 className="h-6 w-6 text-amber-400" />
+            Reporting
+          </h1>
+          <p className="text-slate-400 mt-1 text-sm">
+            Per-client reports computed from raw data files in Google Drive.
+          </p>
+        </div>
+        {migrationRun && <AddClientButton />}
       </div>
 
       {!migrationRun && (
@@ -75,7 +79,7 @@ export default async function ReportingIndexPage() {
       )}
 
       {clients.length === 0 && migrationRun && (
-        <div className="text-slate-400 text-sm">No clients yet. Add a client in the Clients tab first.</div>
+        <div className="text-slate-400 text-sm">No clients yet — click "Add Client" to create one.</div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
