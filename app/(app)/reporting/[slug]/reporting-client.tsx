@@ -382,6 +382,8 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
           <KPICardGrid
             results={kpiResults.filter((r) => r.viz_type === 'card' || r.viz_type === 'pie' || r.viz_type === 'table')}
             loading={kpisLoading}
+            slug={client.slug}
+            timeframe={timeframe}
           />
         )}
       </section>

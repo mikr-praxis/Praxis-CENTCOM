@@ -64,3 +64,27 @@ a,
   background: #1e293b !important;
   border-color: #334155 !important;
 }
+
+/* Print styles — used by the report PDF export ("Export PDF" -> window.print()) */
+@media print {
+  /* Force white background, dark text */
+  html, body {
+    background: white !important;
+    color: black !important;
+  }
+  /* Hide nav + side rails + buttons */
+  aside, nav, .print\:hidden { display: none !important; }
+  /* Make cards / panels printer-friendly */
+  .bg-slate-900, .bg-slate-800\/50, .bg-slate-950\/40, .bg-slate-950\/60, .bg-slate-900\/30 {
+    background: white !important;
+    border-color: #d1d5db !important;
+  }
+  .text-white, .text-slate-200, .text-slate-300 { color: black !important; }
+  .text-slate-400, .text-slate-500 { color: #4b5563 !important; }
+  .text-amber-300, .text-amber-400, .text-emerald-300, .text-emerald-400 { color: #6b7280 !important; }
+  .border-slate-700, .border-slate-700\/50, .border-slate-800 { border-color: #e5e7eb !important; }
+  /* Avoid breaking cards across pages */
+  .rounded-xl, .rounded-lg { break-inside: avoid; page-break-inside: avoid; }
+  /* Expand main column */
+  main { max-width: 100% !important; }
+}

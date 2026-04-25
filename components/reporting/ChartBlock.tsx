@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   ReferenceLine,
+  ReferenceArea,
 } from 'recharts'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
@@ -21,12 +22,23 @@ interface Props {
 
 export function ChartBlock({ result }: Props) {
   const series = result.series ?? []
-  const data = series.map((p) => ({
-    bucket: p.bucket,
-    value: p.value ?? 0,
-  }))
+  const forecast = result.forecast ?? []
+  const data = [
+    ...series.map((p) => ({ bucket: p.bucket, actual: p.value ?? 0, forecast: null as number | null })),
+    ...forecast.map((p, i) => ({
+      bucket: p.bucket,
+      // Bridge connection: first forecast point pulls from last actual to keep the line continuous
+      actual: i === 0 && series.length > 0 ? (series[series.length - 1].value ?? 0) : null,
+      forecast: p.value ?? null,
+    })),
+  ]
+  // Adjust: when forecast exists, push the last actual into the bridge so visually the dashed line continues
+  if (forecast.length > 0 && series.length > 0) {
+    const last = data[series.length - 1]
+    if (last) last.forecast = last.actual
+  }
 
-  const hasData = data.some((d) => d.value !== 0)
+  const hasData = data.some((d) => (d.actual ?? 0) !== 0 || (d.forecast ?? 0) !== 0)
 
   if (!hasData && series.length === 0) {
     return (
@@ -40,6 +52,10 @@ export function ChartBlock({ result }: Props) {
       </div>
     )
   }
+
+  // Forecast region for visual highlight
+  const forecastStart = forecast.length > 0 && series.length > 0 ? series[series.length - 1].bucket : null
+  const forecastEnd = forecast.length > 0 ? forecast[forecast.length - 1].bucket : null
 
   return (
     <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900">
@@ -64,7 +80,8 @@ export function ChartBlock({ result }: Props) {
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />
               )}
-              <Bar dataKey="value" fill="#f59e0b" />
+              <Bar dataKey="actual" fill="#f59e0b" />
+              {forecast.length > 0 && <Bar dataKey="forecast" fill="#f59e0b" fillOpacity={0.4} />}
             </BarChart>
           ) : (
             <LineChart data={data}>
@@ -79,11 +96,29 @@ export function ChartBlock({ result }: Props) {
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />
               )}
-              <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={false} />
+              {forecastStart && forecastEnd && (
+                <ReferenceArea x1={forecastStart} x2={forecastEnd} fill="#6366f1" fillOpacity={0.05} />
+              )}
+              <Line type="monotone" dataKey="actual" stroke="#6366f1" strokeWidth={2} dot={false} />
+              {forecast.length > 0 && (
+                <Line
+                  type="monotone"
+                  dataKey="forecast"
+                  stroke="#a78bfa"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                />
+              )}
             </LineChart>
           )}
         </ResponsiveContainer>
       </div>
+      {forecast.length > 0 && (
+        <p className="mt-2 text-[10px] text-violet-400/80">
+          Dashed line: {forecast.length}-period forecast
+        </p>
+      )}
     </div>
   )
 }

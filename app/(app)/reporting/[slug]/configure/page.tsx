@@ -60,6 +60,11 @@ export default async function ConfigureKPIsPage({
         target: k.target,
         viz_type: k.viz_type as KPIVizType,
         display_order: k.display_order,
+        group_by_column: k.group_by_column ?? null,
+        group_by_source: k.group_by_source ?? null,
+        compare_to: k.compare_to ?? null,
+        forecast_periods: k.forecast_periods ?? 0,
+        forecast_method: k.forecast_method ?? null,
       }))}
       files={(files ?? []).map((f) => ({
         filename: f.filename,

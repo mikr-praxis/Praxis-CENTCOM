@@ -25,6 +25,11 @@ interface KPIRow {
   target: number | null
   viz_type: KPIVizType
   display_order: number
+  group_by_column?: string | null
+  group_by_source?: string | null
+  compare_to?: 'previous_period' | 'previous_year' | null
+  forecast_periods?: number
+  forecast_method?: 'linear' | 'moving_avg' | null
 }
 
 interface Props {
@@ -73,6 +78,11 @@ function emptyKPI(filename: string): Omit<KPIRow, 'id' | 'client_id'> {
     target: null,
     viz_type: 'card',
     display_order: 0,
+    group_by_column: null,
+    group_by_source: null,
+    compare_to: null,
+    forecast_periods: 0,
+    forecast_method: null,
   }
 }
 
@@ -368,6 +378,13 @@ function KPIEditor({ slug, value, files, onChange, onSave, onCancel, onDelete, i
 
         <FormulaPreview slug={slug} formula={value.formula} format={value.format} viz={value.viz_type} />
       </div>
+
+      <details className="mt-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40">
+        <summary className="cursor-pointer text-xs uppercase tracking-wide text-slate-500 hover:text-slate-300">
+          Advanced — Group by, comparison, forecasting
+        </summary>
+        <AdvancedKPIOptions value={value} files={files} onChange={(patch) => onChange({ ...value, ...patch } as KPIRow)} />
+      </details>
 
       <div className="mt-4 flex items-center justify-between gap-2">
         <div>
@@ -780,6 +797,89 @@ function FormulaPreview({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function AdvancedKPIOptions({
+  value,
+  files,
+  onChange,
+}: {
+  value: Omit<KPIRow, 'id' | 'client_id'>
+  files: FileColumns[]
+  onChange: (patch: Partial<KPIRow>) => void
+}) {
+  const groupSource = value.group_by_source ?? files[0]?.filename ?? ''
+  const groupColumns = files.find((f) => f.filename === groupSource)?.columns ?? []
+  return (
+    <div className="space-y-3 mt-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Field label="Group by — source file">
+          <select
+            value={value.group_by_source ?? ''}
+            onChange={(e) => onChange({ group_by_source: e.target.value || null, group_by_column: null })}
+            className={inputCls}
+          >
+            <option value="">— none —</option>
+            {files.map((f) => (
+              <option key={f.filename} value={f.filename}>{f.filename}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Group by — column">
+          <select
+            value={value.group_by_column ?? ''}
+            onChange={(e) => onChange({ group_by_column: e.target.value || null })}
+            className={inputCls}
+            disabled={!value.group_by_source}
+          >
+            <option value="">— none —</option>
+            {groupColumns.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <Field label="Compare to (period over period)">
+        <select
+          value={value.compare_to ?? ''}
+          onChange={(e) => onChange({ compare_to: (e.target.value || null) as 'previous_period' | 'previous_year' | null })}
+          className={inputCls}
+        >
+          <option value="">— none —</option>
+          <option value="previous_period">Previous period (same span)</option>
+          <option value="previous_year">Previous year (same dates)</option>
+        </select>
+      </Field>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Field label="Forecast — periods ahead">
+          <input
+            type="number"
+            min={0}
+            max={52}
+            value={value.forecast_periods ?? 0}
+            onChange={(e) => onChange({ forecast_periods: Number(e.target.value) || 0 })}
+            className={inputCls}
+            placeholder="0 = no forecast"
+          />
+        </Field>
+        <Field label="Forecast — method">
+          <select
+            value={value.forecast_method ?? ''}
+            onChange={(e) => onChange({ forecast_method: (e.target.value || null) as 'linear' | 'moving_avg' | null })}
+            className={inputCls}
+            disabled={!value.forecast_periods || value.forecast_periods === 0}
+          >
+            <option value="">— pick method —</option>
+            <option value="linear">Linear regression</option>
+            <option value="moving_avg">Moving average (last 4)</option>
+          </select>
+        </Field>
+      </div>
+      <p className="text-[11px] text-slate-500">
+        Forecasting and trend charts require <span className="font-mono">viz_type = line / bar</span> and a <span className="font-mono">timeframe_column</span> on the formula.
+      </p>
     </div>
   )
 }

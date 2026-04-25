@@ -13,13 +13,17 @@ import {
   Check,
   AlertCircle,
   ExternalLink,
+  Printer,
+  Clock,
 } from 'lucide-react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
 import { ChartBlock } from '@/components/reporting/ChartBlock'
 import { FileBrowser } from '@/components/reporting/FileBrowser'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
-import type { KPIResult } from '@/lib/reporting/types'
+import { SlicersBar } from '@/components/reporting/SlicersBar'
+import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViewsBar'
+import type { KPIResult, Slicer } from '@/lib/reporting/types'
 import type { Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
@@ -123,6 +127,7 @@ export function ClientsHome({ clients }: Props) {
 function ClientWorkspace({ client }: { client: ClientSummary }) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set(client.filenames))
   const [timeframe, setTimeframe] = useState<TimeframeValue>(() => computeTimeframe('30d', null, null))
+  const [slicers, setSlicers] = useState<Slicer[]>([])
   const [results, setResults] = useState<KPIResult[]>([])
   const [kpiCount, setKpiCount] = useState(client.kpi_count)
   const [loading, setLoading] = useState(false)
@@ -146,6 +151,7 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
       const params = new URLSearchParams()
       if (timeframe.start) params.set('start', timeframe.start)
       if (timeframe.end) params.set('end', timeframe.end)
+      if (slicers.length > 0) params.set('slicers', JSON.stringify(slicers))
       const res = await fetch(`/api/reporting/${client.slug}/kpis?${params.toString()}`)
       const body = await res.json()
       setResults(body.results ?? [])
@@ -155,7 +161,7 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
     } finally {
       setLoading(false)
     }
-  }, [client.slug, timeframe.start, timeframe.end])
+  }, [client.slug, timeframe.start, timeframe.end, slicers])
 
   useEffect(() => {
     fetchKpis()
@@ -282,11 +288,7 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
               </Pill>
               <Pill ok={client.file_count > 0}>{client.file_count} files synced</Pill>
               <Pill ok={kpiCount > 0}>{kpiCount} KPIs</Pill>
-              {client.last_synced && (
-                <span className="text-[11px] text-slate-500 self-center">
-                  Last sync: {new Date(client.last_synced).toLocaleString()}
-                </span>
-              )}
+              {client.last_synced && <FreshnessPill lastSynced={client.last_synced} />}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -311,6 +313,12 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
             >
               <Settings2 className="h-4 w-4" /> Configure
             </Link>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800 print:hidden"
+            >
+              <Printer className="h-4 w-4" /> Export PDF
+            </button>
           </div>
         </div>
         {syncMsg && <p className="text-xs text-emerald-400">{syncMsg}</p>}
@@ -407,6 +415,31 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
           <h3 className="text-sm font-semibold text-white">Live KPIs</h3>
           <TimeframePicker value={timeframe} onChange={setTimeframe} slug={client.slug} />
         </div>
+        {client.file_count > 0 && (
+          <div className="mb-3 space-y-2">
+            <SlicersBar
+              slug={client.slug}
+              files={client.filenames.map((fn) => ({ filename: fn, columns: [] }))}
+              slicers={slicers}
+              onChange={setSlicers}
+            />
+            <SavedViewsBar
+              slug={client.slug}
+              current={{
+                timeframe,
+                slicers,
+                selected_filenames: Array.from(selectedFiles),
+              }}
+              onApply={(v: SavedView) => {
+                if (v.timeframe) setTimeframe(v.timeframe)
+                setSlicers(v.slicers ?? [])
+                if (Array.isArray(v.selected_filenames) && v.selected_filenames.length > 0) {
+                  setSelectedFiles(new Set(v.selected_filenames))
+                }
+              }}
+            />
+          </div>
+        )}
         {kpiCount === 0 ? (
           <div className="p-6 rounded-lg border border-dashed border-slate-700 bg-slate-900/30 text-slate-400 text-sm">
             {client.file_count === 0
@@ -419,6 +452,8 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
               (r) => r.viz_type === 'card' || r.viz_type === 'pie' || r.viz_type === 'table'
             )}
             loading={loading}
+            slug={client.slug}
+            timeframe={timeframe}
           />
         )}
       </div>
@@ -549,6 +584,30 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
         </div>
       )}
     </div>
+  )
+}
+
+function FreshnessPill({ lastSynced }: { lastSynced: string }) {
+  const ageMs = Date.now() - new Date(lastSynced).getTime()
+  const days = Math.floor(ageMs / (24 * 60 * 60 * 1000))
+  const hours = Math.floor(ageMs / (60 * 60 * 1000))
+  let label = ''
+  if (days >= 7) label = `${days}d old`
+  else if (days >= 1) label = `${days}d old`
+  else if (hours >= 1) label = `${hours}h old`
+  else label = 'fresh'
+  const stale = days >= 7
+  const aging = days >= 1 && days < 7
+  const cls = stale
+    ? 'bg-red-500/10 border-red-500/30 text-red-300'
+    : aging
+      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border ${cls}`} title={`Last sync: ${new Date(lastSynced).toLocaleString()}`}>
+      <Clock className="h-3 w-3" />
+      {label}
+    </span>
   )
 }
 
