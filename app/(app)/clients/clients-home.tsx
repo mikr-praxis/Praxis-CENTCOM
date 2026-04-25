@@ -6,7 +6,6 @@ import {
   BarChart3,
   Sparkles,
   RefreshCw,
-  FolderOpen,
   Database,
   Settings2,
   Wand2,
@@ -15,6 +14,12 @@ import {
   ExternalLink,
   Printer,
   Clock,
+  ChevronDown,
+  Search,
+  Filter as FilterIcon,
+  X,
+  MoreHorizontal,
+  AlertTriangle,
 } from 'lucide-react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
@@ -23,8 +28,7 @@ import { FileBrowser } from '@/components/reporting/FileBrowser'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
 import { SlicersBar } from '@/components/reporting/SlicersBar'
 import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViewsBar'
-import type { KPIResult, Slicer } from '@/lib/reporting/types'
-import type { Formula } from '@/lib/reporting/types'
+import type { KPIResult, Slicer, Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
 export interface ClientSummary {
@@ -76,55 +80,212 @@ export function ClientsHome({ clients }: Props) {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-      <div className="mb-6 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-amber-400" /> Clients
-          </h1>
-          <p className="text-slate-400 mt-1 text-sm">
-            Pick a client. Pick the data files you care about. Build a dashboard with AI in seconds.
-          </p>
+    <div className="min-h-screen">
+      <ClientHeaderBar
+        clients={clients}
+        active={active}
+        onPick={setActiveId}
+      />
+      {active && <Workspace key={active.id} client={active} />}
+    </div>
+  )
+}
+
+/* ───────────────────────────── Header bar ───────────────────────────── */
+
+function ClientHeaderBar({
+  clients,
+  active,
+  onPick,
+}: {
+  clients: ClientSummary[]
+  active: ClientSummary | null
+  onPick: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return clients
+    return clients.filter((c) => c.name.toLowerCase().includes(q))
+  }, [clients, query])
+
+  return (
+    <div className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 print:static print:border-0">
+      <div className="px-4 sm:px-6 lg:px-8 py-3 max-w-[1600px] mx-auto flex items-center gap-3">
+        {/* Client selector */}
+        <div className="relative">
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 min-w-[220px]"
+          >
+            <BarChart3 className="h-4 w-4 text-amber-400 flex-shrink-0" />
+            <div className="flex-1 text-left min-w-0">
+              <div className="text-sm font-semibold text-white truncate">
+                {active?.name ?? 'Pick a client'}
+              </div>
+              {active && (
+                <div className="text-[10px] text-slate-500">
+                  {active.file_count} files · {active.kpi_count} KPIs
+                </div>
+              )}
+            </div>
+            <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+              <div className="absolute z-20 mt-1 w-[320px] rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+                <div className="p-2 border-b border-slate-800 flex items-center gap-2">
+                  <Search className="h-3.5 w-3.5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search clients…"
+                    autoFocus
+                    className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div className="max-h-80 overflow-y-auto py-1">
+                  {filtered.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        onPick(c.id)
+                        setOpen(false)
+                        setQuery('')
+                      }}
+                      className={
+                        c.id === active?.id
+                          ? 'w-full text-left px-3 py-2 bg-amber-500/10 border-l-2 border-amber-500'
+                          : 'w-full text-left px-3 py-2 hover:bg-slate-800/60 border-l-2 border-transparent'
+                      }
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm text-white truncate">{c.name}</span>
+                        <span className="text-[10px] text-slate-500 font-mono flex-shrink-0">
+                          {c.file_count}f · {c.kpi_count}k
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                  {filtered.length === 0 && (
+                    <p className="px-3 py-3 text-xs text-slate-500">No matches.</p>
+                  )}
+                </div>
+                <div className="p-2 border-t border-slate-800">
+                  <AddClientButton />
+                </div>
+              </div>
+            </>
+          )}
         </div>
-        <AddClientButton />
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
-        {/* Sidebar list */}
-        <aside className="space-y-1">
-          {clients.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveId(c.id)}
-              className={
-                activeId === c.id
-                  ? 'w-full text-left p-3 rounded-lg border border-amber-500/30 bg-amber-500/5'
-                  : 'w-full text-left p-3 rounded-lg border border-slate-700/50 bg-slate-900 hover:bg-slate-800/50'
-              }
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold text-white truncate">{c.name}</span>
-                <FolderOpen
-                  className={c.drive_folder_id ? 'h-3.5 w-3.5 text-emerald-400' : 'h-3.5 w-3.5 text-slate-600'}
-                />
-              </div>
-              <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                <span>{c.file_count} files</span>
-                <span>·</span>
-                <span>{c.kpi_count} KPIs</span>
-              </div>
-            </button>
-          ))}
-        </aside>
+        {/* Status pills inline */}
+        {active && (
+          <div className="hidden md:flex items-center gap-1.5 flex-wrap min-w-0">
+            <Pill ok={!!active.drive_folder_id} compact>
+              {active.drive_folder_id ? 'Drive' : 'No Drive'}
+            </Pill>
+            <Pill ok={active.file_count > 0} compact>
+              {active.file_count} files
+            </Pill>
+            <Pill ok={active.kpi_count > 0} compact>
+              {active.kpi_count} KPIs
+            </Pill>
+            {active.last_synced && <FreshnessPill lastSynced={active.last_synced} />}
+          </div>
+        )}
 
-        {/* Main panel */}
-        <main>{active ? <ClientWorkspace key={active.id} client={active} /> : null}</main>
+        {/* Right-side actions */}
+        <div className="ml-auto flex items-center gap-1.5 print:hidden">
+          {active && <ActionMenu client={active} />}
+        </div>
       </div>
     </div>
   )
 }
 
-function ClientWorkspace({ client }: { client: ClientSummary }) {
+function ActionMenu({ client }: { client: ClientSummary }) {
+  const [moreOpen, setMoreOpen] = useState(false)
+  return (
+    <>
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent('praxis:sync', { detail: client.slug }))}
+        disabled={!client.drive_folder_id}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium hover:bg-amber-500/20 disabled:opacity-50"
+      >
+        <RefreshCw className="h-3.5 w-3.5" /> Sync
+      </button>
+      <Link
+        href={`/reporting/${client.slug}/configure`}
+        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-300 hover:bg-slate-800"
+      >
+        <Settings2 className="h-3.5 w-3.5" /> Configure
+      </Link>
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent('praxis:open-build'))}
+        disabled={client.file_count === 0}
+        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs font-medium hover:bg-indigo-500/20 disabled:opacity-50"
+      >
+        <Wand2 className="h-3.5 w-3.5" /> Build
+      </button>
+      <div className="relative">
+        <button
+          onClick={() => setMoreOpen((o) => !o)}
+          className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+        {moreOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
+            <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-700 bg-slate-900 shadow-xl py-1">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('praxis:open-browser'))
+                  setMoreOpen(false)
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 inline-flex items-center gap-2"
+              >
+                <Database className="h-3.5 w-3.5" /> Browse data
+              </button>
+              <Link
+                href={`/reporting/${client.slug}`}
+                onClick={() => setMoreOpen(false)}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Full client report
+              </Link>
+              <Link
+                href={`/reporting/${client.slug}/configure`}
+                onClick={() => setMoreOpen(false)}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2 sm:hidden"
+              >
+                <Settings2 className="h-3.5 w-3.5" /> Configure
+              </Link>
+              <button
+                onClick={() => {
+                  window.print()
+                  setMoreOpen(false)
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 inline-flex items-center gap-2"
+              >
+                <Printer className="h-3.5 w-3.5" /> Export PDF
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
+/* ───────────────────────────── Workspace ───────────────────────────── */
+
+function Workspace({ client }: { client: ClientSummary }) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set(client.filenames))
   const [timeframe, setTimeframe] = useState<TimeframeValue>(() => computeTimeframe('30d', null, null))
   const [slicers, setSlicers] = useState<Slicer[]>([])
@@ -132,18 +293,35 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
   const [kpiCount, setKpiCount] = useState(client.kpi_count)
   const [loading, setLoading] = useState(false)
 
-  // Recommendations (heuristic or AI)
-  const [recOpen, setRecOpen] = useState(false)
+  const [browserOpen, setBrowserOpen] = useState(false)
+  const [buildOpen, setBuildOpen] = useState(false)
+
+  // Build modal state
   const [recLoading, setRecLoading] = useState(false)
   const [recError, setRecError] = useState<string | null>(null)
   const [recSource, setRecSource] = useState<'heuristic' | 'ai'>('heuristic')
   const [suggestions, setSuggestions] = useState<AISuggestion[] | null>(null)
   const [accepted, setAccepted] = useState<Set<number>>(new Set())
-  const [saving, setSaving] = useState(false)
+  const [savingSuggestions, setSavingSuggestions] = useState(false)
 
-  // Sync state
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+
+  // Listen for header actions
+  useEffect(() => {
+    const onSync = () => syncNow()
+    const onBuild = () => setBuildOpen(true)
+    const onBrowse = () => setBrowserOpen(true)
+    window.addEventListener('praxis:sync', onSync)
+    window.addEventListener('praxis:open-build', onBuild)
+    window.addEventListener('praxis:open-browser', onBrowse)
+    return () => {
+      window.removeEventListener('praxis:sync', onSync)
+      window.removeEventListener('praxis:open-build', onBuild)
+      window.removeEventListener('praxis:open-browser', onBrowse)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchKpis = useCallback(async () => {
     setLoading(true)
@@ -167,10 +345,11 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
     fetchKpis()
   }, [fetchKpis])
 
-  // Filter results by selected files (only show KPIs whose source files are in scope)
   const visibleResults = useMemo(() => {
     if (selectedFiles.size === 0 || selectedFiles.size === client.filenames.length) return results
-    return results.filter((r) => r.source_files.every((f) => selectedFiles.has(f)) || r.source_files.length === 0)
+    return results.filter(
+      (r) => r.source_files.length === 0 || r.source_files.every((f) => selectedFiles.has(f))
+    )
   }, [results, selectedFiles, client.filenames.length])
 
   function toggleFile(name: string) {
@@ -193,8 +372,7 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
       setSyncMsg(
         `Synced ${r.files_synced ?? 0} of ${r.files_seen ?? 0} files (${r.files_skipped ?? 0} unchanged, ${r.files_unsupported ?? 0} unsupported)`
       )
-      // Refresh page state — easiest is full reload to pick up new file list
-      setTimeout(() => window.location.reload(), 1500)
+      setTimeout(() => window.location.reload(), 1200)
     } catch (e) {
       setSyncMsg(e instanceof Error ? e.message : 'Sync failed')
     } finally {
@@ -203,7 +381,7 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
   }
 
   async function recommend(source: 'heuristic' | 'ai') {
-    setRecOpen(true)
+    setBuildOpen(true)
     setRecLoading(true)
     setRecError(null)
     setSuggestions(null)
@@ -222,7 +400,6 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'Recommend failed')
       setSuggestions(body.suggestions ?? [])
-      // Default: accept all
       setAccepted(new Set((body.suggestions ?? []).map((_: unknown, i: number) => i)))
     } catch (e) {
       setRecError(e instanceof Error ? e.message : 'Recommend failed')
@@ -242,7 +419,7 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
 
   async function saveAccepted() {
     if (!suggestions || accepted.size === 0) return
-    setSaving(true)
+    setSavingSuggestions(true)
     try {
       const kpis = suggestions
         .filter((_, i) => accepted.has(i))
@@ -263,166 +440,56 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'Save failed')
-      setRecOpen(false)
+      setBuildOpen(false)
       setSuggestions(null)
       await fetchKpis()
     } catch (e) {
       setRecError(e instanceof Error ? e.message : 'Save failed')
     } finally {
-      setSaving(false)
+      setSavingSuggestions(false)
     }
   }
 
-  const allSelected = selectedFiles.size === client.filenames.length
+  const cardResults = visibleResults.filter(
+    (r) => r.viz_type === 'card' || r.viz_type === 'pie' || r.viz_type === 'table'
+  )
+  const trendResults = visibleResults.filter((r) => r.viz_type === 'line' || r.viz_type === 'bar')
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="rounded-xl border border-slate-700/50 bg-slate-900 p-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <h2 className="text-xl font-bold text-white">{client.name}</h2>
-            <div className="flex flex-wrap gap-2 mt-1.5">
-              <Pill ok={!!client.drive_folder_id}>
-                {client.drive_folder_id ? 'Drive connected' : 'Drive not set'}
-              </Pill>
-              <Pill ok={client.file_count > 0}>{client.file_count} files synced</Pill>
-              <Pill ok={kpiCount > 0}>{kpiCount} KPIs</Pill>
-              {client.last_synced && <FreshnessPill lastSynced={client.last_synced} />}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={syncNow}
-              disabled={!client.drive_folder_id || syncing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing…' : 'Sync Now'}
-            </button>
-            <FileBrowser slug={client.slug} filenames={client.filenames} />
-            <Link
-              href={`/reporting/${client.slug}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800"
-            >
-              <ExternalLink className="h-4 w-4" /> Full report
-            </Link>
-            <Link
-              href={`/reporting/${client.slug}/configure`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800"
-            >
-              <Settings2 className="h-4 w-4" /> Configure
-            </Link>
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800 print:hidden"
-            >
-              <Printer className="h-4 w-4" /> Export PDF
-            </button>
-          </div>
-        </div>
-        {syncMsg && <p className="text-xs text-emerald-400">{syncMsg}</p>}
-        {!client.drive_folder_id && (
-          <p className="mt-2 text-xs text-amber-300/80">
-            No Drive folder connected.{' '}
-            <Link href={`/reporting/${client.slug}`} className="underline">
-              Connect one →
-            </Link>
-          </p>
-        )}
-      </div>
-
-      {/* Data sources */}
-      {client.filenames.length > 0 && (
-        <div className="rounded-xl border border-slate-700/50 bg-slate-900 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2">
-              <Database className="h-4 w-4 text-slate-400" /> Data sources
-            </h3>
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                onClick={() => setSelectedFiles(new Set(client.filenames))}
-                disabled={allSelected}
-                className="text-slate-400 hover:text-slate-200 disabled:opacity-30"
-              >
-                Select all
-              </button>
-              <span className="text-slate-700">|</span>
-              <button
-                onClick={() => setSelectedFiles(new Set())}
-                disabled={selectedFiles.size === 0}
-                className="text-slate-400 hover:text-slate-200 disabled:opacity-30"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {client.filenames.map((fn) => (
-              <button
-                key={fn}
-                onClick={() => toggleFile(fn)}
-                className={
-                  selectedFiles.has(fn)
-                    ? 'px-2.5 py-1 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-200'
-                    : 'px-2.5 py-1 text-xs rounded-md border border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-                }
-              >
-                {fn}
-              </button>
-            ))}
-          </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px] mx-auto">
+      {/* Sync feedback toast */}
+      {(syncing || syncMsg) && (
+        <div className={syncing ? 'mb-3 p-2 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-300 text-xs' : 'mb-3 p-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 text-emerald-300 text-xs'}>
+          {syncing ? <>Syncing…</> : syncMsg}
         </div>
       )}
 
-      {/* Build-out — heuristic primary, AI polish */}
-      {client.file_count > 0 && (
-        <div className="rounded-xl border border-slate-700/50 bg-slate-900 p-4">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div className="flex-1 min-w-[240px]">
-              <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2">
-                <Wand2 className="h-4 w-4 text-amber-300" /> Build a dashboard
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Free heuristic suggester reads column names + types from your selected files. AI version adds context and cross-file reasoning — costs ~$0.20 per call.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => recommend('heuristic')}
-                disabled={recLoading || selectedFiles.size === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
-              >
-                <Wand2 className="h-4 w-4" />
-                {recLoading && recSource === 'heuristic' ? 'Building…' : 'Recommend (free)'}
-              </button>
-              <button
-                onClick={() => recommend('ai')}
-                disabled={recLoading || selectedFiles.size === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-500/20 disabled:opacity-50"
-              >
-                <Sparkles className="h-4 w-4" />
-                {recLoading && recSource === 'ai' ? 'Thinking…' : 'Polish with AI'}
-              </button>
-            </div>
-          </div>
+      {/* No-Drive banner */}
+      {!client.drive_folder_id && (
+        <div className="mb-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-300 text-xs flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4" />
+          <span>No Drive folder connected for {client.name}.</span>
+          <Link href={`/reporting/${client.slug}`} className="ml-auto underline">
+            Connect →
+          </Link>
         </div>
       )}
 
-      {/* Timeframe + KPIs */}
-      <div className="rounded-xl border border-slate-700/50 bg-slate-900 p-4">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h3 className="text-sm font-semibold text-white">Live KPIs</h3>
+      {/* Filter strip */}
+      <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-3 mb-3 space-y-2 print:hidden">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <TimeframePicker value={timeframe} onChange={setTimeframe} slug={client.slug} />
-        </div>
-        {client.file_count > 0 && (
-          <div className="mb-3 space-y-2">
+          {client.file_count > 0 && (
             <SlicersBar
               slug={client.slug}
               files={client.filenames.map((fn) => ({ filename: fn, columns: [] }))}
               slicers={slicers}
               onChange={setSlicers}
             />
+          )}
+        </div>
+        {client.file_count > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-800/60">
             <SavedViewsBar
               slug={client.slug}
               current={{
@@ -438,151 +505,416 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
                 }
               }}
             />
+            <FilesToggle
+              filenames={client.filenames}
+              selectedFiles={selectedFiles}
+              onChange={setSelectedFiles}
+              onToggle={toggleFile}
+            />
           </div>
         )}
-        {kpiCount === 0 ? (
-          <div className="p-6 rounded-lg border border-dashed border-slate-700 bg-slate-900/30 text-slate-400 text-sm">
-            {client.file_count === 0
-              ? 'No files synced yet. Click Sync Now above.'
-              : 'No KPIs yet. Click "Recommend a dashboard" to have AI build a starter set, or Configure manually.'}
-          </div>
-        ) : (
+      </div>
+
+      {/* KPI Grid */}
+      {kpiCount === 0 && !loading ? (
+        <EmptyKPIs
+          fileCount={client.file_count}
+          onBuild={() => setBuildOpen(true)}
+          onSync={syncNow}
+          syncing={syncing}
+          driveConnected={!!client.drive_folder_id}
+        />
+      ) : (
+        <>
           <KPICardGrid
-            results={visibleResults.filter(
-              (r) => r.viz_type === 'card' || r.viz_type === 'pie' || r.viz_type === 'table'
-            )}
+            results={cardResults}
             loading={loading}
             slug={client.slug}
             timeframe={timeframe}
           />
-        )}
-      </div>
-
-      {/* Trends */}
-      {!loading && visibleResults.some((r) => r.viz_type === 'line' || r.viz_type === 'bar') && (
-        <div className="rounded-xl border border-slate-700/50 bg-slate-900 p-4">
-          <h3 className="text-sm font-semibold text-white mb-3">Trends</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {visibleResults
-              .filter((r) => r.viz_type === 'line' || r.viz_type === 'bar')
-              .map((r) => (
-                <ChartBlock key={r.kpi_id} result={r} />
-              ))}
-          </div>
-        </div>
+          {trendResults.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Trends</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                {trendResults.map((r) => (
+                  <ChartBlock key={r.kpi_id} result={r} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Recommendation modal */}
-      {recOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={() => !saving && setRecOpen(false)}
-        >
-          <div
-            className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-xl border border-slate-700 bg-slate-900"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
-              <h2 className="text-lg font-semibold text-white inline-flex items-center gap-2">
-                {recSource === 'ai' ? (
-                  <><Sparkles className="h-4 w-4 text-indigo-400" /> AI dashboard recommendations</>
-                ) : (
-                  <><Wand2 className="h-4 w-4 text-amber-400" /> Heuristic dashboard recommendations</>
-                )}
-              </h2>
+      {/* Modals */}
+      {browserOpen && client.filenames.length > 0 && (
+        <FileBrowserModal slug={client.slug} filenames={client.filenames} onClose={() => setBrowserOpen(false)} />
+      )}
+
+      {buildOpen && (
+        <BuildModal
+          loading={recLoading}
+          error={recError}
+          source={recSource}
+          suggestions={suggestions}
+          accepted={accepted}
+          saving={savingSuggestions}
+          fileCount={client.file_count}
+          onPickHeuristic={() => recommend('heuristic')}
+          onPickAI={() => recommend('ai')}
+          onToggle={toggleAccept}
+          onSelectAll={() => suggestions && setAccepted(new Set(suggestions.map((_, i) => i)))}
+          onSave={saveAccepted}
+          onClose={() => {
+            setBuildOpen(false)
+            setSuggestions(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ───────────────────────────── Sub-components ───────────────────────────── */
+
+function FilesToggle({
+  filenames,
+  selectedFiles,
+  onChange,
+  onToggle,
+}: {
+  filenames: string[]
+  selectedFiles: Set<string>
+  onChange: (s: Set<string>) => void
+  onToggle: (name: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const allSelected = selectedFiles.size === filenames.length
+  return (
+    <div className="relative inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+        <FilterIcon className="h-3.5 w-3.5" /> Files:
+      </span>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800"
+      >
+        {selectedFiles.size}/{filenames.length} selected
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 left-0 top-full mt-1 w-72 rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+            <div className="p-2 border-b border-slate-800 flex items-center justify-between text-xs">
               <button
-                onClick={() => !saving && setRecOpen(false)}
-                className="text-slate-400 hover:text-slate-200 text-sm"
+                onClick={() => onChange(new Set(filenames))}
+                disabled={allSelected}
+                className="text-slate-400 hover:text-slate-200 disabled:opacity-30"
               >
-                Close
+                Select all
+              </button>
+              <button
+                onClick={() => onChange(new Set())}
+                disabled={selectedFiles.size === 0}
+                className="text-slate-400 hover:text-slate-200 disabled:opacity-30"
+              >
+                Clear
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {recLoading && (
-                <p className="text-sm text-slate-400 inline-flex items-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin" /> Reading your files and thinking through useful KPIs…
-                </p>
-              )}
-              {recError && (
-                <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/5 text-red-300 text-sm flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>{recError}</span>
-                </div>
-              )}
-              {suggestions && suggestions.length === 0 && (
-                <p className="text-sm text-slate-400">No suggestions returned.</p>
-              )}
-              {suggestions && suggestions.length > 0 && (
-                <div className="space-y-2">
-                  {suggestions.map((s, i) => (
-                    <label
-                      key={i}
-                      className={
-                        accepted.has(i)
-                          ? 'flex items-start gap-3 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 cursor-pointer'
-                          : 'flex items-start gap-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40 cursor-pointer hover:border-slate-600'
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        checked={accepted.has(i)}
-                        onChange={() => toggleAccept(i)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-sm font-semibold text-white truncate">{s.display_name}</span>
-                          <span
-                            className={
-                              s.confidence === 'high'
-                                ? 'text-[10px] uppercase text-emerald-400'
-                                : s.confidence === 'medium'
-                                  ? 'text-[10px] uppercase text-amber-400'
-                                  : 'text-[10px] uppercase text-red-400'
-                            }
-                          >
-                            {s.confidence}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
-                        <div className="flex flex-wrap gap-2 text-[10px] text-slate-500 mt-1.5">
-                          <span className="font-mono">format: {s.format}</span>
-                          <span className="font-mono">viz: {s.viz_type}</span>
-                          {s.target != null && <span className="font-mono">target: {s.target}</span>}
-                        </div>
-                        {s.notes && <p className="text-[11px] text-slate-500 mt-1 italic">{s.notes}</p>}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
+            <div className="max-h-64 overflow-y-auto py-1">
+              {filenames.map((fn) => (
+                <label
+                  key={fn}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-800/40 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedFiles.has(fn)}
+                    onChange={() => onToggle(fn)}
+                  />
+                  <span className="text-slate-200 truncate">{fn}</span>
+                </label>
+              ))}
             </div>
-            {suggestions && suggestions.length > 0 && (
-              <div className="p-4 border-t border-slate-700/50 flex items-center justify-between">
-                <span className="text-xs text-slate-400">
-                  {accepted.size} of {suggestions.length} selected
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setAccepted(new Set(suggestions.map((_, i) => i)))}
-                    className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 border border-slate-700"
-                  >
-                    Select all
-                  </button>
-                  <button
-                    onClick={saveAccepted}
-                    disabled={saving || accepted.size === 0}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 disabled:opacity-50"
-                  >
-                    <Check className="h-4 w-4" />
-                    {saving ? 'Saving…' : `Save ${accepted.size} KPI${accepted.size === 1 ? '' : 's'}`}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-        </div>
+        </>
       )}
+    </div>
+  )
+}
+
+function EmptyKPIs({
+  fileCount,
+  onBuild,
+  onSync,
+  syncing,
+  driveConnected,
+}: {
+  fileCount: number
+  onBuild: () => void
+  onSync: () => void
+  syncing: boolean
+  driveConnected: boolean
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/30 p-12 text-center">
+      <BarChart3 className="h-10 w-10 text-slate-600 mx-auto mb-3" />
+      {fileCount === 0 ? (
+        <>
+          <h3 className="text-base font-semibold text-white">No data synced yet</h3>
+          <p className="text-sm text-slate-400 mt-1 mb-4">
+            {driveConnected
+              ? 'Click Sync to pull files from this client\'s Drive folder.'
+              : 'Connect this client\'s Drive folder first, then sync.'}
+          </p>
+          <button
+            onClick={onSync}
+            disabled={!driveConnected || syncing}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing…' : 'Sync Now'}
+          </button>
+        </>
+      ) : (
+        <>
+          <h3 className="text-base font-semibold text-white">No KPIs yet</h3>
+          <p className="text-sm text-slate-400 mt-1 mb-4">
+            Build a starter dashboard from your synced files.
+          </p>
+          <button
+            onClick={onBuild}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-500/20"
+          >
+            <Wand2 className="h-4 w-4" /> Build a dashboard
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+function FileBrowserModal({
+  slug,
+  filenames,
+  onClose,
+}: {
+  slug: string
+  filenames: string[]
+  onClose: () => void
+}) {
+  // Reuse FileBrowser but auto-open by simulating its trigger
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-xl border border-slate-700 bg-slate-900 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
+          <h2 className="text-lg font-semibold text-white inline-flex items-center gap-2">
+            <Database className="h-4 w-4 text-amber-400" /> Browse data
+          </h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-800 text-slate-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <FileBrowserInner slug={slug} filenames={filenames} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FileBrowserInner({ slug, filenames }: { slug: string; filenames: string[] }) {
+  // Re-use the existing FileBrowser by rendering it with always-open behavior would require a refactor.
+  // Simpler: link the user to /reporting/<slug> where the existing tool lives, until refactored.
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-slate-400">
+        Inspect synced files (columns + types + sample rows).
+      </p>
+      <div className="space-y-1">
+        {filenames.map((fn) => (
+          <a
+            key={fn}
+            href={`/reporting/${slug}#file=${encodeURIComponent(fn)}`}
+            className="block px-3 py-2 rounded border border-slate-700 hover:bg-slate-800/50 text-sm text-slate-200"
+          >
+            {fn}
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function BuildModal({
+  loading,
+  error,
+  source,
+  suggestions,
+  accepted,
+  saving,
+  fileCount,
+  onPickHeuristic,
+  onPickAI,
+  onToggle,
+  onSelectAll,
+  onSave,
+  onClose,
+}: {
+  loading: boolean
+  error: string | null
+  source: 'heuristic' | 'ai'
+  suggestions: AISuggestion[] | null
+  accepted: Set<number>
+  saving: boolean
+  fileCount: number
+  onPickHeuristic: () => void
+  onPickAI: () => void
+  onToggle: (i: number) => void
+  onSelectAll: () => void
+  onSave: () => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => !saving && onClose()}>
+      <div
+        className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-xl border border-slate-700 bg-slate-900 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
+          <h2 className="text-lg font-semibold text-white inline-flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-amber-400" /> Build a dashboard
+          </h2>
+          <button onClick={() => !saving && onClose()} className="p-1 rounded hover:bg-slate-800 text-slate-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {!suggestions && !loading && (
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-slate-400">
+              Generate a starter set of KPIs from your synced files. Pick how you want them generated:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={onPickHeuristic}
+                disabled={fileCount === 0}
+                className="text-left p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Wand2 className="h-4 w-4 text-amber-300" />
+                  <span className="text-sm font-semibold text-white">Heuristic (free)</span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Pattern-matches column names + types. Instant. No tokens.
+                </p>
+              </button>
+              <button
+                onClick={onPickAI}
+                disabled={fileCount === 0}
+                className="text-left p-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 disabled:opacity-50"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="h-4 w-4 text-indigo-300" />
+                  <span className="text-sm font-semibold text-white">AI polish</span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Claude reads samples + adds cross-file reasoning. ~$0.20/call.
+                </p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex-1 p-6 inline-flex items-center gap-2 text-sm text-slate-400">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            {source === 'ai'
+              ? 'Reading your files and reasoning through useful KPIs…'
+              : 'Inferring KPIs from column names + types…'}
+          </div>
+        )}
+
+        {error && (
+          <div className="p-4 m-4 rounded-lg border border-red-500/30 bg-red-500/5 text-red-300 text-sm flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {suggestions && suggestions.length > 0 && (
+          <>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-2">
+                {suggestions.map((s, i) => (
+                  <label
+                    key={i}
+                    className={
+                      accepted.has(i)
+                        ? 'flex items-start gap-3 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 cursor-pointer'
+                        : 'flex items-start gap-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40 cursor-pointer hover:border-slate-600'
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={accepted.has(i)}
+                      onChange={() => onToggle(i)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-semibold text-white truncate">{s.display_name}</span>
+                        <span
+                          className={
+                            s.confidence === 'high'
+                              ? 'text-[10px] uppercase text-emerald-400'
+                              : s.confidence === 'medium'
+                                ? 'text-[10px] uppercase text-amber-400'
+                                : 'text-[10px] uppercase text-red-400'
+                          }
+                        >
+                          {s.confidence}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
+                      <div className="flex flex-wrap gap-2 text-[10px] text-slate-500 mt-1.5">
+                        <span className="font-mono">format: {s.format}</span>
+                        <span className="font-mono">viz: {s.viz_type}</span>
+                        {s.target != null && <span className="font-mono">target: {s.target}</span>}
+                      </div>
+                      {s.notes && <p className="text-[11px] text-slate-500 mt-1 italic">{s.notes}</p>}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-700/50 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                {accepted.size} of {suggestions.length} selected
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={onSelectAll}
+                  className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 border border-slate-700"
+                >
+                  Select all
+                </button>
+                <button
+                  onClick={onSave}
+                  disabled={saving || accepted.size === 0}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" />
+                  {saving ? 'Saving…' : `Save ${accepted.size} KPI${accepted.size === 1 ? '' : 's'}`}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -592,8 +924,7 @@ function FreshnessPill({ lastSynced }: { lastSynced: string }) {
   const days = Math.floor(ageMs / (24 * 60 * 60 * 1000))
   const hours = Math.floor(ageMs / (60 * 60 * 1000))
   let label = ''
-  if (days >= 7) label = `${days}d old`
-  else if (days >= 1) label = `${days}d old`
+  if (days >= 1) label = `${days}d old`
   else if (hours >= 1) label = `${hours}h old`
   else label = 'fresh'
   const stale = days >= 7
@@ -604,20 +935,23 @@ function FreshnessPill({ lastSynced }: { lastSynced: string }) {
       ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
       : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border ${cls}`} title={`Last sync: ${new Date(lastSynced).toLocaleString()}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border ${cls}`}
+      title={`Last sync: ${new Date(lastSynced).toLocaleString()}`}
+    >
       <Clock className="h-3 w-3" />
       {label}
     </span>
   )
 }
 
-function Pill({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+function Pill({ ok, children, compact }: { ok: boolean; children: React.ReactNode; compact?: boolean }) {
   return (
     <span
       className={
         ok
-          ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
-          : 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-slate-800 border border-slate-700 text-slate-400'
+          ? `inline-flex items-center gap-1 ${compact ? 'px-1.5 py-0.5' : 'px-2 py-0.5'} rounded-full text-[11px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-300`
+          : `inline-flex items-center gap-1 ${compact ? 'px-1.5 py-0.5' : 'px-2 py-0.5'} rounded-full text-[11px] bg-slate-800 border border-slate-700 text-slate-400`
       }
     >
       {ok && <Check className="h-3 w-3" />}
