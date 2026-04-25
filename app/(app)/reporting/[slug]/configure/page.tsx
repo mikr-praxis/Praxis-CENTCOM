@@ -3,6 +3,10 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createServerClient } from '@/lib/supabase/server'
 import { ConfigureClient } from './configure-client'
+import {
+  getReportingForecastDefaultMethod,
+  getReportingForecastDefaultPeriods,
+} from '@/lib/reporting/config'
 import type { Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType, ReportKPI } from '@/lib/supabase/types'
 
@@ -46,9 +50,14 @@ export default async function ConfigureKPIsPage({
     .select('filename, columns')
     .eq('client_id', client.id)
 
+  const forecastDefaultMethod = await getReportingForecastDefaultMethod()
+  const forecastDefaultPeriods = await getReportingForecastDefaultPeriods()
+
   return (
     <ConfigureClient
       client={{ id: client.id, slug: client.slug, name: client.name }}
+      forecastDefaultMethod={forecastDefaultMethod}
+      forecastDefaultPeriods={forecastDefaultPeriods}
       kpis={(kpis ?? []).map((k: ReportKPI) => ({
         id: k.id,
         client_id: k.client_id,

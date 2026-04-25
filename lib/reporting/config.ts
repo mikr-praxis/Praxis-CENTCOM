@@ -20,6 +20,8 @@ export const REPORTING_CONFIG_DEFAULTS = {
   SHARE_TOKEN_DEFAULT_EXPIRY_DAYS: '30',
   REPORTING_DEFAULT_FUNNEL_TYPE: 'call',
   REPORTING_DATE_PARSE_THRESHOLD: '0.3',
+  REPORTING_FORECAST_DEFAULT_METHOD: 'linear',
+  REPORTING_FORECAST_DEFAULT_PERIODS: '0',
 } as const
 
 export type ReportingConfigKey = keyof typeof REPORTING_CONFIG_DEFAULTS
@@ -107,6 +109,20 @@ export async function getReportingDateParseThreshold(): Promise<number> {
   const n = Number(v ?? '')
   if (!Number.isFinite(n) || n < 0 || n > 1) return 0.3
   return n
+}
+
+export type ForecastMethod = 'linear' | 'moving_avg'
+
+export async function getReportingForecastDefaultMethod(): Promise<ForecastMethod> {
+  const v = (await getConfig('REPORTING_FORECAST_DEFAULT_METHOD'))?.trim().toLowerCase()
+  return v === 'moving_avg' ? 'moving_avg' : 'linear'
+}
+
+export async function getReportingForecastDefaultPeriods(): Promise<number> {
+  const v = await getConfig('REPORTING_FORECAST_DEFAULT_PERIODS')
+  const n = Number(v ?? '')
+  if (!Number.isFinite(n) || n < 0 || n > 52) return 0
+  return Math.floor(n)
 }
 
 export interface GranularityThresholds {

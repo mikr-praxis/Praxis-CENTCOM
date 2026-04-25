@@ -116,6 +116,8 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'SHARE_TOKEN_DEFAULT_EXPIRY_DAYS', label: 'Share Link Default Expiry (days)', description: 'New share links auto-expire after this many days unless the user picks "Never" or a custom date. Set to 0 for "no default expiry" (always permanent unless overridden). Default 30.' },
       { configKey: 'REPORTING_DEFAULT_FUNNEL_TYPE', label: 'Default Funnel Type', description: 'Pre-fills the dropdown when adding a new client: call | webinar | challenge. Default call.' },
       { configKey: 'REPORTING_DATE_PARSE_THRESHOLD', label: 'Date Detection Threshold', description: 'Minimum ratio (0–1) of parseable-date values a column needs to qualify as a date column. Lower (e.g. 0.1) accepts sparse-date columns; higher (e.g. 0.5) requires dense ones. Default 0.3.' },
+      { configKey: 'REPORTING_FORECAST_DEFAULT_PERIODS', label: 'Forecast Default Periods', description: 'How many future periods to forecast on new line/bar KPIs by default. Set to 0 for no forecast. User can override per-KPI in the Advanced section. Default 0.' },
+      { configKey: 'REPORTING_FORECAST_DEFAULT_METHOD', label: 'Forecast Default Method', description: 'Algorithm used when forecast periods > 0: linear (least-squares regression) or moving_avg (last 4 buckets average). Default linear.' },
     ],
   },
 ]

@@ -36,6 +36,10 @@ interface Props {
   client: { id: string; slug: string; name: string }
   kpis: KPIRow[]
   files: FileColumns[]
+  /** Default forecast method for new KPIs (from REPORTING_FORECAST_DEFAULT_METHOD). */
+  forecastDefaultMethod?: 'linear' | 'moving_avg'
+  /** Default forecast period count for new KPIs (from REPORTING_FORECAST_DEFAULT_PERIODS). */
+  forecastDefaultPeriods?: number
 }
 
 const FORMAT_OPTIONS: KPIFormat[] = ['count', 'currency', 'percent', 'ratio']
@@ -68,7 +72,11 @@ function detectKind(f: Formula): FormulaKind {
   return 'agg'
 }
 
-function emptyKPI(filename: string): Omit<KPIRow, 'id' | 'client_id'> {
+function emptyKPI(
+  filename: string,
+  forecastPeriods: number = 0,
+  forecastMethod: 'linear' | 'moving_avg' | null = null
+): Omit<KPIRow, 'id' | 'client_id'> {
   return {
     key: '',
     display_name: '',
@@ -81,8 +89,8 @@ function emptyKPI(filename: string): Omit<KPIRow, 'id' | 'client_id'> {
     group_by_column: null,
     group_by_source: null,
     compare_to: null,
-    forecast_periods: 0,
-    forecast_method: null,
+    forecast_periods: forecastPeriods,
+    forecast_method: forecastPeriods > 0 ? forecastMethod ?? 'linear' : null,
   }
 }
 
@@ -113,11 +121,19 @@ function formulaSummary(f: Formula): string {
   return s
 }
 
-export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
+export function ConfigureClient({
+  client,
+  kpis: initialKpis,
+  files,
+  forecastDefaultMethod = 'linear',
+  forecastDefaultPeriods = 0,
+}: Props) {
   const [kpis, setKpis] = useState<KPIRow[]>(initialKpis)
   const [adding, setAdding] = useState(false)
   const defaultFile = files[0]?.filename ?? ''
-  const [draft, setDraft] = useState<Omit<KPIRow, 'id' | 'client_id'>>(emptyKPI(defaultFile))
+  const [draft, setDraft] = useState<Omit<KPIRow, 'id' | 'client_id'>>(
+    emptyKPI(defaultFile, forecastDefaultPeriods, forecastDefaultMethod)
+  )
   const [error, setError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
 
@@ -137,7 +153,7 @@ export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
       if (!res.ok) throw new Error(body.error || 'Create failed')
       setKpis((prev) => [...prev, body.kpi])
       setAdding(false)
-      setDraft(emptyKPI(defaultFile))
+      setDraft(emptyKPI(defaultFile, forecastDefaultPeriods, forecastDefaultMethod))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed')
     }
@@ -241,7 +257,7 @@ export function ConfigureClient({ client, kpis: initialKpis, files }: Props) {
           onChange={(d) => setDraft(d as Omit<KPIRow, 'id' | 'client_id'>)}
           onCancel={() => {
             setAdding(false)
-            setDraft(emptyKPI(defaultFile))
+            setDraft(emptyKPI(defaultFile, forecastDefaultPeriods, forecastDefaultMethod))
           }}
           onSave={createKPI}
           isNew
