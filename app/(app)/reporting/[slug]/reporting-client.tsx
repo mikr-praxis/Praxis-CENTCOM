@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, RefreshCw, Settings2, FolderInput, Sparkles, Share2 } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Settings2, FolderInput, Sparkles, Share2, Search } from 'lucide-react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
 import { ChartBlock } from '@/components/reporting/ChartBlock'
@@ -50,6 +50,38 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
   const [kpisLoading, setKpisLoading] = useState(true)
   const [seedingKpis, setSeedingKpis] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+
+  // Browse Drive subfolders
+  const [browseOpen, setBrowseOpen] = useState(false)
+  const [parentId, setParentId] = useState('')
+  const [browsing, setBrowsing] = useState(false)
+  const [browseError, setBrowseError] = useState<string | null>(null)
+  const [subfolders, setSubfolders] = useState<{ id: string; name: string; modifiedTime: string | null }[]>([])
+
+  async function browseFolders() {
+    setBrowsing(true)
+    setBrowseError(null)
+    try {
+      const res = await fetch('/api/reporting/drive/list-subfolders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId: parentId.trim(), remember: true }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || `Browse failed (${res.status})`)
+      setSubfolders(body.folders ?? [])
+    } catch (e) {
+      setBrowseError(e instanceof Error ? e.message : 'Browse failed')
+      setSubfolders([])
+    } finally {
+      setBrowsing(false)
+    }
+  }
+
+  function pickFolder(id: string) {
+    setFolderId(id)
+    setBrowseOpen(false)
+  }
 
   const fetchKpis = useCallback(async () => {
     setKpisLoading(true)
@@ -236,6 +268,12 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
               className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50"
             />
             <button
+              onClick={() => setBrowseOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800"
+            >
+              <Search className="h-4 w-4" /> Browse
+            </button>
+            <button
               onClick={saveFolder}
               disabled={savingFolder}
               className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
@@ -243,6 +281,54 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
               {savingFolder ? 'Saving...' : 'Save'}
             </button>
           </div>
+
+          {browseOpen && (
+            <div className="mt-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40 space-y-2">
+              <p className="text-xs text-slate-400">
+                Paste the ID of the parent folder (e.g. <span className="font-mono text-slate-300">Client Raw Data for AI</span>). I'll list its subfolders so you can pick {client.name}.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={parentId}
+                  onChange={(e) => setParentId(e.target.value)}
+                  placeholder="Parent folder ID"
+                  className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 placeholder:text-slate-500"
+                />
+                <button
+                  onClick={browseFolders}
+                  disabled={browsing || !parentId.trim()}
+                  className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm hover:bg-amber-500/20 disabled:opacity-50"
+                >
+                  {browsing ? 'Listing...' : 'List subfolders'}
+                </button>
+                <button
+                  onClick={() => setBrowseOpen(false)}
+                  className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-800 border border-slate-700"
+                >
+                  Cancel
+                </button>
+              </div>
+              {browseError && <p className="text-red-400 text-xs">{browseError}</p>}
+              {subfolders.length > 0 && (
+                <div className="rounded border border-slate-700 max-h-64 overflow-y-auto">
+                  {subfolders.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => pickFolder(f.id)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-800 border-b border-slate-800 last:border-b-0 flex items-center justify-between gap-2"
+                    >
+                      <span className="text-slate-200 truncate">{f.name}</span>
+                      <span className="text-[10px] font-mono text-slate-500 truncate">{f.id}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!browsing && subfolders.length === 0 && !browseError && parentId.trim() && (
+                <p className="text-xs text-slate-500">Click "List subfolders" to discover folders.</p>
+              )}
+            </div>
+          )}
           {folderError && <p className="text-red-400 text-xs mt-2">{folderError}</p>}
           {folderSaved && <p className="text-emerald-400 text-xs mt-2">Saved.</p>}
           {syncError && <p className="text-red-400 text-xs mt-2">{syncError}</p>}
