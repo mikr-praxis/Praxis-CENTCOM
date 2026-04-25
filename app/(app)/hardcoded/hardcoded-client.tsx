@@ -113,6 +113,7 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'REPORTING_TOP_VALUES_PER_COLUMN', label: 'Top Values Per Column', description: 'How many distinct values to keep per column for File Browser + heuristic suggester. Default 30.' },
       { configKey: 'REPORTING_GRANULARITY_THRESHOLDS_JSON', label: 'Chart Granularity Thresholds', description: 'JSON: {"day_max":N,"week_max":N}. Timeframes ≤day_max days bucket daily, ≤week_max weekly, else monthly. Default {"day_max":14,"week_max":120}.', isJson: true },
       { configKey: 'REPORTING_SYNC_NOTIFY_CHANNEL_ID', label: 'Sync Notify Channel ID', description: 'Slack channel ID (e.g. C0ABC1234) to post a summary after every sync (manual + weekly cron). Leave blank to disable. Requires SLACK_BOT_TOKEN.' },
+      { configKey: 'SHARE_TOKEN_DEFAULT_EXPIRY_DAYS', label: 'Share Link Default Expiry (days)', description: 'New share links auto-expire after this many days unless the user picks "Never" or a custom date. Set to 0 for "no default expiry" (always permanent unless overridden). Default 30.' },
     ],
   },
 ]

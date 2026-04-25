@@ -23,6 +23,8 @@ export function ShareDialog({ slug, open, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [label, setLabel] = useState('')
+  const [expiryMode, setExpiryMode] = useState<'default' | 'never' | 'custom'>('default')
+  const [customExpiry, setCustomExpiry] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -40,15 +42,26 @@ export function ShareDialog({ slug, open, onClose }: Props) {
     setCreating(true)
     setError(null)
     try {
+      const body_: { label: string | null; expires_at?: string | null; never_expires?: boolean } = {
+        label: label || null,
+      }
+      if (expiryMode === 'never') body_.never_expires = true
+      else if (expiryMode === 'custom' && customExpiry) {
+        body_.expires_at = new Date(customExpiry).toISOString()
+      }
+      // 'default' → omit expires_at; server uses SHARE_TOKEN_DEFAULT_EXPIRY_DAYS
+
       const res = await fetch(`/api/reporting/${slug}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: label || null }),
+        body: JSON.stringify(body_),
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'Failed to create token')
       setTokens((prev) => [body.token, ...prev])
       setLabel('')
+      setExpiryMode('default')
+      setCustomExpiry('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed')
     } finally {
@@ -105,22 +118,48 @@ export function ShareDialog({ slug, open, onClose }: Props) {
           You can revoke access at any time.
         </p>
 
-        <div className="flex gap-2 mb-4">
+        <div className="space-y-2 mb-4">
           <input
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="Label (optional, e.g. 'For Krista')"
-            className="flex-1 px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700 text-sm text-slate-200"
+            className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700 text-sm text-slate-200"
           />
-          <button
-            onClick={createToken}
-            disabled={creating}
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            {creating ? 'Creating...' : 'New link'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">Expires:</span>
+            <div className="flex items-center gap-1 rounded-md border border-slate-700 p-0.5 bg-slate-900">
+              {(['default', 'never', 'custom'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setExpiryMode(m)}
+                  className={
+                    expiryMode === m
+                      ? 'px-2 py-1 text-[11px] rounded bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      : 'px-2 py-1 text-[11px] rounded text-slate-400 hover:text-slate-200 border border-transparent'
+                  }
+                >
+                  {m === 'default' ? 'Default (config)' : m === 'never' ? 'Never' : 'Custom'}
+                </button>
+              ))}
+            </div>
+            {expiryMode === 'custom' && (
+              <input
+                type="date"
+                value={customExpiry}
+                onChange={(e) => setCustomExpiry(e.target.value)}
+                className="px-2 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200"
+              />
+            )}
+            <button
+              onClick={createToken}
+              disabled={creating || (expiryMode === 'custom' && !customExpiry)}
+              className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              {creating ? 'Creating...' : 'New link'}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -149,6 +188,15 @@ export function ShareDialog({ slug, open, onClose }: Props) {
                       </p>
                       <p className="text-[10px] text-slate-500 mt-0.5">
                         Created {new Date(t.created_at).toLocaleString()}
+                        {t.expires_at ? (
+                          new Date(t.expires_at).getTime() < Date.now() ? (
+                            <span className="ml-2 text-red-400">expired {new Date(t.expires_at).toLocaleDateString()}</span>
+                          ) : (
+                            <span className="ml-2 text-amber-400">expires {new Date(t.expires_at).toLocaleDateString()}</span>
+                          )
+                        ) : (
+                          <span className="ml-2 text-slate-600">no expiry</span>
+                        )}
                       </p>
                     </div>
                     {!revoked && (

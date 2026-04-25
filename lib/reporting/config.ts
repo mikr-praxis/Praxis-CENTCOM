@@ -17,6 +17,7 @@ export const REPORTING_CONFIG_DEFAULTS = {
   REPORTING_DEFAULT_TIMEFRAME: '30d',
   REPORTING_GRANULARITY_THRESHOLDS_JSON: '{"day_max":14,"week_max":120}',
   REPORTING_SYNC_NOTIFY_CHANNEL_ID: '',
+  SHARE_TOKEN_DEFAULT_EXPIRY_DAYS: '30',
 } as const
 
 export type ReportingConfigKey = keyof typeof REPORTING_CONFIG_DEFAULTS
@@ -72,6 +73,17 @@ export async function getReportingDefaultTimeframe(): Promise<string> {
 export async function getReportingSyncNotifyChannelId(): Promise<string | null> {
   const v = await getConfig('REPORTING_SYNC_NOTIFY_CHANNEL_ID')
   return v && v.trim() ? v.trim() : null
+}
+
+/**
+ * How many days a freshly-generated share token lives by default. Returns 0
+ * for "never expires" (any non-positive number is treated as no-expiry).
+ */
+export async function getShareTokenDefaultExpiryDays(): Promise<number> {
+  const v = await getConfig('SHARE_TOKEN_DEFAULT_EXPIRY_DAYS')
+  const n = Number(v ?? '')
+  if (!Number.isFinite(n) || n < 0) return 30
+  return n
 }
 
 export interface GranularityThresholds {
