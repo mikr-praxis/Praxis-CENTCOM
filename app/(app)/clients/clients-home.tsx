@@ -324,13 +324,23 @@ function Workspace({ client }: { client: ClientSummary }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Effective slicers = manual slicers + an implicit slicer for the picker's
+  // selected event (column = value). If the user manually added a slicer for
+  // the same (file, column), the event slicer overrides it.
+  const effectiveSlicers = useMemo(() => {
+    const evt = timeframe.event
+    if (!evt || !evt.filename || !evt.column || !evt.value) return slicers
+    const filtered = slicers.filter((s) => !(s.filename === evt.filename && s.column === evt.column))
+    return [...filtered, { filename: evt.filename, column: evt.column, values: [evt.value] }]
+  }, [slicers, timeframe.event])
+
   const fetchKpis = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (timeframe.start) params.set('start', timeframe.start)
       if (timeframe.end) params.set('end', timeframe.end)
-      if (slicers.length > 0) params.set('slicers', JSON.stringify(slicers))
+      if (effectiveSlicers.length > 0) params.set('slicers', JSON.stringify(effectiveSlicers))
       const res = await fetch(`/api/reporting/${client.slug}/kpis?${params.toString()}`)
       const body = await res.json()
       setResults(body.results ?? [])
@@ -340,7 +350,7 @@ function Workspace({ client }: { client: ClientSummary }) {
     } finally {
       setLoading(false)
     }
-  }, [client.slug, timeframe.start, timeframe.end, slicers])
+  }, [client.slug, timeframe.start, timeframe.end, effectiveSlicers])
 
   useEffect(() => {
     fetchKpis()
@@ -498,11 +508,35 @@ function Workspace({ client }: { client: ClientSummary }) {
             />
           )}
         </div>
+        {timeframe.event && timeframe.event.value && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/60">
+            <span className="text-xs text-slate-500">Event filter:</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-200">
+              <span className="font-mono text-[10px] text-emerald-300/70">
+                {timeframe.event.filename}.{timeframe.event.column}
+              </span>
+              <span className="text-emerald-100">=</span>
+              <span className="truncate max-w-[200px]">{timeframe.event.value}</span>
+              <button
+                onClick={() => setTimeframe(computeTimeframe('30d', null, null))}
+                className="ml-1 text-emerald-300 hover:text-emerald-100"
+                title="Clear event filter and reset timeframe"
+              >
+                ×
+              </button>
+            </span>
+            <span className="text-[10px] text-slate-500">
+              All KPIs whose source contains <span className="font-mono">{timeframe.event.column}</span> are filtered. Others use the date range.
+            </span>
+          </div>
+        )}
         {client.file_count > 0 && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-800/60">
             <SavedViewsBar
               slug={client.slug}
               current={{
+                // Save the timeframe (incl. event metadata) + ONLY the manual
+                // slicers — the event slicer is implicit and re-derived on apply.
                 timeframe,
                 slicers,
                 selected_filenames: Array.from(selectedFiles),
@@ -541,6 +575,7 @@ function Workspace({ client }: { client: ClientSummary }) {
             loading={loading}
             slug={client.slug}
             timeframe={timeframe}
+            slicers={effectiveSlicers}
           />
           {trendResults.length > 0 && (
             <div className="mt-4">

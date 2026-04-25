@@ -18,10 +18,11 @@ interface Props {
   slug: string
   kpiId: string
   timeframe?: { start: string | null; end: string | null }
+  slicers?: { filename: string; column: string; values: string[] }[]
   onClose: () => void
 }
 
-export function DrillDownModal({ slug, kpiId, timeframe, onClose }: Props) {
+export function DrillDownModal({ slug, kpiId, timeframe, slicers, onClose }: Props) {
   const [data, setData] = useState<DrillResp | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +34,7 @@ export function DrillDownModal({ slug, kpiId, timeframe, onClose }: Props) {
     const params = new URLSearchParams()
     if (timeframe?.start) params.set('start', timeframe.start)
     if (timeframe?.end) params.set('end', timeframe.end)
+    if (slicers && slicers.length > 0) params.set('slicers', JSON.stringify(slicers))
     params.set('page', String(page))
     fetch(`/api/reporting/${slug}/kpis/${kpiId}/drill?${params.toString()}`)
       .then(async (r) => {
@@ -42,7 +44,7 @@ export function DrillDownModal({ slug, kpiId, timeframe, onClose }: Props) {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Drill-down failed'))
       .finally(() => setLoading(false))
-  }, [slug, kpiId, page, timeframe?.start, timeframe?.end])
+  }, [slug, kpiId, page, timeframe?.start, timeframe?.end, slicers])
 
   function exportCsv() {
     if (!data) return

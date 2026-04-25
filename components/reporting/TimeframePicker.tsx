@@ -282,6 +282,11 @@ export function TimeframePicker({ value, onChange, slug }: Props) {
     else onChange(computeTimeframe(p, null, null))
   }
   function pickEventValue(value: string) {
+    if (!value) {
+      // Clear event but stay in event mode
+      onChange({ preset: 'event', start: null, end: null, event: null })
+      return
+    }
     const evt = evtValues.find((v) => v.value === value)
     if (!evt) return
     setMode('event')

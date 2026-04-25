@@ -12,9 +12,11 @@ interface Props {
   /** Pass slug + timeframe so cards can open the drill-down for their KPI */
   slug?: string
   timeframe?: { start: string | null; end: string | null }
+  /** Active slicers — passed to drill-down so contributing rows match the dashboard. */
+  slicers?: { filename: string; column: string; values: string[] }[]
 }
 
-export function KPICardGrid({ results, loading, slug, timeframe }: Props) {
+export function KPICardGrid({ results, loading, slug, timeframe, slicers }: Props) {
   const [drillKpiId, setDrillKpiId] = useState<string | null>(null)
 
   if (loading) {
@@ -48,6 +50,7 @@ export function KPICardGrid({ results, loading, slug, timeframe }: Props) {
           slug={slug}
           kpiId={drillKpiId}
           timeframe={timeframe}
+          slicers={slicers}
           onClose={() => setDrillKpiId(null)}
         />
       )}
