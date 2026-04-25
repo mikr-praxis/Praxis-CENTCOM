@@ -50,8 +50,9 @@ export async function POST(
     .eq('client_id', client.id)
   const existingKeys = new Set((existingKpis ?? []).map((k) => k.key))
 
-  // Build candidate KPIs
-  const candidates: Partial<ReportKPI>[] = []
+  // Build candidate KPIs (must satisfy Insert type: key, display_name, formula required)
+  type KPIInsert = Pick<ReportKPI, 'key' | 'display_name' | 'formula'> & Partial<ReportKPI>
+  const candidates: KPIInsert[] = []
   let order = 0
   for (const file of files.slice(0, 3)) {
     const safeKey = `total_${file.filename.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase()}`

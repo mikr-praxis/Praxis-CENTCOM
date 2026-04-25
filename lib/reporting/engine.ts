@@ -172,6 +172,7 @@ function evaluateAgg(node: AggOp, ctx: EvalContext): number | null {
     case 'max':
       return Math.max(...values)
   }
+  return null
 }
 
 function evaluateComposite(node: CompositeOp, ctx: EvalContext): number | null {
