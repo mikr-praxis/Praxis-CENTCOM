@@ -18,12 +18,22 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const folderId = body.drive_folder_id?.trim() || null
-  if (folderId !== null && !/^[a-zA-Z0-9_-]{10,}$/.test(folderId)) {
-    return NextResponse.json(
-      { error: 'Folder ID looks invalid. Paste only the ID (the part after /folders/).' },
-      { status: 400 }
-    )
+  const raw = body.drive_folder_id?.trim() ?? ''
+  let folderId: string | null = null
+  if (raw) {
+    const m = raw.match(/\/folders\/([a-zA-Z0-9_-]{10,})/)
+    if (m) {
+      folderId = m[1]
+    } else {
+      const cleaned = raw.split('?')[0].split('#')[0].replace(/\/+$/, '').trim()
+      if (/^[a-zA-Z0-9_-]{10,}$/.test(cleaned)) folderId = cleaned
+    }
+    if (!folderId) {
+      return NextResponse.json(
+        { error: 'Folder ID looks invalid. Paste a Drive folder URL or the raw ID.' },
+        { status: 400 }
+      )
+    }
   }
 
   const supabase = createServerClient()

@@ -56,11 +56,15 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
   const [parentId, setParentId] = useState('')
   const [browsing, setBrowsing] = useState(false)
   const [browseError, setBrowseError] = useState<string | null>(null)
+  const [browseHint, setBrowseHint] = useState<string | null>(null)
+  const [browseLeafId, setBrowseLeafId] = useState<string | null>(null)
   const [subfolders, setSubfolders] = useState<{ id: string; name: string; modifiedTime: string | null }[]>([])
 
   async function browseFolders() {
     setBrowsing(true)
     setBrowseError(null)
+    setBrowseHint(null)
+    setBrowseLeafId(null)
     try {
       const res = await fetch('/api/reporting/drive/list-subfolders', {
         method: 'POST',
@@ -70,6 +74,11 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || `Browse failed (${res.status})`)
       setSubfolders(body.folders ?? [])
+      if (body.hint) setBrowseHint(body.hint)
+      // If the parent is itself a folder with no subfolders, surface its ID for one-click use
+      if ((body.folders?.length ?? 0) === 0 && body.meta) {
+        setBrowseLeafId(body.parentId)
+      }
     } catch (e) {
       setBrowseError(e instanceof Error ? e.message : 'Browse failed')
       setSubfolders([])
@@ -324,8 +333,18 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
                   ))}
                 </div>
               )}
-              {!browsing && subfolders.length === 0 && !browseError && parentId.trim() && (
-                <p className="text-xs text-slate-500">Click "List subfolders" to discover folders.</p>
+              {browseHint && !browseError && subfolders.length === 0 && (
+                <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200 space-y-2">
+                  <p>{browseHint}</p>
+                  {browseLeafId && (
+                    <button
+                      onClick={() => pickFolder(browseLeafId)}
+                      className="px-2 py-1 rounded bg-amber-500/20 border border-amber-500/40 text-amber-100 text-xs hover:bg-amber-500/30"
+                    >
+                      Use this folder for {client.name}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
