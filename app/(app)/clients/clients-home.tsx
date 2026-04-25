@@ -127,10 +127,11 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
   const [kpiCount, setKpiCount] = useState(client.kpi_count)
   const [loading, setLoading] = useState(false)
 
-  // AI recommendations
+  // Recommendations (heuristic or AI)
   const [recOpen, setRecOpen] = useState(false)
   const [recLoading, setRecLoading] = useState(false)
   const [recError, setRecError] = useState<string | null>(null)
+  const [recSource, setRecSource] = useState<'heuristic' | 'ai'>('heuristic')
   const [suggestions, setSuggestions] = useState<AISuggestion[] | null>(null)
   const [accepted, setAccepted] = useState<Set<number>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -195,14 +196,16 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
     }
   }
 
-  async function recommend() {
+  async function recommend(source: 'heuristic' | 'ai') {
     setRecOpen(true)
     setRecLoading(true)
     setRecError(null)
     setSuggestions(null)
     setAccepted(new Set())
+    setRecSource(source)
     try {
-      const res = await fetch(`/api/reporting/${client.slug}/kpis/ai-recommend`, {
+      const path = source === 'ai' ? 'ai-recommend' : 'heuristic-recommend'
+      const res = await fetch(`/api/reporting/${client.slug}/kpis/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -364,26 +367,36 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
         </div>
       )}
 
-      {/* AI recommend */}
+      {/* Build-out — heuristic primary, AI polish */}
       {client.file_count > 0 && (
-        <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
+        <div className="rounded-xl border border-slate-700/50 bg-slate-900 p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex-1 min-w-[240px]">
               <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-300" /> AI build-out
+                <Wand2 className="h-4 w-4 text-amber-300" /> Build a dashboard
               </h3>
-              <p className="text-xs text-indigo-200/70 mt-1">
-                Let Claude propose a coherent dashboard of 5–8 KPIs from your selected files.
+              <p className="text-xs text-slate-400 mt-1">
+                Free heuristic suggester reads column names + types from your selected files. AI version adds context and cross-file reasoning — costs ~$0.20 per call.
               </p>
             </div>
-            <button
-              onClick={recommend}
-              disabled={recLoading || selectedFiles.size === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/40 text-indigo-200 text-sm font-medium hover:bg-indigo-500/25 disabled:opacity-50"
-            >
-              <Wand2 className="h-4 w-4" />
-              {recLoading ? 'Thinking…' : 'Recommend a dashboard'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => recommend('heuristic')}
+                disabled={recLoading || selectedFiles.size === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
+              >
+                <Wand2 className="h-4 w-4" />
+                {recLoading && recSource === 'heuristic' ? 'Building…' : 'Recommend (free)'}
+              </button>
+              <button
+                onClick={() => recommend('ai')}
+                disabled={recLoading || selectedFiles.size === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-500/20 disabled:opacity-50"
+              >
+                <Sparkles className="h-4 w-4" />
+                {recLoading && recSource === 'ai' ? 'Thinking…' : 'Polish with AI'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -436,7 +449,11 @@ function ClientWorkspace({ client }: { client: ClientSummary }) {
           >
             <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
               <h2 className="text-lg font-semibold text-white inline-flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" /> AI dashboard recommendations
+                {recSource === 'ai' ? (
+                  <><Sparkles className="h-4 w-4 text-indigo-400" /> AI dashboard recommendations</>
+                ) : (
+                  <><Wand2 className="h-4 w-4 text-amber-400" /> Heuristic dashboard recommendations</>
+                )}
               </h2>
               <button
                 onClick={() => !saving && setRecOpen(false)}
