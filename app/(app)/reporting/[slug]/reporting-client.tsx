@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, RefreshCw, Settings2, FolderInput, Sparkles } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Settings2, FolderInput, Sparkles, Share2 } from 'lucide-react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
 import { ChartBlock } from '@/components/reporting/ChartBlock'
+import { ShareDialog } from '@/components/reporting/ShareDialog'
 import type { KPIResult } from '@/lib/reporting/types'
 
 interface RawFileSummary {
@@ -48,6 +49,7 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
   const [kpiCount, setKpiCount] = useState(0)
   const [kpisLoading, setKpisLoading] = useState(true)
   const [seedingKpis, setSeedingKpis] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const fetchKpis = useCallback(async () => {
     setKpisLoading(true)
@@ -197,6 +199,13 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
               <Settings2 className="h-4 w-4" />
               Configure KPIs
             </Link>
+            <button
+              onClick={() => setShareOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800"
+            >
+              <Share2 className="h-4 w-4" />
+              Share
+            </button>
           </div>
         )}
       </div>
@@ -327,6 +336,8 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
           </table>
         )}
       </div>
+
+      <ShareDialog slug={client.slug} open={shareOpen} onClose={() => setShareOpen(false)} />
     </div>
   )
 }
