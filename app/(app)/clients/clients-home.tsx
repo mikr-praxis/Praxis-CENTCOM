@@ -299,7 +299,8 @@ function Workspace({ client }: { client: ClientSummary }) {
   // Build modal state
   const [recLoading, setRecLoading] = useState(false)
   const [recError, setRecError] = useState<string | null>(null)
-  const [recSource, setRecSource] = useState<'heuristic' | 'ai'>('heuristic')
+  const [recSource, setRecSource] = useState<'heuristic' | 'ai' | 'template'>('heuristic')
+  const [recMissingRoles, setRecMissingRoles] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<AISuggestion[] | null>(null)
   const [accepted, setAccepted] = useState<Set<number>>(new Set())
   const [savingSuggestions, setSavingSuggestions] = useState(false)
@@ -380,26 +381,35 @@ function Workspace({ client }: { client: ClientSummary }) {
     }
   }
 
-  async function recommend(source: 'heuristic' | 'ai') {
+  async function recommend(source: 'heuristic' | 'ai' | 'template', templateId?: string) {
     setBuildOpen(true)
     setRecLoading(true)
     setRecError(null)
     setSuggestions(null)
     setAccepted(new Set())
     setRecSource(source)
+    setRecMissingRoles([])
     try {
-      const path = source === 'ai' ? 'ai-recommend' : 'heuristic-recommend'
+      let path = 'heuristic-recommend'
+      let extra: Record<string, unknown> = {}
+      if (source === 'ai') path = 'ai-recommend'
+      if (source === 'template') {
+        path = 'template'
+        extra = { template_id: templateId ?? 'marketing_webinar' }
+      }
       const res = await fetch(`/api/reporting/${client.slug}/kpis/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filenames: selectedFiles.size > 0 ? Array.from(selectedFiles) : undefined,
           count: 6,
+          ...extra,
         }),
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'Recommend failed')
       setSuggestions(body.suggestions ?? [])
+      setRecMissingRoles(body.missing_roles ?? [])
       setAccepted(new Set((body.suggestions ?? []).map((_: unknown, i: number) => i)))
     } catch (e) {
       setRecError(e instanceof Error ? e.message : 'Recommend failed')
@@ -556,11 +566,13 @@ function Workspace({ client }: { client: ClientSummary }) {
           error={recError}
           source={recSource}
           suggestions={suggestions}
+          missingRoles={recMissingRoles}
           accepted={accepted}
           saving={savingSuggestions}
           fileCount={client.file_count}
           onPickHeuristic={() => recommend('heuristic')}
           onPickAI={() => recommend('ai')}
+          onPickTemplate={(id) => recommend('template', id)}
           onToggle={toggleAccept}
           onSelectAll={() => suggestions && setAccepted(new Set(suggestions.map((_, i) => i)))}
           onSave={saveAccepted}
@@ -749,16 +761,26 @@ function FileBrowserInner({ slug, filenames }: { slug: string; filenames: string
   )
 }
 
+interface TemplateMeta {
+  id: string
+  name: string
+  description: string
+  industry: string
+  kpi_count: number
+}
+
 function BuildModal({
   loading,
   error,
   source,
   suggestions,
+  missingRoles,
   accepted,
   saving,
   fileCount,
   onPickHeuristic,
   onPickAI,
+  onPickTemplate,
   onToggle,
   onSelectAll,
   onSave,
@@ -766,18 +788,31 @@ function BuildModal({
 }: {
   loading: boolean
   error: string | null
-  source: 'heuristic' | 'ai'
+  source: 'heuristic' | 'ai' | 'template'
   suggestions: AISuggestion[] | null
+  missingRoles: string[]
   accepted: Set<number>
   saving: boolean
   fileCount: number
   onPickHeuristic: () => void
   onPickAI: () => void
+  onPickTemplate: (id: string) => void
   onToggle: (i: number) => void
   onSelectAll: () => void
   onSave: () => void
   onClose: () => void
 }) {
+  // Static template metadata — kept in sync with lib/reporting/templates.ts
+  const templates: TemplateMeta[] = [
+    {
+      id: 'marketing_webinar',
+      name: 'Marketing Webinar',
+      description:
+        '5 webinar funnel KPIs: registrations · show-up rate · conversion · cost per reg · ROAS',
+      industry: 'marketing_webinar',
+      kpi_count: 5,
+    },
+  ]
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => !saving && onClose()}>
       <div
@@ -794,37 +829,64 @@ function BuildModal({
         </div>
 
         {!suggestions && !loading && (
-          <div className="p-6 space-y-4">
-            <p className="text-sm text-slate-400">
-              Generate a starter set of KPIs from your synced files. Pick how you want them generated:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                onClick={onPickHeuristic}
-                disabled={fileCount === 0}
-                className="text-left p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 disabled:opacity-50"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Wand2 className="h-4 w-4 text-amber-300" />
-                  <span className="text-sm font-semibold text-white">Heuristic (free)</span>
-                </div>
-                <p className="text-xs text-slate-400">
-                  Pattern-matches column names + types. Instant. No tokens.
-                </p>
-              </button>
-              <button
-                onClick={onPickAI}
-                disabled={fileCount === 0}
-                className="text-left p-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 disabled:opacity-50"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Sparkles className="h-4 w-4 text-indigo-300" />
-                  <span className="text-sm font-semibold text-white">AI polish</span>
-                </div>
-                <p className="text-xs text-slate-400">
-                  Claude reads samples + adds cross-file reasoning. ~$0.20/call.
-                </p>
-              </button>
+          <div className="p-6 space-y-5">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Templates</p>
+              <div className="space-y-2">
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => onPickTemplate(t.id)}
+                    disabled={fileCount === 0}
+                    className="w-full text-left p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-sm font-semibold text-white inline-flex items-center gap-2">
+                        <Wand2 className="h-4 w-4 text-emerald-300" /> {t.name}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wide text-emerald-400">
+                        {t.kpi_count} KPIs · free
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">{t.description}</p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Auto-resolves data sources from your synced files.
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Generic builders</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={onPickHeuristic}
+                  disabled={fileCount === 0}
+                  className="text-left p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wand2 className="h-4 w-4 text-amber-300" />
+                    <span className="text-sm font-semibold text-white">Heuristic (free)</span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Pattern-matches column names + types. Instant. No tokens.
+                  </p>
+                </button>
+                <button
+                  onClick={onPickAI}
+                  disabled={fileCount === 0}
+                  className="text-left p-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles className="h-4 w-4 text-indigo-300" />
+                    <span className="text-sm font-semibold text-white">AI polish</span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Claude reads samples + adds cross-file reasoning. ~$0.20/call.
+                  </p>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -845,9 +907,27 @@ function BuildModal({
           </div>
         )}
 
+        {suggestions && suggestions.length === 0 && !loading && (
+          <div className="p-6">
+            <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-200 text-sm">
+              <p className="font-semibold mb-1">Template couldn't generate any KPIs.</p>
+              {missingRoles.length > 0 && (
+                <p className="text-[12px]">
+                  Missing data for: <span className="font-mono">{missingRoles.join(', ')}</span>. Sync files matching these roles, or use the Heuristic / AI builders below.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {suggestions && suggestions.length > 0 && (
           <>
             <div className="flex-1 overflow-y-auto p-4">
+              {source === 'template' && missingRoles.length > 0 && (
+                <div className="mb-3 p-2 rounded border border-amber-500/30 bg-amber-500/5 text-amber-200 text-[11px]">
+                  Couldn't find data for: <span className="font-mono">{missingRoles.join(', ')}</span>. KPIs that depend on these were skipped. Sync the relevant files (e.g. ad spend, sales) and re-apply.
+                </div>
+              )}
               <div className="space-y-2">
                 {suggestions.map((s, i) => (
                   <label
