@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, RefreshCw, Settings2, FolderInput } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Settings2, FolderInput, Sparkles } from 'lucide-react'
+import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
+import { KPICardGrid } from '@/components/reporting/KPICardGrid'
+import type { KPIResult } from '@/lib/reporting/types'
 
 interface RawFileSummary {
   id: string
@@ -37,6 +40,40 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
   const [syncError, setSyncError] = useState<string | null>(null)
   const [syncingNow, setSyncingNow] = useState(false)
   const [syncSummary, setSyncSummary] = useState<string | null>(null)
+
+  // Timeframe + KPI state
+  const [timeframe, setTimeframe] = useState<TimeframeValue>(() => computeTimeframe('30d', null, null))
+  const [kpiResults, setKpiResults] = useState<KPIResult[]>([])
+  const [kpiCount, setKpiCount] = useState(0)
+  const [kpisLoading, setKpisLoading] = useState(true)
+  const [seedingKpis, setSeedingKpis] = useState(false)
+
+  const fetchKpis = useCallback(async () => {
+    setKpisLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (timeframe.start) params.set('start', timeframe.start)
+      if (timeframe.end) params.set('end', timeframe.end)
+      const res = await fetch(`/api/reporting/${client.slug}/kpis?${params.toString()}`)
+      if (!res.ok) {
+        setKpiResults([])
+        setKpiCount(0)
+      } else {
+        const body = await res.json()
+        setKpiResults(body.results ?? [])
+        setKpiCount(body.kpi_count ?? 0)
+      }
+    } catch {
+      setKpiResults([])
+      setKpiCount(0)
+    } finally {
+      setKpisLoading(false)
+    }
+  }, [client.slug, timeframe.start, timeframe.end])
+
+  useEffect(() => {
+    fetchKpis()
+  }, [fetchKpis])
 
   async function saveFolder() {
     setSavingFolder(true)
@@ -96,12 +133,25 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
       setSyncSummary(
         `Sync done. Seen ${r.files_seen ?? 0}, synced ${r.files_synced ?? 0}, skipped ${r.files_skipped ?? 0}, unsupported ${r.files_unsupported ?? 0}.`
       )
-      // refresh page to show new files in the table
       setTimeout(() => window.location.reload(), 1200)
     } catch (e) {
       setSyncError(e instanceof Error ? e.message : 'Sync failed')
     } finally {
       setSyncingNow(false)
+    }
+  }
+
+  async function seedKpis() {
+    setSeedingKpis(true)
+    try {
+      const res = await fetch(`/api/reporting/${client.slug}/kpis/seed`, { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || `Seed failed (${res.status})`)
+      await fetchKpis()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Seed failed')
+    } finally {
+      setSeedingKpis(false)
     }
   }
 
@@ -116,7 +166,7 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
         </Link>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-white">{client.name}</h1>
           <p className="text-slate-400 text-sm mt-1">Client report</p>
@@ -149,6 +199,11 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Timeframe picker */}
+      <div className="mb-4">
+        <TimeframePicker value={timeframe} onChange={setTimeframe} />
       </div>
 
       {/* Drive folder configuration */}
@@ -186,12 +241,33 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
         </div>
       )}
 
-      {/* KPI cards placeholder (M3) */}
-      <div className="mb-6 p-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/30">
-        <p className="text-slate-400 text-sm">
-          KPI cards and charts will appear here once data is synced (M3).
-        </p>
-      </div>
+      {/* KPI cards */}
+      <section className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-white">KPIs</h2>
+          {!readOnly && kpiCount === 0 && rawFiles.length > 0 && !kpisLoading && (
+            <button
+              onClick={seedKpis}
+              disabled={seedingKpis}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium hover:bg-amber-500/20 disabled:opacity-50"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {seedingKpis ? 'Seeding...' : 'Seed example KPIs'}
+            </button>
+          )}
+        </div>
+        {kpiCount === 0 && !kpisLoading ? (
+          <div className="p-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/30">
+            <p className="text-slate-400 text-sm">
+              {rawFiles.length === 0
+                ? 'No KPIs yet. Sync data first, then add KPIs in the configurator (M4) or seed examples.'
+                : 'No KPIs configured for this client. Click "Seed example KPIs" to start, or add custom ones in the configurator (M4).'}
+            </p>
+          </div>
+        ) : (
+          <KPICardGrid results={kpiResults} loading={kpisLoading} />
+        )}
+      </section>
 
       {/* Raw files table */}
       <div className="rounded-xl border border-slate-700/50 bg-slate-900 overflow-hidden">
