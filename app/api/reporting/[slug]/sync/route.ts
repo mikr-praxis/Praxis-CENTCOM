@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { syncClientFolder } from '@/lib/reporting/sync'
+import { notifySyncComplete } from '@/lib/reporting/notify'
 
 export const maxDuration = 300 // up to 5 min for large folder sync
 
@@ -17,7 +18,7 @@ export async function POST(
   const supabase = createServerClient()
   const { data: client, error } = await supabase
     .from('clients')
-    .select('id, drive_folder_id')
+    .select('id, name, drive_folder_id')
     .eq('slug', slug)
     .single()
 
@@ -36,6 +37,8 @@ export async function POST(
       clientId: client.id,
       folderId: client.drive_folder_id,
     })
+    // Best-effort Slack notification (no-op if channel unset)
+    await notifySyncComplete({ clientName: client.name, results: [result] })
     return NextResponse.json({ ok: true, result })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Sync failed'

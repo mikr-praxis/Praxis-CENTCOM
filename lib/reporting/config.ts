@@ -16,6 +16,7 @@ export const REPORTING_CONFIG_DEFAULTS = {
   REPORTING_TOP_VALUES_PER_COLUMN: '30',
   REPORTING_DEFAULT_TIMEFRAME: '30d',
   REPORTING_GRANULARITY_THRESHOLDS_JSON: '{"day_max":14,"week_max":120}',
+  REPORTING_SYNC_NOTIFY_CHANNEL_ID: '',
 } as const
 
 export type ReportingConfigKey = keyof typeof REPORTING_CONFIG_DEFAULTS
@@ -66,6 +67,11 @@ export async function getReportingDefaultTimeframe(): Promise<string> {
   const valid = ['7d', '30d', '90d', 'qtd', 'ytd', 'all', 'data_7d', 'data_30d', 'data_90d', 'data_all']
   if (v && valid.includes(v.trim())) return v.trim()
   return '30d'
+}
+
+export async function getReportingSyncNotifyChannelId(): Promise<string | null> {
+  const v = await getConfig('REPORTING_SYNC_NOTIFY_CHANNEL_ID')
+  return v && v.trim() ? v.trim() : null
 }
 
 export interface GranularityThresholds {

@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { syncClientFolder, type SyncResult } from '@/lib/reporting/sync'
 import { isWeeklySyncEnabled } from '@/lib/reporting/config'
+import { notifySyncComplete } from '@/lib/reporting/notify'
 
 export const maxDuration = 300
 
@@ -52,6 +53,8 @@ export async function GET(req: Request) {
   }
 
   const results: { slug: string; result?: SyncResult; error?: string }[] = []
+  const successResults: SyncResult[] = []
+  const topLevelErrors: { slug: string; error: string }[] = []
 
   for (const c of clients ?? []) {
     if (!c.drive_folder_id) continue
@@ -61,13 +64,16 @@ export async function GET(req: Request) {
         folderId: c.drive_folder_id,
       })
       results.push({ slug: c.slug, result })
+      successResults.push(result)
     } catch (e) {
-      results.push({
-        slug: c.slug,
-        error: e instanceof Error ? e.message : String(e),
-      })
+      const error = e instanceof Error ? e.message : String(e)
+      results.push({ slug: c.slug, error })
+      topLevelErrors.push({ slug: c.slug, error })
     }
   }
+
+  // Best-effort Slack notification (no-op if REPORTING_SYNC_NOTIFY_CHANNEL_ID unset)
+  await notifySyncComplete({ results: successResults, topLevelErrors })
 
   return NextResponse.json({
     ok: true,

@@ -112,6 +112,7 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'REPORTING_MAX_CACHED_ROWS', label: 'Max Cached Rows / File', description: 'Cap on rows stored per synced file in Supabase. Larger files are truncated. Default 50000. Lower if hitting jsonb size limits.' },
       { configKey: 'REPORTING_TOP_VALUES_PER_COLUMN', label: 'Top Values Per Column', description: 'How many distinct values to keep per column for File Browser + heuristic suggester. Default 30.' },
       { configKey: 'REPORTING_GRANULARITY_THRESHOLDS_JSON', label: 'Chart Granularity Thresholds', description: 'JSON: {"day_max":N,"week_max":N}. Timeframes ≤day_max days bucket daily, ≤week_max weekly, else monthly. Default {"day_max":14,"week_max":120}.', isJson: true },
+      { configKey: 'REPORTING_SYNC_NOTIFY_CHANNEL_ID', label: 'Sync Notify Channel ID', description: 'Slack channel ID (e.g. C0ABC1234) to post a summary after every sync (manual + weekly cron). Leave blank to disable. Requires SLACK_BOT_TOKEN.' },
     ],
   },
 ]
