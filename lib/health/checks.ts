@@ -365,7 +365,8 @@ async function checkClients(): Promise<HealthCheck[]> {
         issues.push('0 KPIs')
       }
       if (ageDays != null && ageDays >= 14) {
-        status = status === 'fail' ? 'fail' : 'warn'
+        // status here can only be 'ok' or 'warn' from the prior branches; both upgrade to 'warn'
+        status = 'warn'
         issues.push(`stale (${ageDays}d old)`)
       }
 
