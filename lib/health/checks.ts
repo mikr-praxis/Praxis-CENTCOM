@@ -13,6 +13,14 @@ import { BRANDING_DEFAULTS } from '@/lib/branding'
 
 export type HealthStatus = 'ok' | 'warn' | 'fail' | 'info'
 
+export type AutoFixAction =
+  | 'seed_reporting_config'
+  | 'seed_branding_config'
+  | 'discover_drive_folders'
+  | 'sync_all_clients'
+  | 'test_slack'
+  | 'connect_everything'
+
 export interface HealthCheck {
   id: string
   category: string
@@ -22,7 +30,7 @@ export interface HealthCheck {
   fix?: {
     description?: string
     /** Slug for an auto-fix POST endpoint that the UI can call. */
-    auto_fix?: 'seed_reporting_config' | 'seed_branding_config'
+    auto_fix?: AutoFixAction
     /** External link the user should open to remediate (e.g. GCP console). */
     doc_link?: string
   }
@@ -365,7 +373,6 @@ async function checkClients(): Promise<HealthCheck[]> {
         issues.push('0 KPIs')
       }
       if (ageDays != null && ageDays >= 14) {
-        // status here can only be 'ok' or 'warn' from the prior branches; both upgrade to 'warn'
         status = 'warn'
         issues.push(`stale (${ageDays}d old)`)
       }
@@ -374,6 +381,17 @@ async function checkClients(): Promise<HealthCheck[]> {
         ? `${fc} files · ${kc} KPIs · synced ${ageDays}d ago`
         : `${fc} files · ${kc} KPIs · never synced`
 
+      // Pick the most useful single auto-fix for this client's worst issue
+      let auto_fix: AutoFixAction | undefined
+      let fixDescription = `Visit /clients and pick ${c.name} to address.`
+      if (!c.drive_folder_id) {
+        auto_fix = 'discover_drive_folders'
+        fixDescription = `Try matching subfolders by name from the Drive parent (auto-discover).`
+      } else if (fc === 0 || (ageDays != null && ageDays >= 14)) {
+        auto_fix = 'sync_all_clients'
+        fixDescription = `Run sync now for every connected client.`
+      }
+
       results.push({
         id: `client_${c.slug}`,
         category: 'Clients',
@@ -381,7 +399,7 @@ async function checkClients(): Promise<HealthCheck[]> {
         status,
         message: status === 'ok' ? okLabel : `${okLabel} — issues: ${issues.join(', ')}`,
         ...(status !== 'ok' && {
-          fix: { description: `Visit /clients and pick ${c.name} to address.` },
+          fix: { description: fixDescription, auto_fix },
         }),
       })
     }

@@ -12,6 +12,8 @@ import {
   RefreshCw,
   Wand2,
   ExternalLink,
+  Zap,
+  Send,
 } from 'lucide-react'
 import type { HealthCheck, HealthReport, HealthStatus } from '@/lib/health/checks'
 
@@ -97,8 +99,8 @@ export function HealthClient({ initialReport }: Props) {
         body: JSON.stringify({ action: check.fix.auto_fix }),
       })
       const body = await res.json()
-      if (res.ok) {
-        setActionMsg(`✓ Ran ${check.fix.auto_fix}. Re-running checks…`)
+      if (res.ok || body.ok) {
+        setActionMsg(`✓ ${formatActionMsg(check.fix.auto_fix, body.details)}`)
         await refresh()
       } else {
         setActionMsg(`✗ ${body.error ?? 'Auto-fix failed'}`)
@@ -123,7 +125,7 @@ export function HealthClient({ initialReport }: Props) {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-3">
+      <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Activity className="h-6 w-6 text-amber-400" /> Health
@@ -132,14 +134,36 @@ export function HealthClient({ initialReport }: Props) {
             Server-side checks of database, env, integrations, and per-client setup.
           </p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={refreshing}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Re-running…' : 'Re-run'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() =>
+              runAutoFix({ id: '__manual_test_slack', category: '', name: 'Test Slack', status: 'info', message: '', fix: { auto_fix: 'test_slack' } })
+            }
+            disabled={actionRunning !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          >
+            <Send className="h-4 w-4" />
+            Test Slack
+          </button>
+          <button
+            onClick={() =>
+              runAutoFix({ id: '__manual_connect_everything', category: '', name: 'Connect everything', status: 'info', message: '', fix: { auto_fix: 'connect_everything' } })
+            }
+            disabled={actionRunning !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 disabled:opacity-50"
+          >
+            <Zap className="h-4 w-4" />
+            Connect everything
+          </button>
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Re-running…' : 'Re-run'}
+          </button>
+        </div>
       </div>
 
       {/* Summary pills + filter */}
@@ -271,4 +295,25 @@ export function HealthClient({ initialReport }: Props) {
       </div>
     </div>
   )
+}
+
+function formatActionMsg(action: string, details: unknown): string {
+  if (!details || typeof details !== 'object') return `Ran ${action}`
+  const d = details as Record<string, unknown>
+  switch (action) {
+    case 'discover_drive_folders':
+      return `Auto-discovered ${d.matched ?? 0} of ${d.total_unconnected ?? 0} unconnected client folders`
+    case 'sync_all_clients': {
+      const results = (d.results ?? []) as { result?: { files_synced?: number; files_seen?: number } }[]
+      const totalSynced = results.reduce((a, r) => a + (r.result?.files_synced ?? 0), 0)
+      const totalSeen = results.reduce((a, r) => a + (r.result?.files_seen ?? 0), 0)
+      return `Synced ${totalSynced} of ${totalSeen} files across ${results.length} client${results.length === 1 ? '' : 's'}`
+    }
+    case 'test_slack':
+      return d.posted ? `Posted test message to ${d.channel}` : `Slack test failed: ${d.error ?? 'unknown'}`
+    case 'connect_everything':
+      return `Ran all auto-fixes — see Re-run results for current state`
+    default:
+      return `Ran ${action}`
+  }
 }
