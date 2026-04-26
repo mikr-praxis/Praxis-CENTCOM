@@ -3,6 +3,7 @@ import { SignOutButton } from '@clerk/nextjs'
 import { currentUser } from '@clerk/nextjs/server'
 import { Zap, ShieldAlert } from 'lucide-react'
 import { getConfig } from '@/lib/config'
+import { getBrandingConfig } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,13 +11,14 @@ export default async function UnauthorizedPage() {
   const user = await currentUser()
   const email = user?.emailAddresses?.[0]?.emailAddress ?? 'your account'
   const supportEmail = await getConfig('SUPPORT_EMAIL') || 'mscott@builtbypraxis.com'
+  const branding = await getBrandingConfig()
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-2xl">
         <div className="flex items-center gap-2 mb-6">
           <Zap className="h-6 w-6 text-amber-400" />
-          <span className="text-lg font-bold text-white tracking-tight">Praxis</span>
+          <span className="text-lg font-bold text-white tracking-tight">{branding.app_name}</span>
         </div>
 
         <div className="flex items-start gap-3 mb-4">
@@ -26,7 +28,7 @@ export default async function UnauthorizedPage() {
           <div>
             <h1 className="text-xl font-semibold text-white">Access not authorized</h1>
             <p className="mt-1 text-sm text-slate-400">
-              CENTCOM is restricted to Built by Praxis staff.
+              {branding.app_name} is restricted to {branding.app_footer_primary} staff.
             </p>
           </div>
         </div>

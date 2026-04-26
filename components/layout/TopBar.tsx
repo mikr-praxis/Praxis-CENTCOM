@@ -3,15 +3,17 @@
 import { UserButton } from '@clerk/nextjs'
 import { Bell } from 'lucide-react'
 import { useRole } from '@/components/providers/RoleProvider'
+import { useBranding } from '@/components/providers/BrandingProvider'
 import { ROLE_LABELS, ROLE_COLORS } from '@/lib/roles'
 
 export function TopBar() {
   const { role } = useRole()
+  const branding = useBranding()
 
   return (
     <header className="sticky top-0 z-40 flex h-14 md:h-16 items-center justify-between border-b border-slate-700/50 bg-slate-900/90 backdrop-blur-md px-4 md:px-6">
       <div className="flex items-center gap-3">
-        <h1 className="text-base font-semibold text-slate-100 md:hidden">Praxis</h1>
+        <h1 className="text-base font-semibold text-slate-100 md:hidden">{branding.app_name}</h1>
       </div>
       <div className="flex items-center gap-3">
         <span className={`hidden sm:inline-flex text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${ROLE_COLORS[role]}`}>

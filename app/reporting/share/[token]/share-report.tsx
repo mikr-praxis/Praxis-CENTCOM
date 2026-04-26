@@ -4,14 +4,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
 import { ChartBlock } from '@/components/reporting/ChartBlock'
+import { BrandingProvider } from '@/components/providers/BrandingProvider'
 import type { KPIResult } from '@/lib/reporting/types'
+import type { BrandingConfig } from '@/lib/branding'
 
 interface Props {
   token: string
   clientName: string
+  branding: BrandingConfig
 }
 
-export function ShareReport({ token, clientName }: Props) {
+export function ShareReport({ token, clientName, branding }: Props) {
   const [timeframe, setTimeframe] = useState<TimeframeValue>(() => computeTimeframe('30d', null, null))
   const [results, setResults] = useState<KPIResult[]>([])
   const [count, setCount] = useState(0)
@@ -42,11 +45,12 @@ export function ShareReport({ token, clientName }: Props) {
   }, [fetchKpis])
 
   return (
+    <BrandingProvider value={branding}>
     <div className="min-h-screen bg-slate-950">
       <header className="border-b border-slate-800 bg-slate-900/50">
         <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-lg font-semibold text-white">{clientName} — Report</h1>
-          <span className="text-xs text-slate-500">Built by Praxis</span>
+          <span className="text-xs text-slate-500">{branding.app_footer_primary}</span>
         </div>
       </header>
 
@@ -89,5 +93,6 @@ export function ShareReport({ token, clientName }: Props) {
         )}
       </main>
     </div>
+    </BrandingProvider>
   )
 }

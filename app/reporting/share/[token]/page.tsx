@@ -4,6 +4,7 @@
  */
 
 import { createServerClient } from '@/lib/supabase/server'
+import { getBrandingConfig } from '@/lib/branding'
 import { ShareReport } from './share-report'
 
 export const dynamic = 'force-dynamic'
@@ -70,10 +71,13 @@ export default async function SharedReportPage({
     )
   }
 
+  const branding = await getBrandingConfig()
+
   return (
     <ShareReport
       token={token}
       clientName={client.name}
+      branding={branding}
     />
   )
 }
