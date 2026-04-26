@@ -1,19 +1,35 @@
 /**
  * Weekly Drive sync cron — invoked by Vercel cron (see vercel.json).
  *
+ * Schedule policy: vercel.json fires this DAILY at 03:00 UTC (the only schedule
+ * the Hobby plan reliably allows). Inside the route we gate on app_config:
+ *
+ *   WEEKLY_SYNC_DAY_OF_WEEK (0–6, Sun=0) and WEEKLY_SYNC_HOUR_UTC (0–23)
+ *
+ * If the current invocation isn't the configured slot, we 200-skip without
+ * doing work. This means an admin can change the active sync day/time from
+ * /hardcoded without touching vercel.json or redeploying.
+ *
  * Auth: requires header `x-vercel-cron-secret` matching env var CRON_SECRET, OR
  * Vercel's standard cron `Authorization: Bearer ${CRON_SECRET}` (Vercel sets
  * this on cron requests when CRON_SECRET is configured in env).
  *
- * Iterates every client with a configured drive_folder_id and runs the
- * one-client sync. Always returns 200 with a summary so partial failures don't
- * break the schedule; per-client errors are surfaced in the response body.
+ * `?force=1` query param bypasses the slot gate (still requires the secret) so
+ * you can trigger an out-of-cycle sync via curl or the /health "Connect
+ * everything" path.
+ *
+ * Always returns 200 with a summary so partial failures don't break the
+ * schedule; per-client errors are surfaced in the response body.
  */
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { syncClientFolder, type SyncResult } from '@/lib/reporting/sync'
-import { isWeeklySyncEnabled } from '@/lib/reporting/config'
+import {
+  isWeeklySyncEnabled,
+  getWeeklySyncDayOfWeek,
+  getWeeklySyncHourUtc,
+} from '@/lib/reporting/config'
 import { notifySyncComplete } from '@/lib/reporting/notify'
 
 export const maxDuration = 300
@@ -40,6 +56,26 @@ export async function GET(req: Request) {
       reason: 'WEEKLY_SYNC_ENABLED is disabled in app_config',
       ran_at: new Date().toISOString(),
     })
+  }
+
+  // Slot gate: cron fires daily at 03:00 UTC. Only proceed if the configured
+  // day-of-week and hour match. ?force=1 bypasses for ad-hoc triggers.
+  const url = new URL(req.url)
+  const force = url.searchParams.get('force') === '1' || url.searchParams.get('force') === 'true'
+  if (!force) {
+    const now = new Date()
+    const currentDow = now.getUTCDay()
+    const currentHour = now.getUTCHours()
+    const targetDow = await getWeeklySyncDayOfWeek()
+    const targetHour = await getWeeklySyncHourUtc()
+    if (currentDow !== targetDow || currentHour !== targetHour) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: `Not the configured slot (now: dow=${currentDow} hour=${currentHour}; target: dow=${targetDow} hour=${targetHour})`,
+        ran_at: now.toISOString(),
+      })
+    }
   }
 
   const supabase = createServerClient()

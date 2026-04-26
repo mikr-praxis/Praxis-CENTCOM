@@ -22,6 +22,8 @@ export const REPORTING_CONFIG_DEFAULTS = {
   REPORTING_DATE_PARSE_THRESHOLD: '0.3',
   REPORTING_FORECAST_DEFAULT_METHOD: 'linear',
   REPORTING_FORECAST_DEFAULT_PERIODS: '0',
+  WEEKLY_SYNC_DAY_OF_WEEK: '0', // 0 = Sunday … 6 = Saturday (UTC)
+  WEEKLY_SYNC_HOUR_UTC: '3',
 } as const
 
 export type ReportingConfigKey = keyof typeof REPORTING_CONFIG_DEFAULTS
@@ -123,6 +125,34 @@ export async function getReportingForecastDefaultPeriods(): Promise<number> {
   const n = Number(v ?? '')
   if (!Number.isFinite(n) || n < 0 || n > 52) return 0
   return Math.floor(n)
+}
+
+/**
+ * Day-of-week (UTC) the weekly sync should actually run. 0 = Sunday … 6 = Saturday.
+ * Vercel cron fires daily; the route uses this + WEEKLY_SYNC_HOUR_UTC to decide
+ * whether the current invocation is the right slot to do work.
+ */
+export async function getWeeklySyncDayOfWeek(): Promise<number> {
+  const v = await getConfig('WEEKLY_SYNC_DAY_OF_WEEK')
+  const n = Number(v ?? '')
+  if (!Number.isFinite(n) || n < 0 || n > 6) return 0
+  return Math.floor(n)
+}
+
+/** Hour of day (UTC, 0–23) the weekly sync should run. */
+export async function getWeeklySyncHourUtc(): Promise<number> {
+  const v = await getConfig('WEEKLY_SYNC_HOUR_UTC')
+  const n = Number(v ?? '')
+  if (!Number.isFinite(n) || n < 0 || n > 23) return 3
+  return Math.floor(n)
+}
+
+/** Human-readable label for the active weekly slot. */
+export async function describeWeeklySyncSlot(): Promise<string> {
+  const day = await getWeeklySyncDayOfWeek()
+  const hour = await getWeeklySyncHourUtc()
+  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day]
+  return `${dayName} ${String(hour).padStart(2, '0')}:00 UTC`
 }
 
 export interface GranularityThresholds {
