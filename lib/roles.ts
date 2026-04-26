@@ -92,6 +92,7 @@ const DEFAULT_ROUTE_PERMISSIONS: RoutePermission[] = [
   { href: '/clients',   roles: ['exec'] },
   { href: '/reporting', roles: ['exec', 'am'] },
   { href: '/hardcoded', roles: ['exec'] },
+  { href: '/health',    roles: ['exec'] },
   { href: '/config',    roles: ['exec'] },
 ]
 

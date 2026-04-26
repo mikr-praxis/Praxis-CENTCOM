@@ -18,6 +18,7 @@ import {
   Columns3,
   BarChart3,
   Code2,
+  Activity,
 } from 'lucide-react'
 import { useRole } from '@/components/providers/RoleProvider'
 import { useBranding } from '@/components/providers/BrandingProvider'
@@ -35,6 +36,7 @@ const navigation = [
   { name: 'Memory', href: '/memory', icon: Brain },
   { name: 'Clients', href: '/clients', icon: BarChart3 },
   { name: 'Hardcoded', href: '/hardcoded', icon: Code2 },
+  { name: 'Health', href: '/health', icon: Activity },
   { name: 'Config', href: '/config', icon: Settings },
 ]
 
