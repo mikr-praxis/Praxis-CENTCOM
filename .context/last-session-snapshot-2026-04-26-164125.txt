@@ -1,0 +1,50 @@
+# SessionEnd Forensic Snapshot
+
+**Timestamp (UTC):** 2026-04-26T23:41:25Z
+**Triggered by:** Claude Code SessionEnd hook (auto)
+**CWD at session end:** /Users/bakedbros/Desktop/Praxis/.claude/worktrees/reverent-albattani
+**Repo root:** /Users/bakedbros/Desktop/Praxis/.claude/worktrees/reverent-albattani
+
+## Branch
+```
+claude/reverent-albattani
+```
+
+## git status --short
+```
+ M .context/.last-active
+?? .context/last-session-snapshot-2026-04-26-164125.txt
+```
+
+## Unstaged changes (git diff --stat)
+```
+ .context/.last-active | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+## Staged changes (git diff --cached --stat)
+```
+```
+
+## Last 10 commits
+```
+7f052d2 fix(branding): wire remaining hardcoded brand strings to config
+3fe3fa8 context: SessionEnd auto-save 2026-04-26T03:27:55Z
+8fb2f39 feat(health): expanded auto-fix actions — actually connect things, not just seed config
+6eb4c0a fix(health): TS — dead 'fail' branch in client staleness check (status can only be ok|warn here)
+cb2a0ad feat: /health page — full audit of broken/unconnected systems
+f93b528 feat: branding + currency dynamic from Hardcoded tab
+256674b feat(reporting): #5 — forecast defaults (REPORTING_FORECAST_DEFAULT_METHOD + _PERIODS)
+6adb78f feat(reporting): #4 — date detection threshold (REPORTING_DATE_PARSE_THRESHOLD)
+b5d7bd6 feat(reporting): #3 — default funnel type for new clients (REPORTING_DEFAULT_FUNNEL_TYPE)
+5f0a49c feat(reporting): #2 — share token default expiry (SHARE_TOKEN_DEFAULT_EXPIRY_DAYS)
+```
+
+## Stash list
+```
+```
+
+---
+
+This file is a mechanical snapshot. For narrative context, see
+the most recent dated save or checkpoint in this directory.
