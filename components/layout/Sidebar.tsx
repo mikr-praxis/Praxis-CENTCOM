@@ -20,6 +20,7 @@ import {
   Code2,
 } from 'lucide-react'
 import { useRole } from '@/components/providers/RoleProvider'
+import { useBranding } from '@/components/providers/BrandingProvider'
 import { ROUTE_PERMISSIONS } from '@/lib/roles'
 
 const navigation = [
@@ -40,6 +41,7 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname()
   const { role } = useRole()
+  const branding = useBranding()
 
   // Filter navigation to only show routes the current role can access
   const visibleNav = navigation.filter((item) => {
@@ -54,7 +56,7 @@ export function Sidebar() {
         <div className="flex flex-col flex-grow bg-slate-900 border-r border-slate-700/50 pt-5 pb-4 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-6">
             <Zap className="h-8 w-8 text-amber-400" />
-            <span className="ml-3 text-xl font-bold text-white tracking-tight">Praxis</span>
+            <span className="ml-3 text-xl font-bold text-white tracking-tight">{branding.app_name}</span>
           </div>
           <nav className="mt-8 flex-1 px-3 space-y-1">
             {visibleNav.map((item) => {
@@ -82,8 +84,8 @@ export function Sidebar() {
             })}
           </nav>
           <div className="px-6 py-4 border-t border-slate-700/50">
-            <p className="text-xs text-slate-500">Built by Praxis</p>
-            <p className="text-xs text-slate-600">Internal Ops v1.0</p>
+            <p className="text-xs text-slate-500">{branding.app_footer_primary}</p>
+            <p className="text-xs text-slate-600">{branding.app_footer_secondary}</p>
           </div>
         </div>
       </aside>

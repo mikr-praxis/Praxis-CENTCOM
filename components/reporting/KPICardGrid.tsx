@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Target, AlertCircle, ArrowDown, ArrowUp, ChevronRight, Database, Info } from 'lucide-react'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
+import { useBranding } from '@/components/providers/BrandingProvider'
 import { DrillDownModal } from './DrillDownModal'
 
 interface Props {
@@ -60,7 +61,9 @@ export function KPICardGrid({ results, loading, slug, timeframe, slicers }: Prop
 
 function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () => void }) {
   const [infoOpen, setInfoOpen] = useState(false)
-  const display = formatKPIValue(result.value, result.format)
+  const branding = useBranding()
+  const fmtOpts = { currency: branding.kpi_currency_code, locale: branding.kpi_currency_locale }
+  const display = formatKPIValue(result.value, result.format, fmtOpts)
   const meetingTarget =
     result.target != null && result.value != null && result.value >= result.target
 
@@ -128,7 +131,7 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
           {deltaNeg && <ArrowDown className="h-3 w-3" />}
           <span>{(cmp.delta_percent * 100).toFixed(1)}%</span>
           <span className="text-slate-500 ml-1">
-            (was {formatKPIValue(cmp.previous_value, result.format)})
+            (was {formatKPIValue(cmp.previous_value, result.format, fmtOpts)})
           </span>
         </div>
       )}
@@ -142,7 +145,7 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
           {result.groups.slice(0, 5).map((g) => (
             <div key={g.group} className="flex items-center justify-between gap-2 text-[11px]" title={g.group}>
               <span className="text-slate-400 truncate flex-1 min-w-0">{g.group}</span>
-              <span className="text-slate-200 font-mono flex-shrink-0">{formatKPIValue(g.value, result.format)}</span>
+              <span className="text-slate-200 font-mono flex-shrink-0">{formatKPIValue(g.value, result.format, fmtOpts)}</span>
             </div>
           ))}
         </div>
@@ -151,7 +154,7 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
         <span>{result.rows_used.toLocaleString()} rows</span>
         {result.target != null && (
-          <span>Target: {formatKPIValue(result.target, result.format)}</span>
+          <span>Target: {formatKPIValue(result.target, result.format, fmtOpts)}</span>
         )}
       </div>
       {result.error && (
@@ -194,7 +197,7 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
               <>
                 <span className="text-slate-500">Target</span>
                 <span className="col-span-2 text-slate-300 font-mono">
-                  {formatKPIValue(result.target, result.format)}
+                  {formatKPIValue(result.target, result.format, fmtOpts)}
                 </span>
               </>
             )}
@@ -202,7 +205,7 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
               <>
                 <span className="text-slate-500">Prior</span>
                 <span className="col-span-2 text-slate-300 font-mono">
-                  {formatKPIValue(cmp.previous_value, result.format)}
+                  {formatKPIValue(cmp.previous_value, result.format, fmtOpts)}
                 </span>
               </>
             )}

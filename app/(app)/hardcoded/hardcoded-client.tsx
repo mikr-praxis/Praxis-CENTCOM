@@ -120,6 +120,20 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'REPORTING_FORECAST_DEFAULT_METHOD', label: 'Forecast Default Method', description: 'Algorithm used when forecast periods > 0: linear (least-squares regression) or moving_avg (last 4 buckets average). Default linear.' },
     ],
   },
+  {
+    id: 'branding',
+    title: 'Branding & Display',
+    priority: 'config',
+    description: 'App name, footer text, currency formatting, and accent color — propagate live to every page',
+    items: [
+      { configKey: 'APP_NAME', label: 'App Name', description: 'Top-of-sidebar wordmark. Default "Praxis".' },
+      { configKey: 'APP_FOOTER_PRIMARY', label: 'Footer Line 1', description: 'Bottom of the sidebar (slate-500). Default "Built by Praxis".' },
+      { configKey: 'APP_FOOTER_SECONDARY', label: 'Footer Line 2', description: 'Bottom of the sidebar (slate-600). Default "Internal Ops v1.0".' },
+      { configKey: 'KPI_CURRENCY_CODE', label: 'Currency Code', description: 'ISO 4217 code for KPI currency formatting (e.g. USD, EUR, GBP, CAD). Default USD.' },
+      { configKey: 'KPI_CURRENCY_LOCALE', label: 'Currency Locale', description: 'BCP-47 locale for currency + count formatting (e.g. en-US, en-GB, fr-FR, ja-JP). Default en-US.' },
+      { configKey: 'APP_ACCENT_HEX', label: 'Accent Color', description: 'Hex color used as the brand accent (#RRGGBB). Exposed to components as the --accent CSS variable. Default #f59e0b (amber-500).' },
+    ],
+  },
 ]
 
 const priorityConfig = {

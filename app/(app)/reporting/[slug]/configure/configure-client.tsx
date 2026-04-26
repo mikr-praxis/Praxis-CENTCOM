@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft, Plus, Trash2, Save, Activity } from 'lucide-react'
 import type { AggOp, Formula, Filter, CompositeOp, ConstOp } from '@/lib/reporting/types'
 import { formatKPIValue } from '@/lib/reporting/engine'
+import { useBranding } from '@/components/providers/BrandingProvider'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 import { AIKPIBuilder, type AIDraft } from '@/components/reporting/AIKPIBuilder'
 import { FileBrowser } from '@/components/reporting/FileBrowser'
@@ -751,6 +752,8 @@ function FormulaPreview({
   format: KPIFormat
   viz: KPIVizType
 }) {
+  const branding = useBranding()
+  const fmtOpts = { currency: branding.kpi_currency_code, locale: branding.kpi_currency_locale }
   const [loading, setLoading] = useState(false)
   const [value, setValue] = useState<number | null>(null)
   const [rowsUsed, setRowsUsed] = useState<number>(0)
@@ -805,7 +808,7 @@ function FormulaPreview({
         ) : (
           <div className="flex items-baseline gap-3">
             <span className="text-2xl font-semibold text-white">
-              {loading ? '…' : formatKPIValue(value, format)}
+              {loading ? '…' : formatKPIValue(value, format, fmtOpts)}
             </span>
             <span className="text-[11px] text-slate-500">
               {rowsUsed.toLocaleString()} rows · {sources.length > 0 ? sources.join(', ') : 'no source matched'}

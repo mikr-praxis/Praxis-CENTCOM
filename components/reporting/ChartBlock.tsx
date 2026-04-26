@@ -15,12 +15,15 @@ import {
 } from 'recharts'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
+import { useBranding } from '@/components/providers/BrandingProvider'
 
 interface Props {
   result: KPIResult
 }
 
 export function ChartBlock({ result }: Props) {
+  const branding = useBranding()
+  const fmtOpts = { currency: branding.kpi_currency_code, locale: branding.kpi_currency_locale }
   const series = result.series ?? []
   const forecast = result.forecast ?? []
   const data = [
@@ -62,7 +65,7 @@ export function ChartBlock({ result }: Props) {
       <div className="flex items-baseline justify-between mb-2">
         <h3 className="text-sm font-semibold text-white">{result.display_name}</h3>
         <span className="text-lg font-semibold text-slate-200">
-          {formatKPIValue(result.value, result.format)}
+          {formatKPIValue(result.value, result.format, fmtOpts)}
         </span>
       </div>
       <div className="h-48">
@@ -75,7 +78,7 @@ export function ChartBlock({ result }: Props) {
               <Tooltip
                 contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6 }}
                 labelStyle={{ color: '#cbd5e1' }}
-                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format)}
+                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format, fmtOpts)}
               />
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -91,7 +94,7 @@ export function ChartBlock({ result }: Props) {
               <Tooltip
                 contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6 }}
                 labelStyle={{ color: '#cbd5e1' }}
-                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format)}
+                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format, fmtOpts)}
               />
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />

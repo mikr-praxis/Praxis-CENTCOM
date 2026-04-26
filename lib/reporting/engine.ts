@@ -523,17 +523,43 @@ export function evaluateKPI(
   }
 }
 
-export function formatKPIValue(value: number | null, format: 'count' | 'currency' | 'percent' | 'ratio'): string {
+export interface FormatOptions {
+  /** ISO 4217 currency code (e.g. 'USD', 'EUR', 'GBP'). Default 'USD'. */
+  currency?: string
+  /** BCP-47 locale (e.g. 'en-US', 'en-GB', 'fr-FR'). Default 'en-US'. */
+  locale?: string
+}
+
+export function formatKPIValue(
+  value: number | null,
+  format: 'count' | 'currency' | 'percent' | 'ratio',
+  opts: FormatOptions = {}
+): string {
   if (value == null || !Number.isFinite(value)) return '—'
+  const locale = opts.locale ?? 'en-US'
+  const currency = opts.currency ?? 'USD'
   switch (format) {
     case 'currency':
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
+      try {
+        return new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency,
+          maximumFractionDigits: 0,
+        }).format(value)
+      } catch {
+        // Fall back to USD if invalid currency/locale combo
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
+      }
     case 'percent':
       return `${(value * 100).toFixed(1)}%`
     case 'ratio':
       return value.toFixed(2)
     case 'count':
     default:
-      return new Intl.NumberFormat('en-US').format(Math.round(value))
+      try {
+        return new Intl.NumberFormat(locale).format(Math.round(value))
+      } catch {
+        return new Intl.NumberFormat('en-US').format(Math.round(value))
+      }
   }
 }
