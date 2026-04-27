@@ -7,6 +7,7 @@ import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/compon
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
 import { ChartBlock } from '@/components/reporting/ChartBlock'
 import { ShareDialog } from '@/components/reporting/ShareDialog'
+import { WeeklyReportPanel } from '@/components/reporting/WeeklyReportPanel'
 import type { KPIResult } from '@/lib/reporting/types'
 
 interface RawFileSummary {
@@ -50,6 +51,7 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
   const [kpisLoading, setKpisLoading] = useState(true)
   const [seedingKpis, setSeedingKpis] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(false)
 
   // Browse Drive subfolders
   const [browseOpen, setBrowseOpen] = useState(false)
@@ -232,6 +234,14 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
             >
               <RefreshCw className={`h-4 w-4 ${syncingNow ? 'animate-spin' : ''}`} />
               {syncingNow ? 'Syncing...' : 'Sync Now'}
+            </button>
+            <button
+              onClick={() => setAgentOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-200 text-sm hover:bg-amber-500/15"
+              title="Generate or view weekly client reports"
+            >
+              <Sparkles className="h-4 w-4" />
+              Weekly Report
             </button>
             <Link
               href={`/reporting/${client.slug}/configure`}
@@ -445,6 +455,7 @@ export function ReportingClient({ client, rawFiles, readOnly }: Props) {
       </div>
 
       <ShareDialog slug={client.slug} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <WeeklyReportPanel slug={client.slug} open={agentOpen} onClose={() => setAgentOpen(false)} />
     </div>
   )
 }

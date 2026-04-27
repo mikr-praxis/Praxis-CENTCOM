@@ -173,6 +173,37 @@ export type ReportShareToken = {
   revoked_at: string | null
 }
 
+export type ReportAgentRunStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+
+/** Single KPI line in the snapshot fed to / saved with an agent run. */
+export interface ReportAgentKPISnapshot {
+  key: string
+  display_name: string
+  format: string
+  current: number | null
+  prior: number | null
+  delta_pct: number | null
+  target: number | null
+}
+
+export type ReportAgentRun = {
+  id: string
+  client_id: string
+  period_start: string | null
+  period_end: string | null
+  kpi_snapshot: ReportAgentKPISnapshot[]
+  prompt: string
+  output_markdown: string | null
+  model: string | null
+  status: ReportAgentRunStatus
+  error_message: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  created_by: string | null
+  created_at: string
+  completed_at: string | null
+}
+
 export type DataSourceRow = {
   id: string
   client_id: string
@@ -509,6 +540,12 @@ export type Database = {
         Row: ReportView
         Insert: Partial<ReportView> & Pick<ReportView, 'client_id' | 'name'>
         Update: Partial<ReportView>
+        Relationships: []
+      }
+      report_agent_runs: {
+        Row: ReportAgentRun
+        Insert: Partial<ReportAgentRun> & Pick<ReportAgentRun, 'client_id' | 'prompt'>
+        Update: Partial<ReportAgentRun>
         Relationships: []
       }
     }
