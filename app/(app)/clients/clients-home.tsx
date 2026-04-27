@@ -33,6 +33,7 @@ import { SlicersBar } from '@/components/reporting/SlicersBar'
 import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViewsBar'
 import { ShareDialog } from '@/components/reporting/ShareDialog'
 import { DriveFolderConfigurator } from '@/components/reporting/DriveFolderConfigurator'
+import { WeeklyReportPanel } from '@/components/reporting/WeeklyReportPanel'
 import type { KPIResult, Slicer, Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
@@ -305,6 +306,15 @@ function ActionMenu({ client }: { client: ClientSummary }) {
               </Link>
               <button
                 onClick={() => {
+                  window.dispatchEvent(new CustomEvent('praxis:open-weekly-report'))
+                  setMoreOpen(false)
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs text-amber-300 hover:bg-slate-800 inline-flex items-center gap-2"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Weekly Report (AI)
+              </button>
+              <button
+                onClick={() => {
                   window.print()
                   setMoreOpen(false)
                 }}
@@ -345,6 +355,7 @@ function Workspace({
   const [shareOpen, setShareOpen] = useState(false)
   const [driveConfigOpen, setDriveConfigOpen] = useState(false)
   const [rawFilesOpen, setRawFilesOpen] = useState(false)
+  const [weeklyReportOpen, setWeeklyReportOpen] = useState(false)
 
   // Build modal state
   const [recLoading, setRecLoading] = useState(false)
@@ -365,17 +376,20 @@ function Workspace({
     const onBrowse = () => setBrowserOpen(true)
     const onShare = () => setShareOpen(true)
     const onToggleDrive = () => setDriveConfigOpen((o) => !o)
+    const onWeeklyReport = () => setWeeklyReportOpen(true)
     window.addEventListener('praxis:sync', onSync)
     window.addEventListener('praxis:open-build', onBuild)
     window.addEventListener('praxis:open-browser', onBrowse)
     window.addEventListener('praxis:open-share', onShare)
     window.addEventListener('praxis:toggle-drive', onToggleDrive)
+    window.addEventListener('praxis:open-weekly-report', onWeeklyReport)
     return () => {
       window.removeEventListener('praxis:sync', onSync)
       window.removeEventListener('praxis:open-build', onBuild)
       window.removeEventListener('praxis:open-browser', onBrowse)
       window.removeEventListener('praxis:open-share', onShare)
       window.removeEventListener('praxis:toggle-drive', onToggleDrive)
+      window.removeEventListener('praxis:open-weekly-report', onWeeklyReport)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -727,6 +741,14 @@ function Workspace({
       )}
       {shareOpen && (
         <ShareDialog slug={client.slug} open={shareOpen} onClose={() => setShareOpen(false)} />
+      )}
+
+      {weeklyReportOpen && (
+        <WeeklyReportPanel
+          slug={client.slug}
+          open={weeklyReportOpen}
+          onClose={() => setWeeklyReportOpen(false)}
+        />
       )}
 
       {buildOpen && (
