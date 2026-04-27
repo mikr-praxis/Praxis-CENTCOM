@@ -180,27 +180,12 @@ export async function POST(
     if (inserts.length === 0) {
       return NextResponse.json({ error: 'No valid KPIs in request' }, { status: 400 })
     }
-    let data: unknown[] | null
-    let insErr
-    {
-      const res = await supabase.from('report_kpis').insert(inserts).select()
-      data = res.data
-      insErr = res.error
-    }
-    // Graceful fallback: migration 017 (chart_options column) hasn't been run yet
-    if (insErr && /chart_options/i.test(insErr.message)) {
-      type InsertWithChartOptions = (typeof inserts)[number] & { chart_options?: unknown }
-      const stripped = inserts.map((row) => {
-        const copy = { ...(row as InsertWithChartOptions) }
-        delete copy.chart_options
-        return copy
-      })
-      const retry = await supabase.from('report_kpis').insert(stripped).select()
-      data = retry.data
-      insErr = retry.error
-    }
+    // Don't .select() — PostgREST's schema cache may reference chart_options
+    // (when migration 017 is pending), which makes returning rows fail even
+    // though the insert itself is fine. Caller (clients-home) refetches after.
+    const { error: insErr } = await supabase.from('report_kpis').insert(inserts)
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
-    return NextResponse.json({ ok: true, inserted: data?.length ?? 0, kpis: data })
+    return NextResponse.json({ ok: true, inserted: inserts.length })
   }
 
   // Single path
@@ -233,21 +218,17 @@ export async function POST(
       : {}),
   }
 
-  let data, insertErr
-  {
-    const res = await supabase.from('report_kpis').insert(insert).select().single()
-    data = res.data
-    insertErr = res.error
-  }
-  // Graceful fallback if migration 017 hasn't run
-  if (insertErr && /chart_options/i.test(insertErr.message)) {
-    type InsertWithChartOptions = typeof insert & { chart_options?: unknown }
-    const stripped = { ...(insert as InsertWithChartOptions) }
-    delete stripped.chart_options
-    const retry = await supabase.from('report_kpis').insert(stripped).select().single()
-    data = retry.data
-    insertErr = retry.error
-  }
+  // Use explicit column list in .select() so PostgREST never references
+  // chart_options (which may not exist yet on databases without migration 017).
+  const SAFE_COLS =
+    'id, client_id, key, display_name, description, formula, format, target, viz_type, display_order, group_by_column, group_by_source, compare_to, forecast_periods, forecast_method, created_at, updated_at'
+
+  const { data, error: insertErr } = await supabase
+    .from('report_kpis')
+    .insert(insert)
+    .select(SAFE_COLS)
+    .single()
+
   if (insertErr) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }

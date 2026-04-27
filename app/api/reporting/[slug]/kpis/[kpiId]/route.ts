@@ -49,33 +49,18 @@ export async function PATCH(
     updated_at: new Date().toISOString(),
   }
 
-  let data, error
-  {
-    const res = await supabase
-      .from('report_kpis')
-      .update(update)
-      .eq('id', kpiId)
-      .eq('client_id', client.id)
-      .select()
-      .single()
-    data = res.data
-    error = res.error
-  }
-  // Graceful fallback if migration 017 hasn't run yet
-  if (error && /chart_options/i.test(error.message)) {
-    type UpdateWithChartOptions = typeof update & { chart_options?: unknown }
-    const stripped = { ...(update as UpdateWithChartOptions) }
-    delete stripped.chart_options
-    const retry = await supabase
-      .from('report_kpis')
-      .update(stripped)
-      .eq('id', kpiId)
-      .eq('client_id', client.id)
-      .select()
-      .single()
-    data = retry.data
-    error = retry.error
-  }
+  // Explicit column list so PostgREST doesn't reference chart_options when
+  // migration 017 is still pending on the DB.
+  const SAFE_COLS =
+    'id, client_id, key, display_name, description, formula, format, target, viz_type, display_order, group_by_column, group_by_source, compare_to, forecast_periods, forecast_method, created_at, updated_at'
+
+  const { data, error } = await supabase
+    .from('report_kpis')
+    .update(update)
+    .eq('id', kpiId)
+    .eq('client_id', client.id)
+    .select(SAFE_COLS)
+    .single()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
