@@ -28,6 +28,7 @@ function rowToDefinition(r: ReportKPI): KPIDefinition {
     compare_to: r.compare_to ?? null,
     forecast_periods: r.forecast_periods ?? 0,
     forecast_method: r.forecast_method ?? null,
+    chart_options: r.chart_options ?? {},
   }
 }
 
@@ -83,7 +84,7 @@ export async function GET(
   const granularity = pickGranularity(timeframe, granThresholds)
   const results = definitions.map((d) => {
     const r = evaluateKPI(d, files, timeframe)
-    if (d.viz_type === 'line' || d.viz_type === 'bar') {
+    if (d.viz_type === 'line' || d.viz_type === 'bar' || d.viz_type === 'area') {
       r.series = evaluateKPISeries(d, files, timeframe, granularity)
       if ((d.forecast_periods ?? 0) > 0 && r.series && r.series.length > 1) {
         r.forecast = forecastSeries(r.series, d.forecast_periods ?? 0, d.forecast_method ?? 'linear')

@@ -105,7 +105,28 @@ export type ReportRawFile = {
 }
 
 export type KPIFormat = 'count' | 'currency' | 'percent' | 'ratio'
-export type KPIVizType = 'card' | 'line' | 'bar' | 'pie' | 'table'
+export type KPIVizType = 'card' | 'line' | 'bar' | 'area' | 'pie' | 'table' | 'gauge'
+
+/**
+ * Free-form chart customization. Components only read keys they recognize so
+ * unknown keys are tolerated. Persisted as JSONB on report_kpis.
+ */
+export interface ChartOptions {
+  /** Primary series / bar / pie segment color. Hex (#RRGGBB). Defaults to brand accent. */
+  color_primary?: string
+  /** Stack bars/areas instead of grouping them (when multi-series). */
+  stacked?: boolean
+  /** Show the chart legend (line/bar/area/pie). Default: false (cleaner cards). */
+  show_legend?: boolean
+  /** How to order the group-by breakdown (pie + table). */
+  sort_groups?: 'value_desc' | 'value_asc' | 'group_asc'
+  /** Cap on rendered groups for pie + table (default 8). */
+  max_groups?: number
+  /** Y-axis floor for line/bar/area (auto-fit if undefined). */
+  y_axis_min?: number
+  /** Y-axis ceiling for line/bar/area (auto-fit if undefined). */
+  y_axis_max?: number
+}
 
 export type ReportKPI = {
   id: string
@@ -123,6 +144,7 @@ export type ReportKPI = {
   compare_to: 'previous_period' | 'previous_year' | null
   forecast_periods: number
   forecast_method: 'linear' | 'moving_avg' | null
+  chart_options: ChartOptions
   created_at: string
   updated_at: string
 }

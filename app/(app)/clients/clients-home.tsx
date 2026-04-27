@@ -26,6 +26,7 @@ import {
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
 import { ChartBlock } from '@/components/reporting/ChartBlock'
+import { PieBlock, TableBlock, GaugeBlock } from '@/components/reporting/VizBlocks'
 import { FileBrowser } from '@/components/reporting/FileBrowser'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
 import { SlicersBar } from '@/components/reporting/SlicersBar'
@@ -525,10 +526,13 @@ function Workspace({
     }
   }
 
-  const cardResults = visibleResults.filter(
-    (r) => r.viz_type === 'card' || r.viz_type === 'pie' || r.viz_type === 'table'
+  const cardResults = visibleResults.filter((r) => r.viz_type === 'card')
+  const trendResults = visibleResults.filter(
+    (r) => r.viz_type === 'line' || r.viz_type === 'bar' || r.viz_type === 'area'
   )
-  const trendResults = visibleResults.filter((r) => r.viz_type === 'line' || r.viz_type === 'bar')
+  const pieResults = visibleResults.filter((r) => r.viz_type === 'pie')
+  const tableResults = visibleResults.filter((r) => r.viz_type === 'table')
+  const gaugeResults = visibleResults.filter((r) => r.viz_type === 'gauge')
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px] mx-auto">
@@ -639,6 +643,16 @@ function Workspace({
             timeframe={timeframe}
             slicers={effectiveSlicers}
           />
+          {gaugeResults.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Gauges</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {gaugeResults.map((r) => (
+                  <GaugeBlock key={r.kpi_id} result={r} />
+                ))}
+              </div>
+            </div>
+          )}
           {trendResults.length > 0 && (
             <div className="mt-4">
               <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Trends</h3>
@@ -647,6 +661,24 @@ function Workspace({
                   <ChartBlock key={r.kpi_id} result={r} />
                 ))}
               </div>
+            </div>
+          )}
+          {pieResults.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Breakdowns</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                {pieResults.map((r) => (
+                  <PieBlock key={r.kpi_id} result={r} />
+                ))}
+              </div>
+            </div>
+          )}
+          {tableResults.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <h3 className="text-xs uppercase tracking-wide text-slate-500">Tables</h3>
+              {tableResults.map((r) => (
+                <TableBlock key={r.kpi_id} result={r} />
+              ))}
             </div>
           )}
         </>

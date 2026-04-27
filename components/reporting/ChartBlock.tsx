@@ -5,6 +5,8 @@ import {
   Line,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -12,6 +14,7 @@ import {
   CartesianGrid,
   ReferenceLine,
   ReferenceArea,
+  Legend,
 } from 'recharts'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
@@ -24,18 +27,19 @@ interface Props {
 export function ChartBlock({ result }: Props) {
   const branding = useBranding()
   const fmtOpts = { currency: branding.kpi_currency_code, locale: branding.kpi_currency_locale }
+  const opts = result.chart_options ?? {}
+  const accent = opts.color_primary || branding.app_accent_hex
+
   const series = result.series ?? []
   const forecast = result.forecast ?? []
   const data = [
     ...series.map((p) => ({ bucket: p.bucket, actual: p.value ?? 0, forecast: null as number | null })),
     ...forecast.map((p, i) => ({
       bucket: p.bucket,
-      // Bridge connection: first forecast point pulls from last actual to keep the line continuous
       actual: i === 0 && series.length > 0 ? (series[series.length - 1].value ?? 0) : null,
       forecast: p.value ?? null,
     })),
   ]
-  // Adjust: when forecast exists, push the last actual into the bridge so visually the dashed line continues
   if (forecast.length > 0 && series.length > 0) {
     const last = data[series.length - 1]
     if (last) last.forecast = last.actual
@@ -56,9 +60,18 @@ export function ChartBlock({ result }: Props) {
     )
   }
 
-  // Forecast region for visual highlight
   const forecastStart = forecast.length > 0 && series.length > 0 ? series[series.length - 1].bucket : null
   const forecastEnd = forecast.length > 0 ? forecast[forecast.length - 1].bucket : null
+  const yDomain: [number | string, number | string] = [
+    opts.y_axis_min ?? 'auto',
+    opts.y_axis_max ?? 'auto',
+  ]
+
+  const tooltipProps = {
+    contentStyle: { backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6 },
+    labelStyle: { color: '#cbd5e1' },
+    formatter: (v: unknown) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format, fmtOpts),
+  }
 
   return (
     <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900">
@@ -74,40 +87,77 @@ export function ChartBlock({ result }: Props) {
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis dataKey="bucket" stroke="#64748b" fontSize={10} />
-              <YAxis stroke="#64748b" fontSize={10} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6 }}
-                labelStyle={{ color: '#cbd5e1' }}
-                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format, fmtOpts)}
-              />
+              <YAxis stroke="#64748b" fontSize={10} domain={yDomain} />
+              <Tooltip {...tooltipProps} />
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />
               )}
-              <Bar dataKey="actual" fill="#f59e0b" />
-              {forecast.length > 0 && <Bar dataKey="forecast" fill="#f59e0b" fillOpacity={0.4} />}
+              {opts.show_legend && <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8' }} />}
+              <Bar dataKey="actual" fill={accent} stackId={opts.stacked ? 'a' : undefined} />
+              {forecast.length > 0 && (
+                <Bar
+                  dataKey="forecast"
+                  fill={accent}
+                  fillOpacity={0.4}
+                  stackId={opts.stacked ? 'a' : undefined}
+                />
+              )}
             </BarChart>
-          ) : (
-            <LineChart data={data}>
+          ) : result.viz_type === 'area' ? (
+            <AreaChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis dataKey="bucket" stroke="#64748b" fontSize={10} />
-              <YAxis stroke="#64748b" fontSize={10} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 6 }}
-                labelStyle={{ color: '#cbd5e1' }}
-                formatter={(v) => formatKPIValue(typeof v === 'number' ? v : Number(v), result.format, fmtOpts)}
-              />
+              <YAxis stroke="#64748b" fontSize={10} domain={yDomain} />
+              <Tooltip {...tooltipProps} />
               {result.target != null && (
                 <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />
               )}
               {forecastStart && forecastEnd && (
                 <ReferenceArea x1={forecastStart} x2={forecastEnd} fill="#6366f1" fillOpacity={0.05} />
               )}
-              <Line type="monotone" dataKey="actual" stroke="#6366f1" strokeWidth={2} dot={false} />
+              {opts.show_legend && <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8' }} />}
+              <Area
+                type="monotone"
+                dataKey="actual"
+                stroke={accent}
+                fill={accent}
+                fillOpacity={0.25}
+                strokeWidth={2}
+                stackId={opts.stacked ? 'a' : undefined}
+              />
+              {forecast.length > 0 && (
+                <Area
+                  type="monotone"
+                  dataKey="forecast"
+                  stroke={accent}
+                  fill={accent}
+                  fillOpacity={0.1}
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  stackId={opts.stacked ? 'a' : undefined}
+                />
+              )}
+            </AreaChart>
+          ) : (
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="bucket" stroke="#64748b" fontSize={10} />
+              <YAxis stroke="#64748b" fontSize={10} domain={yDomain} />
+              <Tooltip {...tooltipProps} />
+              {result.target != null && (
+                <ReferenceLine y={result.target} stroke="#f59e0b" strokeDasharray="4 4" />
+              )}
+              {forecastStart && forecastEnd && (
+                <ReferenceArea x1={forecastStart} x2={forecastEnd} fill="#6366f1" fillOpacity={0.05} />
+              )}
+              {opts.show_legend && <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8' }} />}
+              <Line type="monotone" dataKey="actual" stroke={accent} strokeWidth={2} dot={false} />
               {forecast.length > 0 && (
                 <Line
                   type="monotone"
                   dataKey="forecast"
-                  stroke="#a78bfa"
+                  stroke={accent}
+                  strokeOpacity={0.7}
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={false}
@@ -118,7 +168,7 @@ export function ChartBlock({ result }: Props) {
         </ResponsiveContainer>
       </div>
       {forecast.length > 0 && (
-        <p className="mt-2 text-[10px] text-violet-400/80">
+        <p className="mt-2 text-[10px] text-slate-500">
           Dashed line: {forecast.length}-period forecast
         </p>
       )}

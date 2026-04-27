@@ -3,7 +3,7 @@
  * No `eval`, no string formulas. All operations are validated server-side.
  */
 
-import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
+import type { KPIFormat, KPIVizType, ChartOptions } from '@/lib/supabase/types'
 
 /** A global slicer applied to KPIs whose source file contains the column. */
 export interface Slicer {
@@ -79,6 +79,8 @@ export interface KPIDefinition {
   forecast_periods?: number
   /** Optional: forecast algorithm. */
   forecast_method?: 'linear' | 'moving_avg' | null
+  /** Per-chart customization. */
+  chart_options?: ChartOptions
 }
 
 export interface KPIResult {
@@ -104,6 +106,8 @@ export interface KPIResult {
   } | null
   /** Group-by breakdown: top-N (group, value) pairs. */
   groups?: { group: string; value: number | null; rows_used: number }[]
+  /** Per-chart customization carried through from the KPI definition. */
+  chart_options?: ChartOptions
 }
 
 export interface RawFileForEngine {

@@ -45,6 +45,7 @@ export async function PATCH(
     ...(body.compare_to !== undefined ? { compare_to: body.compare_to } : {}),
     ...(body.forecast_periods !== undefined ? { forecast_periods: body.forecast_periods } : {}),
     ...(body.forecast_method !== undefined ? { forecast_method: body.forecast_method } : {}),
+    ...(body.chart_options !== undefined ? { chart_options: body.chart_options } : {}),
     updated_at: new Date().toISOString(),
   }
 

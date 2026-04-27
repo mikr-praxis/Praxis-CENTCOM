@@ -6,7 +6,7 @@ import { ChevronLeft, Plus, Trash2, Save, Activity } from 'lucide-react'
 import type { AggOp, Formula, Filter, CompositeOp, ConstOp } from '@/lib/reporting/types'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import { useBranding } from '@/components/providers/BrandingProvider'
-import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
+import type { KPIFormat, KPIVizType, ChartOptions } from '@/lib/supabase/types'
 import { AIKPIBuilder, type AIDraft } from '@/components/reporting/AIKPIBuilder'
 import { FileBrowser } from '@/components/reporting/FileBrowser'
 
@@ -31,6 +31,7 @@ interface KPIRow {
   compare_to?: 'previous_period' | 'previous_year' | null
   forecast_periods?: number
   forecast_method?: 'linear' | 'moving_avg' | null
+  chart_options?: ChartOptions
 }
 
 interface Props {
@@ -44,7 +45,7 @@ interface Props {
 }
 
 const FORMAT_OPTIONS: KPIFormat[] = ['count', 'currency', 'percent', 'ratio']
-const VIZ_OPTIONS: KPIVizType[] = ['card', 'line', 'bar', 'pie', 'table']
+const VIZ_OPTIONS: KPIVizType[] = ['card', 'line', 'bar', 'area', 'pie', 'table', 'gauge']
 const AGG_OPS: AggOp['op'][] = ['count', 'count_distinct', 'sum', 'avg', 'min', 'max']
 const COMPOSITE_OPS: CompositeOp['op'][] = ['divide', 'multiply', 'add', 'subtract']
 const FILTER_OPS: Filter['op'][] = ['eq', 'neq', 'in', 'not_in', 'contains', 'gt', 'gte', 'lt', 'lte', 'not_empty', 'empty']
@@ -92,6 +93,7 @@ function emptyKPI(
     compare_to: null,
     forecast_periods: forecastPeriods,
     forecast_method: forecastPeriods > 0 ? forecastMethod ?? 'linear' : null,
+    chart_options: {},
   }
 }
 
@@ -401,6 +403,17 @@ function KPIEditor({ slug, value, files, onChange, onSave, onCancel, onDelete, i
           Advanced — Group by, comparison, forecasting
         </summary>
         <AdvancedKPIOptions value={value} files={files} onChange={(patch) => onChange({ ...value, ...patch } as KPIRow)} />
+      </details>
+
+      <details className="mt-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40">
+        <summary className="cursor-pointer text-xs uppercase tracking-wide text-slate-500 hover:text-slate-300">
+          Visualization options — color, axis, legend, top-N
+        </summary>
+        <VizOptionsEditor
+          vizType={value.viz_type}
+          options={value.chart_options ?? {}}
+          onChange={(co) => onChange({ ...value, chart_options: co } as KPIRow)}
+        />
       </details>
 
       <div className="mt-4 flex items-center justify-between gap-2">
@@ -899,6 +912,147 @@ function AdvancedKPIOptions({
       <p className="text-[11px] text-slate-500">
         Forecasting and trend charts require <span className="font-mono">viz_type = line / bar</span> and a <span className="font-mono">timeframe_column</span> on the formula.
       </p>
+    </div>
+  )
+}
+
+function VizOptionsEditor({
+  vizType,
+  options,
+  onChange,
+}: {
+  vizType: KPIVizType
+  options: ChartOptions
+  onChange: (next: ChartOptions) => void
+}) {
+  const branding = useBranding()
+  const accentDefault = branding.app_accent_hex
+  const isTimeSeries = vizType === 'line' || vizType === 'bar' || vizType === 'area'
+  const isCategorical = vizType === 'pie' || vizType === 'table'
+
+  function patch(p: Partial<ChartOptions>) {
+    onChange({ ...options, ...p })
+  }
+
+  if (vizType === 'card') {
+    return (
+      <p className="text-xs text-slate-500 mt-3">
+        Card KPIs don&apos;t use chart options. Switch viz type to line, bar, area, pie, table, or gauge to expose customization.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-3 mt-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Field label="Primary color">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={options.color_primary || accentDefault}
+              onChange={(e) => patch({ color_primary: e.target.value })}
+              className="h-9 w-16 rounded bg-slate-950/60 border border-slate-700 cursor-pointer"
+            />
+            <input
+              type="text"
+              value={options.color_primary ?? ''}
+              onChange={(e) => patch({ color_primary: e.target.value || undefined })}
+              placeholder={`default: ${accentDefault}`}
+              className={inputCls}
+            />
+          </div>
+        </Field>
+        {(isTimeSeries || isCategorical) && (
+          <Field label="Show legend">
+            <select
+              value={options.show_legend ? 'true' : 'false'}
+              onChange={(e) => patch({ show_legend: e.target.value === 'true' })}
+              className={inputCls}
+            >
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </Field>
+        )}
+      </div>
+
+      {(vizType === 'bar' || vizType === 'area') && (
+        <Field label="Stacked (when multi-series)">
+          <select
+            value={options.stacked ? 'true' : 'false'}
+            onChange={(e) => patch({ stacked: e.target.value === 'true' })}
+            className={inputCls}
+          >
+            <option value="false">No (grouped)</option>
+            <option value="true">Yes (stacked)</option>
+          </select>
+        </Field>
+      )}
+
+      {isTimeSeries && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Field label="Y-axis min (auto if blank)">
+            <input
+              type="number"
+              value={options.y_axis_min ?? ''}
+              onChange={(e) =>
+                patch({ y_axis_min: e.target.value === '' ? undefined : Number(e.target.value) })
+              }
+              className={inputCls}
+              placeholder="auto"
+            />
+          </Field>
+          <Field label="Y-axis max (auto if blank)">
+            <input
+              type="number"
+              value={options.y_axis_max ?? ''}
+              onChange={(e) =>
+                patch({ y_axis_max: e.target.value === '' ? undefined : Number(e.target.value) })
+              }
+              className={inputCls}
+              placeholder="auto"
+            />
+          </Field>
+        </div>
+      )}
+
+      {isCategorical && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Field label="Sort groups">
+            <select
+              value={options.sort_groups ?? 'value_desc'}
+              onChange={(e) => patch({ sort_groups: e.target.value as ChartOptions['sort_groups'] })}
+              className={inputCls}
+            >
+              <option value="value_desc">Value (desc)</option>
+              <option value="value_asc">Value (asc)</option>
+              <option value="group_asc">Group name (A→Z)</option>
+            </select>
+          </Field>
+          <Field label="Max groups (top N)">
+            <input
+              type="number"
+              min={2}
+              max={50}
+              value={options.max_groups ?? 8}
+              onChange={(e) => patch({ max_groups: Number(e.target.value) || 8 })}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+      )}
+
+      {vizType === 'gauge' && (
+        <p className="text-[11px] text-slate-500">
+          Gauge needs a Target on the KPI (above). Arc fills toward 100% of target.
+        </p>
+      )}
+
+      {(vizType === 'pie' || vizType === 'table') && (
+        <p className="text-[11px] text-slate-500">
+          Pie + table need a Group By column on the KPI (Advanced section). Without it, the chart shows a setup hint instead of data.
+        </p>
+      )}
     </div>
   )
 }

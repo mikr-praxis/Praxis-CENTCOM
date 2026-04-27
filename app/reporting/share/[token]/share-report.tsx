@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { TimeframePicker, computeTimeframe, type TimeframeValue } from '@/components/reporting/TimeframePicker'
 import { KPICardGrid } from '@/components/reporting/KPICardGrid'
 import { ChartBlock } from '@/components/reporting/ChartBlock'
+import { PieBlock, TableBlock, GaugeBlock } from '@/components/reporting/VizBlocks'
 import { BrandingProvider } from '@/components/providers/BrandingProvider'
 import type { KPIResult } from '@/lib/reporting/types'
 import type { BrandingConfig } from '@/lib/branding'
@@ -72,23 +73,52 @@ export function ShareReport({ token, clientName, branding }: Props) {
               This report has no KPIs configured yet.
             </div>
           ) : (
-            <KPICardGrid
-              results={results.filter((r) => r.viz_type === 'card' || r.viz_type === 'pie' || r.viz_type === 'table')}
-              loading={loading}
-            />
+            <KPICardGrid results={results.filter((r) => r.viz_type === 'card')} loading={loading} />
           )}
         </section>
 
-        {!loading && results.some((r) => r.viz_type === 'line' || r.viz_type === 'bar') && (
+        {!loading && results.some((r) => r.viz_type === 'gauge') && (
           <section className="mb-6">
-            <h2 className="text-sm font-semibold text-white mb-3">Trends</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {results
-                .filter((r) => r.viz_type === 'line' || r.viz_type === 'bar')
-                .map((r) => (
-                  <ChartBlock key={r.kpi_id} result={r} />
-                ))}
+            <h2 className="text-sm font-semibold text-white mb-3">Gauges</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {results.filter((r) => r.viz_type === 'gauge').map((r) => (
+                <GaugeBlock key={r.kpi_id} result={r} />
+              ))}
             </div>
+          </section>
+        )}
+
+        {!loading &&
+          results.some((r) => r.viz_type === 'line' || r.viz_type === 'bar' || r.viz_type === 'area') && (
+            <section className="mb-6">
+              <h2 className="text-sm font-semibold text-white mb-3">Trends</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {results
+                  .filter((r) => r.viz_type === 'line' || r.viz_type === 'bar' || r.viz_type === 'area')
+                  .map((r) => (
+                    <ChartBlock key={r.kpi_id} result={r} />
+                  ))}
+              </div>
+            </section>
+          )}
+
+        {!loading && results.some((r) => r.viz_type === 'pie') && (
+          <section className="mb-6">
+            <h2 className="text-sm font-semibold text-white mb-3">Breakdowns</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {results.filter((r) => r.viz_type === 'pie').map((r) => (
+                <PieBlock key={r.kpi_id} result={r} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && results.some((r) => r.viz_type === 'table') && (
+          <section className="mb-6 space-y-3">
+            <h2 className="text-sm font-semibold text-white">Tables</h2>
+            {results.filter((r) => r.viz_type === 'table').map((r) => (
+              <TableBlock key={r.kpi_id} result={r} />
+            ))}
           </section>
         )}
       </main>

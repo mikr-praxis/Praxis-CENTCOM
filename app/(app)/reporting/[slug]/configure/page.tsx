@@ -8,7 +8,7 @@ import {
   getReportingForecastDefaultPeriods,
 } from '@/lib/reporting/config'
 import type { Formula } from '@/lib/reporting/types'
-import type { KPIFormat, KPIVizType, ReportKPI } from '@/lib/supabase/types'
+import type { KPIFormat, KPIVizType, ReportKPI, ChartOptions } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,6 +74,7 @@ export default async function ConfigureKPIsPage({
         compare_to: k.compare_to ?? null,
         forecast_periods: k.forecast_periods ?? 0,
         forecast_method: k.forecast_method ?? null,
+        chart_options: (k.chart_options ?? {}) as ChartOptions,
       }))}
       files={(files ?? []).map((f) => ({
         filename: f.filename,

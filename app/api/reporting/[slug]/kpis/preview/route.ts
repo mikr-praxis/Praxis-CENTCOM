@@ -79,10 +79,11 @@ export async function POST(
     compare_to: null,
     forecast_periods: 0,
     forecast_method: null,
+    chart_options: {},
   }
 
   const result = evaluateKPI(fakeKpi, files, timeframe)
-  if (fakeKpi.viz_type === 'line' || fakeKpi.viz_type === 'bar') {
+  if (fakeKpi.viz_type === 'line' || fakeKpi.viz_type === 'bar' || fakeKpi.viz_type === 'area') {
     const granThresholds = await getReportingGranularityThresholds()
     result.series = evaluateKPISeries(fakeKpi, files, timeframe, pickGranularity(timeframe, granThresholds))
   }

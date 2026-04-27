@@ -4,7 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { evaluateKPI, evaluateKPISeries, pickGranularity, forecastSeries } from '@/lib/reporting/engine'
 import { getReportingGranularityThresholds } from '@/lib/reporting/config'
 import type { Formula, KPIDefinition, RawFileForEngine, Timeframe, Slicer } from '@/lib/reporting/types'
-import type { ReportKPI, ReportRawFile } from '@/lib/supabase/types'
+import type { ReportKPI, ReportRawFile, ChartOptions } from '@/lib/supabase/types'
 
 function rowToDefinition(r: ReportKPI): KPIDefinition {
   return {
@@ -23,6 +23,7 @@ function rowToDefinition(r: ReportKPI): KPIDefinition {
     compare_to: r.compare_to ?? null,
     forecast_periods: r.forecast_periods ?? 0,
     forecast_method: r.forecast_method ?? null,
+    chart_options: (r.chart_options ?? {}) as ChartOptions,
   }
 }
 
@@ -90,7 +91,7 @@ export async function GET(
   const granularity = pickGranularity(timeframe, granThresholds)
   const results = definitions.map((d) => {
     const r = evaluateKPI(d, files, timeframe, { slicers })
-    if (d.viz_type === 'line' || d.viz_type === 'bar') {
+    if (d.viz_type === 'line' || d.viz_type === 'bar' || d.viz_type === 'area') {
       r.series = evaluateKPISeries(d, files, timeframe, granularity, { slicers })
       if ((d.forecast_periods ?? 0) > 0 && r.series && r.series.length > 1) {
         r.forecast = forecastSeries(
@@ -169,6 +170,7 @@ export async function POST(
         compare_to: k.compare_to ?? null,
         forecast_periods: k.forecast_periods ?? 0,
         forecast_method: k.forecast_method ?? null,
+        chart_options: k.chart_options ?? {},
       })
     }
     if (inserts.length === 0) {
@@ -206,6 +208,7 @@ export async function POST(
     compare_to: single.compare_to ?? null,
     forecast_periods: single.forecast_periods ?? 0,
     forecast_method: single.forecast_method ?? null,
+    chart_options: single.chart_options ?? {},
   }
 
   const { data, error: insertErr } = await supabase

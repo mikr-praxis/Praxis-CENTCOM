@@ -403,10 +403,19 @@ function evaluateGroupBy(
     const value = evaluateFormula(augmented, ctx)
     out.push({ group: g, value, rows_used: ctx.rowsUsed.value })
   }
-  // Sort desc by value, top 8
-  return out
-    .sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity))
-    .slice(0, 8)
+
+  // Sort + cap based on chart_options
+  const opts = kpi.chart_options ?? {}
+  const sortMode = opts.sort_groups ?? 'value_desc'
+  if (sortMode === 'value_desc') {
+    out.sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity))
+  } else if (sortMode === 'value_asc') {
+    out.sort((a, b) => (a.value ?? Infinity) - (b.value ?? Infinity))
+  } else {
+    out.sort((a, b) => a.group.localeCompare(b.group))
+  }
+  const cap = Math.max(1, Math.min(50, opts.max_groups ?? 8))
+  return out.slice(0, cap)
 }
 
 /** Linear-regression / moving-average forecast on a series. */
@@ -520,6 +529,7 @@ export function evaluateKPI(
     error,
     compare,
     groups,
+    chart_options: kpi.chart_options,
   }
 }
 
