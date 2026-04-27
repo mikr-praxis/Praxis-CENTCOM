@@ -49,13 +49,33 @@ export async function PATCH(
     updated_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase
-    .from('report_kpis')
-    .update(update)
-    .eq('id', kpiId)
-    .eq('client_id', client.id)
-    .select()
-    .single()
+  let data, error
+  {
+    const res = await supabase
+      .from('report_kpis')
+      .update(update)
+      .eq('id', kpiId)
+      .eq('client_id', client.id)
+      .select()
+      .single()
+    data = res.data
+    error = res.error
+  }
+  // Graceful fallback if migration 017 hasn't run yet
+  if (error && /chart_options/i.test(error.message)) {
+    type UpdateWithChartOptions = typeof update & { chart_options?: unknown }
+    const stripped = { ...(update as UpdateWithChartOptions) }
+    delete stripped.chart_options
+    const retry = await supabase
+      .from('report_kpis')
+      .update(stripped)
+      .eq('id', kpiId)
+      .eq('client_id', client.id)
+      .select()
+      .single()
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -170,16 +170,35 @@ export async function POST(
         compare_to: k.compare_to ?? null,
         forecast_periods: k.forecast_periods ?? 0,
         forecast_method: k.forecast_method ?? null,
-        chart_options: k.chart_options ?? {},
+        // Only include chart_options if explicitly set; the column may not
+        // exist yet on databases that haven't run migration 017.
+        ...(k.chart_options && Object.keys(k.chart_options).length > 0
+          ? { chart_options: k.chart_options }
+          : {}),
       })
     }
     if (inserts.length === 0) {
       return NextResponse.json({ error: 'No valid KPIs in request' }, { status: 400 })
     }
-    const { data, error: insErr } = await supabase
-      .from('report_kpis')
-      .insert(inserts)
-      .select()
+    let data: unknown[] | null
+    let insErr
+    {
+      const res = await supabase.from('report_kpis').insert(inserts).select()
+      data = res.data
+      insErr = res.error
+    }
+    // Graceful fallback: migration 017 (chart_options column) hasn't been run yet
+    if (insErr && /chart_options/i.test(insErr.message)) {
+      type InsertWithChartOptions = (typeof inserts)[number] & { chart_options?: unknown }
+      const stripped = inserts.map((row) => {
+        const copy = { ...(row as InsertWithChartOptions) }
+        delete copy.chart_options
+        return copy
+      })
+      const retry = await supabase.from('report_kpis').insert(stripped).select()
+      data = retry.data
+      insErr = retry.error
+    }
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
     return NextResponse.json({ ok: true, inserted: data?.length ?? 0, kpis: data })
   }
@@ -208,15 +227,27 @@ export async function POST(
     compare_to: single.compare_to ?? null,
     forecast_periods: single.forecast_periods ?? 0,
     forecast_method: single.forecast_method ?? null,
-    chart_options: single.chart_options ?? {},
+    // Only include chart_options if explicitly set (migration 017 may be pending)
+    ...(single.chart_options && Object.keys(single.chart_options).length > 0
+      ? { chart_options: single.chart_options }
+      : {}),
   }
 
-  const { data, error: insertErr } = await supabase
-    .from('report_kpis')
-    .insert(insert)
-    .select()
-    .single()
-
+  let data, insertErr
+  {
+    const res = await supabase.from('report_kpis').insert(insert).select().single()
+    data = res.data
+    insertErr = res.error
+  }
+  // Graceful fallback if migration 017 hasn't run
+  if (insertErr && /chart_options/i.test(insertErr.message)) {
+    type InsertWithChartOptions = typeof insert & { chart_options?: unknown }
+    const stripped = { ...(insert as InsertWithChartOptions) }
+    delete stripped.chart_options
+    const retry = await supabase.from('report_kpis').insert(stripped).select().single()
+    data = retry.data
+    insertErr = retry.error
+  }
   if (insertErr) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }

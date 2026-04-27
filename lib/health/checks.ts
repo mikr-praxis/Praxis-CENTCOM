@@ -451,6 +451,7 @@ export async function runHealthChecks(): Promise<HealthReport> {
     await checkColumn('report_kpis', 'compare_to', 'Database', '016_reporting_v2.sql'),
     await checkColumn('report_kpis', 'forecast_periods', 'Database', '016_reporting_v2.sql'),
     await checkColumn('report_kpis', 'group_by_column', 'Database', '016_reporting_v2.sql'),
+    await checkColumn('report_kpis', 'chart_options', 'Database', '017_chart_options.sql'),
   )
 
   // Integrations (skip if env not set so we don't spam errors)
