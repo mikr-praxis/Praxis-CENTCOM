@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import type { ProjectBoardData, AssigneeSummary, BoardTaskSummary, TaskTier } from '@/app/api/projects/board-data/route'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 
 // -- Tier config ----------------------------------------------------------------
 
@@ -50,7 +52,7 @@ const TIER_CONFIG: Record<TaskTier, {
 
 // -- Helpers --------------------------------------------------------------------
 
-function deadlineLabel(dateStr: string): { text: string; color: string } {
+function deadlineLabel(dateStr: string, f: BoundFormatters): { text: string; color: string } {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const date = new Date(dateStr + 'T00:00:00')
@@ -59,7 +61,7 @@ function deadlineLabel(dateStr: string): { text: string; color: string } {
   if (diff === 0) return { text: 'Due today', color: 'text-amber-400' }
   if (diff === 1) return { text: 'Tomorrow', color: 'text-amber-300' }
   if (diff <= 7) return { text: `${diff}d left`, color: 'text-blue-400' }
-  return { text: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: 'text-slate-400' }
+  return { text: f.date(date, { month: 'short', day: 'numeric' }), color: 'text-slate-400' }
 }
 
 function statusDot(status: string | null): string {
@@ -149,8 +151,9 @@ function AvatarRow({ assignees }: { assignees: AssigneeSummary[] }) {
 // -- TaskRow (single task in expanded view) -------------------------------------
 
 function TaskRow({ task }: { task: BoardTaskSummary }) {
+  const f = useFormatters()
   const tierCfg = TIER_CONFIG[task.tier]
-  const dl = task.dueDate ? deadlineLabel(task.dueDate) : null
+  const dl = task.dueDate ? deadlineLabel(task.dueDate, f) : null
 
   return (
     <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-slate-800/50 transition-colors group/task">
@@ -307,6 +310,7 @@ export function ProjectBoardCard({
   expandByDefault?: boolean
   highlightMemberId?: string | null
 }) {
+  const f = useFormatters()
   const [expanded, setExpanded] = useState(expandByDefault)
   const [expandedTab, setExpandedTab] = useState<ExpandedTab>('members')
 
@@ -370,7 +374,7 @@ export function ProjectBoardCard({
           {board.deadline && (
             <span className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {new Date(board.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {f.date(board.deadline, { month: 'short', day: 'numeric' })}
             </span>
           )}
           {board.slackTag && (

@@ -133,6 +133,8 @@ const CATEGORIES: ConfigCategory[] = [
       { configKey: 'APP_FOOTER_SECONDARY', label: 'Footer Line 2', description: 'Bottom of the sidebar (slate-600). Default "Internal Ops v1.0".' },
       { configKey: 'KPI_CURRENCY_CODE', label: 'Currency Code', description: 'ISO 4217 code for KPI currency formatting (e.g. USD, EUR, GBP, CAD). Default USD.' },
       { configKey: 'KPI_CURRENCY_LOCALE', label: 'Currency Locale', description: 'BCP-47 locale for currency + count formatting (e.g. en-US, en-GB, fr-FR, ja-JP). Default en-US.' },
+      { configKey: 'APP_DATE_LOCALE', label: 'Date Locale', description: 'BCP-47 locale used for ALL date / time / weekday formatting across the app — calendar, project cards, Slack timestamps, agent prompts, etc. Falls back to the Currency Locale, then en-US. (e.g. en-US, en-GB, fr-FR, de-DE, ja-JP).' },
+      { configKey: 'APP_WEEK_START_DAY', label: 'Week Start Day', description: 'Which day the week starts on for the Calendar grid + week-view. 0 = Sunday, 1 = Monday, … 6 = Saturday. Default 0 (Sunday). Set 1 for Monday-first calendars (most of Europe/UK).' },
       { configKey: 'APP_ACCENT_HEX', label: 'Accent Color', description: 'Hex color used as the brand accent (#RRGGBB). Exposed to components as the --accent CSS variable. Default #f59e0b (amber-500).' },
     ],
   },

@@ -13,6 +13,7 @@ import {
 import type { BoardDetail, DetailedTask, OwnershipData, TaskTier } from '@/app/api/projects/board-detail/route'
 import type { ProjectKPI, KPISnapshot } from '@/app/api/projects/kpis/route'
 import { MilestoneRoadmap } from '@/components/projects/MilestoneRoadmap'
+import { useFormatters } from '@/components/providers/BrandingProvider'
 
 // Ã¢ÂÂÃ¢ÂÂ Colors & Constants Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
@@ -374,6 +375,7 @@ function KPIQuadrant({
   loading: boolean
   onRefresh: () => void
 }) {
+  const f = useFormatters()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<{
     kpi_name: string; current_value: string; target_value: string; unit: string
@@ -461,10 +463,10 @@ function KPIQuadrant({
     return snapshots
       .filter((s) => s.kpi_id === selectedKpiId)
       .map((s) => ({
-        date: new Date(s.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: f.date(s.recorded_at, { month: 'short', day: 'numeric' }),
         value: s.value,
       }))
-  }, [selectedKpiId, snapshots])
+  }, [selectedKpiId, snapshots, f])
 
   if (loading) {
     return (

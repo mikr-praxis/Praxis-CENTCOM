@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { ChevronRight, Calendar } from 'lucide-react'
 import type { Task } from '@/lib/supabase/types'
 import { priorityVariant } from '@/lib/styles/colors'
+import { useFormatters } from '@/components/providers/BrandingProvider'
 
 type TaskCardProps = {
   task: Task
@@ -12,6 +13,7 @@ type TaskCardProps = {
 }
 
 export function TaskCard({ task, onAdvance }: TaskCardProps) {
+  const f = useFormatters()
   return (
     <Card className="p-4 hover:border-slate-600 transition-colors group">
       <div className="flex items-start justify-between">
@@ -28,7 +30,7 @@ export function TaskCard({ task, onAdvance }: TaskCardProps) {
             {task.due_date && (
               <span className="text-xs text-slate-500 flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {f.date(task.due_date, { month: 'short', day: 'numeric' })}
               </span>
             )}
           </div>

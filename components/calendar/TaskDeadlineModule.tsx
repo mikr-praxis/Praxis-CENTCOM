@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import type { CalendarEvent } from '@/lib/google/calendar'
 import type { MondayTask } from '@/lib/monday/client'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 
 type MondayData = {
   tasks: MondayTask[]
@@ -113,7 +115,7 @@ function matchTaskToEvent(
 
 // ââ Relative date display âââââââââââââââââââââââââââââââââââââââââââââââ
 
-function formatDeadline(dateStr: string): { label: string; urgency: 'overdue' | 'today' | 'soon' | 'later' } {
+function formatDeadline(dateStr: string, f: BoundFormatters): { label: string; urgency: 'overdue' | 'today' | 'soon' | 'later' } {
   const now = new Date()
   const date = new Date(dateStr + 'T00:00:00')
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -124,7 +126,7 @@ function formatDeadline(dateStr: string): { label: string; urgency: 'overdue' | 
   if (diff === 1) return { label: 'Due tomorrow', urgency: 'soon' }
   if (diff <= 7) return { label: `Due in ${diff} days`, urgency: 'soon' }
   return {
-    label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    label: f.date(date, { month: 'short', day: 'numeric' }),
     urgency: 'later',
   }
 }
@@ -143,6 +145,7 @@ type Props = {
 }
 
 export function TaskDeadlineModule({ calendarEvents }: Props) {
+  const f = useFormatters()
   const [mondayData, setMondayData] = useState<MondayData | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(true)
@@ -343,9 +346,9 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
               <div className="space-y-2">
                 {displayTasks.slice(0, 20).map((task) => {
                   const deadline = task.dueDate
-                    ? formatDeadline(task.dueDate)
+                    ? formatDeadline(task.dueDate, f)
                     : task.timelineEnd
-                      ? formatDeadline(task.timelineEnd)
+                      ? formatDeadline(task.timelineEnd, f)
                       : { label: 'No date', urgency: 'later' as const }
                   const taskDone = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
                   // Override overdue styling for completed tasks

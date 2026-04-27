@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { RefreshCw, MessageSquare, Hash, Reply } from 'lucide-react'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 
 type Message = {
   ts: string
@@ -22,12 +24,12 @@ type SlackFeedProps = {
   refreshKey?: number
 }
 
-function formatSlackTs(ts: string): string {
+function formatSlackTs(ts: string, f: BoundFormatters): string {
   const date = new Date(Number(ts) * 1000)
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
 
-  const time = date.toLocaleTimeString('en-US', {
+  const time = f.time(date, {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -39,7 +41,7 @@ function formatSlackTs(ts: string): string {
   yesterday.setDate(yesterday.getDate() - 1)
   if (date.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`
 
-  return date.toLocaleDateString('en-US', {
+  return f.date(date, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -59,6 +61,7 @@ function formatSlackText(text: string): string {
 }
 
 export function SlackFeed({ channelId, channelName, refreshKey }: SlackFeedProps) {
+  const f = useFormatters()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -153,7 +156,7 @@ export function SlackFeed({ channelId, channelName, refreshKey }: SlackFeedProps
                 <span className="text-sm font-medium text-slate-200">
                   {msg.username || msg.user}
                 </span>
-                <span className="text-xs text-slate-600">{formatSlackTs(msg.ts)}</span>
+                <span className="text-xs text-slate-600">{formatSlackTs(msg.ts, f)}</span>
               </div>
               <p className="text-sm text-slate-400 mt-0.5 break-words whitespace-pre-wrap">
                 {formatSlackText(msg.text)}

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 import {
   LayoutDashboard,
   RefreshCw,
@@ -78,7 +80,7 @@ function priorityColor(priority: string | null): string {
   return 'text-slate-400'
 }
 
-function deadlineLabel(dateStr: string): { text: string; color: string } {
+function deadlineLabel(dateStr: string, f: BoundFormatters): { text: string; color: string } {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const date = new Date(dateStr + 'T00:00:00')
@@ -88,7 +90,7 @@ function deadlineLabel(dateStr: string): { text: string; color: string } {
   if (diff === 0) return { text: 'Due today', color: 'text-amber-400 bg-amber-500/10' }
   if (diff === 1) return { text: 'Tomorrow', color: 'text-amber-400 bg-amber-500/10' }
   if (diff <= 7) return { text: `${diff}d left`, color: 'text-blue-400 bg-blue-500/10' }
-  return { text: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: 'text-slate-400 bg-slate-500/10' }
+  return { text: f.date(date, { month: 'short', day: 'numeric' }), color: 'text-slate-400 bg-slate-500/10' }
 }
 
 const ITEMS_PER_PAGE = 25
@@ -96,6 +98,7 @@ const ITEMS_PER_PAGE = 25
 // ââ Component ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export function MondayClient() {
+  const f = useFormatters()
   const [tasks, setTasks] = useState<MondayTask[]>([])
   const [boards, setBoards] = useState<MondayBoard[]>([])
   const [connected, setConnected] = useState(false)
@@ -485,7 +488,7 @@ export function MondayClient() {
           {/* Task rows */}
           <div className="divide-y divide-slate-700/30">
             {paged.map((task) => {
-              const deadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+              const deadline = task.dueDate ? deadlineLabel(task.dueDate, f) : null
               const taskDone = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
               const displayDeadline = deadline && taskDone && deadline.color.includes('red')
                 ? { text: deadline.text.replace(/overdue/, 'late (done)'), color: 'text-slate-500 bg-slate-500/10' }
@@ -710,7 +713,7 @@ export function MondayClient() {
                         {boardTasks
                           .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
                           .map((task) => {
-                            const deadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+                            const deadline = task.dueDate ? deadlineLabel(task.dueDate, f) : null
                             // Override overdue styling for completed tasks
                             const taskDone2 = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
                             const displayDl = deadline && taskDone2 && deadline.color.includes('red')

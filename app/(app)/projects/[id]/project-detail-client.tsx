@@ -24,8 +24,10 @@ import type { Project, ProjectStage } from '@/lib/supabase/types'
 import type { SlackMessage } from '@/lib/slack'
 import { formatSlackTs, formatSlackText } from '@/lib/slack'
 import { stageColors, stageBadgeVariant } from '@/lib/styles/colors'
+import { useFormatters } from '@/components/providers/BrandingProvider'
 
 export function ProjectDetailClient({ project }: { project: Project }) {
+  const f = useFormatters()
   const [messages, setMessages] = useState<SlackMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [messageError, setMessageError] = useState<string | null>(null)
@@ -163,7 +165,7 @@ export function ProjectDetailClient({ project }: { project: Project }) {
         {project.deadline && (
           <span className="flex items-center gap-1.5">
             <Calendar className="h-4 w-4 text-slate-500" />
-            {new Date(project.deadline).toLocaleDateString('en-US', {
+            {f.date(project.deadline, {
               month: 'long',
               day: 'numeric',
               year: 'numeric',
@@ -197,7 +199,7 @@ export function ProjectDetailClient({ project }: { project: Project }) {
                 <div key={msg.ts} className="text-xs">
                   <span className="text-slate-500">{msg.username}:</span>{' '}
                   <span className="text-red-300">{formatSlackText(msg.text).slice(0, 120)}</span>
-                  <span className="text-slate-600 block">{formatSlackTs(msg.ts)}</span>
+                  <span className="text-slate-600 block">{formatSlackTs(msg.ts, f.dateLocale)}</span>
                 </div>
               ))}
             </div>
@@ -221,7 +223,7 @@ export function ProjectDetailClient({ project }: { project: Project }) {
                 <div key={msg.ts} className="text-xs">
                   <span className="text-slate-500">{msg.username}:</span>{' '}
                   <span className="text-amber-300">{formatSlackText(msg.text).slice(0, 120)}</span>
-                  <span className="text-slate-600 block">{formatSlackTs(msg.ts)}</span>
+                  <span className="text-slate-600 block">{formatSlackTs(msg.ts, f.dateLocale)}</span>
                 </div>
               ))}
             </div>
@@ -324,7 +326,7 @@ export function ProjectDetailClient({ project }: { project: Project }) {
                     {msg.channel_name && (
                       <span className="text-xs text-slate-600">#{msg.channel_name}</span>
                     )}
-                    <span className="text-xs text-slate-600">{formatSlackTs(msg.ts)}</span>
+                    <span className="text-xs text-slate-600">{formatSlackTs(msg.ts, f.dateLocale)}</span>
                   </div>
                   <p className="text-sm text-slate-400 mt-0.5 break-words whitespace-pre-wrap">
                     {formatSlackText(msg.text)}

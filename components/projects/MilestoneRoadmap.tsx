@@ -5,6 +5,8 @@ import {
   Plus, Loader2, Trash2, ChevronLeft, ChevronRight, User, Calendar,
   Target, CheckCircle2, Clock, CircleDot, AlertTriangle, Pencil, X, Check,
 } from 'lucide-react'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 
 // ââ Types âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
@@ -45,10 +47,10 @@ type StatusKey = keyof typeof STATUS_CONFIG
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
-function formatDate(d: string | null): string {
+function formatDate(d: string | null, f: BoundFormatters): string {
   if (!d) return 'â'
   const dt = new Date(d + 'T00:00:00')
-  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return f.date(dt, { month: 'short', day: 'numeric' })
 }
 
 function isOverdue(d: string | null): boolean {
@@ -78,6 +80,7 @@ function MilestoneCard({
   onUpdate: (id: string, data: Partial<Milestone>) => void
   onDelete: (id: string) => void
 }) {
+  const f = useFormatters()
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(milestone.title)
   const [editTaskId, setEditTaskId] = useState(milestone.monday_task_id || '')
@@ -195,7 +198,7 @@ function MilestoneCard({
         {milestone.due_date && (
           <span className={`flex items-center gap-1 text-[10px] ${overdue ? 'text-red-400' : 'text-slate-500'}`}>
             <Calendar className="h-3 w-3" />
-            {formatDate(milestone.due_date)}
+            {formatDate(milestone.due_date, f)}
             {overdue && <AlertTriangle className="h-2.5 w-2.5" />}
           </span>
         )}

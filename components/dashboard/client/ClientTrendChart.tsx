@@ -3,6 +3,7 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import type { MetricType } from '@/lib/metrics/types'
 import { formatMetricValue } from '@/lib/metrics'
+import { useFormatters } from '@/components/providers/BrandingProvider'
 
 interface TrendDataPoint {
   date: string
@@ -19,6 +20,7 @@ interface ClientTrendChartProps {
 }
 
 export function ClientTrendChart({ label, data, format, benchmark }: ClientTrendChartProps) {
+  const f = useFormatters()
   if (data.length === 0) {
     return (
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -28,7 +30,7 @@ export function ClientTrendChart({ label, data, format, benchmark }: ClientTrend
   }
 
   const chartData = data.map(d => ({
-    date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    date: f.date(d.date, { month: 'short', day: 'numeric' }),
     value: d.value,
   }))
 

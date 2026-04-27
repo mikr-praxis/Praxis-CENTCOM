@@ -56,14 +56,19 @@ export type SlackMessage = {
 
 // ── Formatting utils (shared across client components) ─────────────────
 
-/** Convert a Slack ts (epoch seconds) to a human-readable string. */
-export function formatSlackTs(ts: string): string {
+/**
+ * Convert a Slack ts (epoch seconds) to a human-readable string. Pass `locale`
+ * (BCP-47, e.g. 'en-US') to override the runtime default; client callers
+ * should prefer the BoundFormatters version of this exposed via the SlackFeed
+ * components.
+ */
+export function formatSlackTs(ts: string, locale: string = 'en-US'): string {
   const date = new Date(Number(ts) * 1000)
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
-  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const time = date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', hour12: true })
   if (isToday) return `Today ${time}`
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ` ${time}`
+  return date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }) + ` ${time}`
 }
 
 /** Strip Slack mrkdwn to plain-ish text for display. */

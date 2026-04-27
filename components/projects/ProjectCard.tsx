@@ -7,8 +7,10 @@ import { ChevronRight, Calendar, User, Hash } from 'lucide-react'
 import { advanceProject } from '@/actions/projects'
 import type { Project } from '@/lib/supabase/types'
 import { priorityVariant } from '@/lib/styles/colors'
+import { useFormatters } from '@/components/providers/BrandingProvider'
 
 export function ProjectCard({ project }: { project: Project }) {
+  const f = useFormatters()
   const [isPending, startTransition] = useTransition()
 
   const handleAdvance = (e: React.MouseEvent) => {
@@ -46,7 +48,7 @@ export function ProjectCard({ project }: { project: Project }) {
         {project.deadline && (
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {new Date(project.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {f.date(project.deadline, { month: 'short', day: 'numeric' })}
           </span>
         )}
         {project.slack_tag && (

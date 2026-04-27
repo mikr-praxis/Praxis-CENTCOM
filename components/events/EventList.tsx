@@ -1,7 +1,10 @@
+'use client'
+
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Clock, Users } from 'lucide-react'
 import type { Event } from '@/lib/supabase/types'
+import { useFormatters } from '@/components/providers/BrandingProvider'
 
 const typeVariant: Record<string, 'blue' | 'orange' | 'green'> = {
   internal: 'blue',
@@ -10,6 +13,7 @@ const typeVariant: Record<string, 'blue' | 'orange' | 'green'> = {
 }
 
 export function EventList({ events }: { events: Event[] }) {
+  const f = useFormatters()
   return (
     <div className="space-y-3">
       {events.length === 0 && (
@@ -22,7 +26,7 @@ export function EventList({ events }: { events: Event[] }) {
               <p className="text-sm font-medium text-slate-200">{event.title}</p>
               <div className="flex items-center gap-3 mt-2">
                 <span className="text-xs text-slate-500">
-                  {new Date(event.event_date).toLocaleDateString('en-US', {
+                  {f.date(event.event_date, {
                     weekday: 'short',
                     month: 'short',
                     day: 'numeric',

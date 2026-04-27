@@ -5,6 +5,8 @@ import { getAnthropicClient, AGENTS } from '@/lib/anthropic/agents'
 import { getRedis } from '@/lib/upstash/redis'
 import { hasConfig, getConfig } from '@/lib/config'
 import { createServerClient } from '@/lib/supabase/server'
+import { getBrandingConfig } from '@/lib/branding'
+import { formatDate } from '@/lib/format'
 
 export async function runAgent(agentId: string) {
   const { userId } = await auth()
@@ -55,6 +57,8 @@ export async function runAgent(agentId: string) {
   // Build prompt based on agent type
   let prompt: string
 
+  const branding = await getBrandingConfig()
+  const dateLocale = branding.app_date_locale
   switch (agentId) {
     case 'budget-analyzer':
       prompt = agentDef.buildPrompt({
@@ -77,23 +81,23 @@ export async function runAgent(agentId: string) {
 
     case 'ai-news':
       prompt = agentDef.buildPrompt({
-        currentDate: new Date().toLocaleDateString('en-US', {
+        currentDate: formatDate(new Date(), {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
-        }),
+        }, dateLocale),
       })
       break
 
     case 'breathwork-wellness-news':
       prompt = agentDef.buildPrompt({
-        currentDate: new Date().toLocaleDateString('en-US', {
+        currentDate: formatDate(new Date(), {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
-        }),
+        }, dateLocale),
         clients: projects.map((p) => p.name).join(', ') || await getConfig('DEFAULT_CLIENT_LIST') || 'No clients configured',
       })
       break

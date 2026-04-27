@@ -5,6 +5,8 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { MessageSquare, RefreshCw, Hash, Reply, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 
 type Message = {
   ts: string
@@ -24,16 +26,16 @@ type Channel = {
   num_members?: number
 }
 
-function formatSlackTs(ts: string): string {
+function formatSlackTs(ts: string, f: BoundFormatters): string {
   const date = new Date(Number(ts) * 1000)
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
-  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const time = f.time(date, { hour: 'numeric', minute: '2-digit', hour12: true })
   if (isToday) return time
   const yesterday = new Date(now)
   yesterday.setDate(yesterday.getDate() - 1)
   if (date.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ` ${time}`
+  return f.date(date, { month: 'short', day: 'numeric' }) + ` ${time}`
 }
 
 function formatSlackText(text: string): string {
@@ -48,6 +50,7 @@ function formatSlackText(text: string): string {
 }
 
 export function SlackWidget() {
+  const f = useFormatters()
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -183,7 +186,7 @@ export function SlackWidget() {
                 <span className="text-xs font-medium text-slate-200">
                   {msg.username || msg.user}
                 </span>
-                <span className="text-[10px] text-slate-600">{formatSlackTs(msg.ts)}</span>
+                <span className="text-[10px] text-slate-600">{formatSlackTs(msg.ts, f)}</span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 break-words">
                 {formatSlackText(msg.text)}

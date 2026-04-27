@@ -10,6 +10,8 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { AlertCircle, BarChart3, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { getBrandingConfig } from '@/lib/branding'
+import { formatDate } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +29,8 @@ export default async function DashboardPage() {
     supabase.from('workflows').select('*').eq('user_id', userId),
   ])
 
+  const branding = await getBrandingConfig()
+  const dateLocale = branding.app_date_locale
   const tasks = tasksRes.data || []
   const budgetItems = budgetRes.data || []
   const events = eventsRes.data || []
@@ -98,7 +102,7 @@ export default async function DashboardPage() {
       action: t.status === 'done' ? 'completed' : t.status === 'inprogress' ? 'moved' : 'created',
       subject: t.title,
       module: 'Tasks',
-      time: formatTimeAgo(date),
+      time: formatTimeAgo(date, dateLocale),
       sortDate: date,
     })
   }
@@ -111,7 +115,7 @@ export default async function DashboardPage() {
       action: 'ran',
       subject: log.agent_name || log.agent_id,
       module: 'Agents',
-      time: formatTimeAgo(date),
+      time: formatTimeAgo(date, dateLocale),
       sortDate: date,
     })
   }
@@ -129,7 +133,7 @@ export default async function DashboardPage() {
       action: 'ran',
       subject: w.name,
       module: 'Comms',
-      time: formatTimeAgo(date),
+      time: formatTimeAgo(date, dateLocale),
       sortDate: date,
     })
   }
@@ -264,11 +268,11 @@ async function ClientPerformanceWidget() {
   )
 }
 
-function formatTimeAgo(date: Date): string {
+function formatTimeAgo(date: Date, locale?: string): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
   if (seconds < 60) return 'Just now'
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return formatDate(date, { month: 'short', day: 'numeric' }, locale)
 }

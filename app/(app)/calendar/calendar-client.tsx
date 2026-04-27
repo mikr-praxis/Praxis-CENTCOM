@@ -26,6 +26,8 @@ import {
 import { TaskDeadlineModule } from '@/components/calendar/TaskDeadlineModule'
 import { useView } from '@/lib/views/context'
 import { TEAM_MEMBERS, GROUPS, getMembersByGroup } from '@/lib/views/data'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 import type { CalendarEvent } from '@/lib/google/calendar'
 import type { TeamCalendar } from '@/app/api/calendar/route'
 import type { MondayTask } from '@/lib/monday/client'
@@ -48,9 +50,13 @@ function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate()
 }
 
-function getFirstDayOfWeek(year: number, month: number) {
+/**
+ * Returns the offset (0..6) of the first of the given month from the
+ * configured start-of-week. weekStartDay: 0 = Sunday … 6 = Saturday.
+ */
+function getFirstDayOfWeek(year: number, month: number, weekStartDay: number) {
   const d = new Date(year, month, 1).getDay()
-  return d === 0 ? 6 : d - 1 // Monday = 0
+  return (d - weekStartDay + 7) % 7
 }
 
 function isSameDay(a: Date, b: Date) {
@@ -66,15 +72,15 @@ function formatTime(iso: string) {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
-function formatRelativeDay(date: Date, today: Date): string {
+function formatRelativeDay(date: Date, today: Date, f: BoundFormatters): string {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   const diff = Math.round((dateStart.getTime() - todayStart.getTime()) / 86400000)
 
   if (diff === 0) return 'Today'
   if (diff === 1) return 'Tomorrow'
-  if (diff < 7) return date.toLocaleDateString('en-US', { weekday: 'long' })
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (diff < 7) return f.date(date, { weekday: 'long' })
+  return f.date(date, { month: 'short', day: 'numeric' })
 }
 
 type PriorityLevel = 'urgent' | 'upcoming' | 'later'
@@ -98,7 +104,21 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+/**
+ * Build localized weekday short-names ordered by the configured start day.
+ * weekStartDay: 0 = Sunday … 6 = Saturday.
+ */
+function buildDayNames(locale: string, weekStartDay: number): string[] {
+  const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short' })
+  const out: string[] = []
+  // Use a known reference week (Jan 4 1970 was a Sunday)
+  for (let i = 0; i < 7; i++) {
+    const dayIndex = (weekStartDay + i) % 7
+    const ref = new Date(Date.UTC(1970, 0, 4 + dayIndex))
+    out.push(fmt.format(ref))
+  }
+  return out
+}
 
 const AUTO_REFRESH_MS = 60_000 // 60 seconds
 const HOUR_HEIGHT = 48 // px per hour row in week view
@@ -109,10 +129,14 @@ const WEEK_HOURS = Array.from(
   (_, i) => WEEK_START_HOUR + i
 )
 
-function getWeekStart(date: Date): Date {
+/**
+ * Snap `date` back to the start of its week, honoring the configured
+ * weekStartDay (0 = Sunday … 6 = Saturday).
+ */
+function getWeekStart(date: Date, weekStartDay: number): Date {
   const d = new Date(date)
   const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day // Monday = 0
+  const diff = -((day - weekStartDay + 7) % 7)
   d.setDate(d.getDate() + diff)
   d.setHours(0, 0, 0, 0)
   return d
@@ -231,6 +255,12 @@ function SidebarSkeleton() {
 export function CalendarClient() {
   const today = new Date()
   const { mode, selectedUser, selectedGroup } = useView()
+  const f = useFormatters()
+  const weekStartDay = f.weekStartDay
+  const dayNames = useMemo(
+    () => buildDayNames(f.dateLocale, weekStartDay),
+    [f.dateLocale, weekStartDay]
+  )
 
   // Read initial month/year from URL params
   const getInitialParams = () => {
@@ -255,7 +285,7 @@ export function CalendarClient() {
   const [hiddenCalendars, setHiddenCalendars] = useState<Set<string>>(new Set())
   const [disconnecting, setDisconnecting] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'week'>('week')
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(today))
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(today, weekStartDay))
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -289,9 +319,10 @@ export function CalendarClient() {
       end.setHours(23, 59, 59)
     } else {
       start = new Date(year, month, 1)
-      start.setDate(start.getDate() - getFirstDayOfWeek(year, month))
+      start.setDate(start.getDate() - getFirstDayOfWeek(year, month, weekStartDay))
       end = new Date(year, month + 1, 0)
-      const remaining = 6 - (end.getDay() === 0 ? 6 : end.getDay() - 1)
+      const lastDayOffset = (end.getDay() - weekStartDay + 7) % 7
+      const remaining = 6 - lastDayOffset
       end.setDate(end.getDate() + remaining)
       end.setHours(23, 59, 59)
     }
@@ -370,7 +401,7 @@ export function CalendarClient() {
     setYear(today.getFullYear())
     setMonth(today.getMonth())
     setSelectedDay(today)
-    setWeekStart(getWeekStart(today))
+    setWeekStart(getWeekStart(today, weekStartDay))
   }
 
   const prevWeek = () => {
@@ -392,10 +423,10 @@ export function CalendarClient() {
     end.setDate(end.getDate() + 6)
     const sameMonth = weekStart.getMonth() === end.getMonth()
     if (sameMonth) {
-      return `${weekStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${end.getDate()}`
+      return `${f.date(weekStart, { month: 'long', day: 'numeric' })} – ${end.getDate()}`
     }
-    return `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-  }, [weekStart])
+    return `${f.date(weekStart, { month: 'short', day: 'numeric' })} – ${f.date(end, { month: 'short', day: 'numeric' })}`
+  }, [weekStart, f])
 
   const eventsForDay = useCallback((date: Date) => {
     if (!data) return []
@@ -424,7 +455,7 @@ export function CalendarClient() {
 
   // Month grid helpers
   const daysInMonth = getDaysInMonth(year, month)
-  const firstDay = getFirstDayOfWeek(year, month)
+  const firstDay = getFirstDayOfWeek(year, month, weekStartDay)
   const totalCells = firstDay + daysInMonth + ((7 - (firstDay + daysInMonth) % 7) % 7)
 
   const handleDisconnect
@@ -777,7 +808,7 @@ export function CalendarClient() {
                           return (
                           <div key={i} className="border-r border-slate-700/50 relative">
                             <div className="sticky top-0 z-10 bg-slate-900/80 border-b border-slate-700/50 p-2 text-center">
-                              <p className="text-xs font-medium text-slate-400 uppercase">{DAY_NAMES[i]}</p>
+                              <p className="text-xs font-medium text-slate-400 uppercase">{dayNames[i]}</p>
                               <p className={`text-sm font-bold ${isSameDay(day, today) ? 'text-amber-400' : 'text-slate-200'}`}>
                                 {day.getDate()}
                               </p>
@@ -853,7 +884,7 @@ export function CalendarClient() {
                 {viewMode === 'grid' && (
                   <div className="grid grid-cols-7">
                     {/* Day headers */}
-                    {DAY_NAMES.map(d => (
+                    {dayNames.map(d => (
                       <div
                         key={d}
                         className="px-1 sm:px-2 py-2 text-center text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider"
@@ -960,10 +991,10 @@ export function CalendarClient() {
                             </span>
                             <div>
                               <p className={`text-sm font-medium ${isSameDay(date, today) ? 'text-amber-400' : 'text-slate-300'}`}>
-                                {date.toLocaleDateString('en-US', { weekday: 'long' })}
+                                {f.date(date, { weekday: 'long' })}
                               </p>
                               <p className="text-[10px] text-slate-500">
-                                {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                                {f.date(date, { month: 'long', day: 'numeric' })}
                               </p>
                             </div>
                             <span className="ml-auto text-[10px] text-slate-500">
@@ -1038,13 +1069,13 @@ export function CalendarClient() {
                   {!selectedEvent.allDay ? (
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5" />
-                      {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })},{' '}
+                      {f.date(selectedEvent.start, { weekday: 'short', month: 'short', day: 'numeric' })},{' '}
                       {formatTime(selectedEvent.start)} – {formatTime(selectedEvent.end)}
                     </span>
                   ) : (
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5" />
-                      All day — {new Date(selectedEvent.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      All day — {f.date(selectedEvent.start, { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                   )}
                   <span className="flex items-center gap-1.5" style={{ color: selectedEvent.color }}>
@@ -1231,7 +1262,7 @@ export function CalendarClient() {
       <Card className="p-4">
         <h3 className="text-sm font-medium text-slate-300 mb-3">
           {selectedDay
-            ? selectedDay.toLocaleDateString('en-US', {
+            ? f.date(selectedDay, {
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric',

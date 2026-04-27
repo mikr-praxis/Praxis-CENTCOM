@@ -48,12 +48,16 @@ export function getKPIKeysForFunnel(funnelType: FunnelType) {
   }
 }
 
-export function formatMetricValue(value: number, type: CanonicalMetric['type']): string {
+export function formatMetricValue(
+  value: number,
+  type: CanonicalMetric['type'],
+  locale: string = 'en-US'
+): string {
   switch (type) {
     case 'currency':
       return value >= 1000
         ? `$${(value / 1000).toFixed(1)}k`
-        : `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+        : `$${value.toLocaleString(locale, { maximumFractionDigits: 0 })}`
     case 'percent':
       return `${(value * 100).toFixed(1)}%`
     case 'ratio':
@@ -61,7 +65,7 @@ export function formatMetricValue(value: number, type: CanonicalMetric['type']):
     case 'count':
       return value >= 1000
         ? `${(value / 1000).toFixed(1)}k`
-        : value.toLocaleString('en-US', { maximumFractionDigits: 0 })
+        : value.toLocaleString(locale, { maximumFractionDigits: 0 })
   }
 }
 

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { useFormatters } from '@/components/providers/BrandingProvider'
+import type { BoundFormatters } from '@/lib/format'
 import {
   AlertTriangle,
   Clock,
@@ -124,7 +126,7 @@ const TIERS: TierConfig[] = [
 
 // -- Helpers ---------------------------------------------------------
 
-function deadlineLabel(dateStr: string): { text: string; color: string } {
+function deadlineLabel(dateStr: string, f: BoundFormatters): { text: string; color: string } {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const date = new Date(dateStr + 'T00:00:00')
@@ -133,7 +135,7 @@ function deadlineLabel(dateStr: string): { text: string; color: string } {
   if (diff === 0) return { text: 'Due today', color: 'text-amber-400' }
   if (diff === 1) return { text: 'Tomorrow', color: 'text-amber-300' }
   if (diff <= 7) return { text: `${diff}d left`, color: 'text-blue-400' }
-  return { text: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: 'text-slate-400' }
+  return { text: f.date(date, { month: 'short', day: 'numeric' }), color: 'text-slate-400' }
 }
 
 function statusColor(status: string | null): string {
@@ -156,13 +158,13 @@ function formatSlackText(text: string): string {
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
 }
 
-function formatSlackTs(ts: string): string {
+function formatSlackTs(ts: string, f: BoundFormatters): string {
   const date = new Date(Number(ts) * 1000)
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
-  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const time = f.time(date, { hour: 'numeric', minute: '2-digit', hour12: true })
   if (isToday) return time
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ` ${time}`
+  return f.date(date, { month: 'short', day: 'numeric' }) + ` ${time}`
 }
 
 const STATUS_OPTIONS = [
@@ -172,6 +174,7 @@ const STATUS_OPTIONS = [
 // -- SlackThread loads messages for task -----------------------------
 
 function SlackThread({ slackContext, taskName }: { slackContext: SlackContext | null; taskName: string }) {
+  const f = useFormatters()
   const [messages, setMessages] = useState<SlackMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -256,7 +259,7 @@ function SlackThread({ slackContext, taskName }: { slackContext: SlackContext | 
               {msg.channel_name && (
                 <span className="text-[9px] text-purple-400/50">#{msg.channel_name}</span>
               )}
-              <span className="text-[9px] text-slate-600">{formatSlackTs(msg.ts)}</span>
+              <span className="text-[9px] text-slate-600">{formatSlackTs(msg.ts, f)}</span>
             </div>
             <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">{formatSlackText(msg.text)}</p>
           </div>
@@ -277,6 +280,7 @@ function MilestoneCards({
   milestones: Milestone[]
   onUpdate: () => void
 }) {
+  const f = useFormatters()
   const [milestones, setMilestones] = useState(initialMilestones)
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -406,7 +410,7 @@ function MilestoneCards({
                 <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2">{m.description}</p>
               )}
               {m.due_date && (() => {
-                const dl = deadlineLabel(m.due_date)
+                const dl = deadlineLabel(m.due_date, f)
                 const milestoneDone = m.status === 'done'
                 const displayDl = milestoneDone && dl.color.includes('red')
                   ? { text: dl.text.replace(/overdue/, 'late (done)'), color: 'text-slate-500' }
@@ -473,10 +477,11 @@ function TaskRow({
   onStatusUpdate: (taskId: string, boardId: string, newStatus: string, statusColumnId: string | null) => Promise<void>
   onMilestonesUpdate: () => void
 }) {
+  const f = useFormatters()
   const [expanded, setExpanded] = useState(false)
   const [editingStatus, setEditingStatus] = useState(false)
   const [updating, setUpdating] = useState(false)
-  const rawDeadline = task.dueDate ? deadlineLabel(task.dueDate) : null
+  const rawDeadline = task.dueDate ? deadlineLabel(task.dueDate, f) : null
   const taskDone = task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('complete')
   const deadline = rawDeadline && taskDone && rawDeadline.color.includes('red')
     ? { text: rawDeadline.text.replace(/overdue/, 'late (done)'), color: 'text-slate-500' }

@@ -1,4 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { getBrandingConfig } from '@/lib/branding'
+import { formatDate } from '@/lib/format'
 
 export type MemoryType = 'user' | 'project' | 'feedback' | 'reference'
 
@@ -114,6 +116,8 @@ const DEFAULT_MEMORIES: Omit<MemoryEntry, 'updatedAt'>[] = [
  */
 export async function loadMemories(): Promise<MemoryEntry[]> {
   const order: Record<MemoryType, number> = { user: 0, project: 1, reference: 2, feedback: 3 }
+  const branding = await getBrandingConfig().catch(() => null)
+  const dateLocale = branding?.app_date_locale
 
   try {
     const supabase = createServerClient()
@@ -130,7 +134,7 @@ export async function loadMemories(): Promise<MemoryEntry[]> {
           entries.push({
             ...parsed,
             updatedAt: row.updated_at
-              ? new Date(row.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+              ? formatDate(row.updated_at, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }, dateLocale)
               : 'Unknown',
           })
         } catch { /* skip malformed */ }
@@ -163,7 +167,7 @@ export async function loadMemories(): Promise<MemoryEntry[]> {
           entries.push({
             ...parsed,
             updatedAt: row.updated_at
-              ? new Date(row.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+              ? formatDate(row.updated_at, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }, dateLocale)
               : 'Just seeded',
           })
         } catch { /* skip */ }

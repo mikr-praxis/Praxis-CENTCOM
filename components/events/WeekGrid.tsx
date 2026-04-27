@@ -3,6 +3,7 @@
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
 import type { Event } from '@/lib/supabase/types'
+import { useFormatters } from '@/components/providers/BrandingProvider'
 
 type WeekGridProps = {
   events: Event[]
@@ -10,6 +11,7 @@ type WeekGridProps = {
 }
 
 export function WeekGrid({ events, weekStart }: WeekGridProps) {
+  const f = useFormatters()
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
@@ -38,7 +40,7 @@ export function WeekGrid({ events, weekStart }: WeekGridProps) {
           >
             <div className="flex items-center justify-between mb-2">
               <span className={clsx('text-xs font-medium', isToday ? 'text-amber-400' : 'text-slate-500')}>
-                {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                {f.date(day, { weekday: 'short' })}
               </span>
               <span
                 className={clsx(
