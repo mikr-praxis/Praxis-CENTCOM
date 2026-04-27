@@ -18,6 +18,22 @@ import type { ReportAgentRun } from '@/lib/supabase/types'
 const HARD_MAX_TOKENS_CAP = 8000
 
 /**
+ * True if the error indicates the report_agent_runs table doesn't exist OR
+ * isn't in the PostgREST schema cache yet. Both surface as different error
+ * shapes — the Postgres-level "relation does not exist" and the PostgREST
+ * "Could not find the table … in the schema cache" — so we match both.
+ */
+function isMissingTableError(err: { message?: string; code?: string } | null): boolean {
+  if (!err) return false
+  const msg = (err.message ?? '').toLowerCase()
+  if (err.code === 'PGRST205') return true
+  return (
+    /relation .*report_agent_runs.* does not exist/.test(msg) ||
+    /could not find the table .*report_agent_runs.* in the schema cache/.test(msg)
+  )
+}
+
+/**
  * POST /api/reporting/[slug]/agent
  * Body (all optional): { start?: 'YYYY-MM-DD', end?: 'YYYY-MM-DD' }
  * Generates a fresh weekly report. Inserts a row into report_agent_runs in
@@ -61,34 +77,37 @@ export async function POST(
   const prompt = buildAgentPrompt(context)
   const supabase = createServerClient()
 
-  // Insert a "running" row up front so the UI can poll if we ever go async.
-  const { data: insertedRow, error: insertErr } = await supabase
-    .from('report_agent_runs')
-    .insert({
-      client_id: context.client.id,
-      period_start: context.timeframe.start,
-      period_end: context.timeframe.end,
-      kpi_snapshot: context.kpi_snapshot,
-      prompt,
-      status: 'running',
-      created_by: userId,
-    })
-    .select('id')
-    .single()
-  if (insertErr || !insertedRow) {
-    return NextResponse.json(
-      {
-        error:
-          insertErr?.message ??
-          'Failed to create run. Run migration 018 in Supabase if this is the first time.',
-      },
-      { status: 500 }
-    )
-  }
-  const runId = insertedRow.id as string
+  // Try to insert a "running" row up front so the UI can poll if we ever go
+  // async. If the table is missing (migration 018 pending), fall through
+  // and run the agent ephemerally — better to give the user output now than
+  // to block on a migration.
+  let runId: string | null = null
+  let pendingMigration = false
+  {
+    const { data: insertedRow, error: insertErr } = await supabase
+      .from('report_agent_runs')
+      .insert({
+        client_id: context.client.id,
+        period_start: context.timeframe.start,
+        period_end: context.timeframe.end,
+        kpi_snapshot: context.kpi_snapshot,
+        prompt,
+        status: 'running',
+        created_by: userId,
+      })
+      .select('id')
+      .single()
 
-  // Call Claude. Wrap so any error gets persisted on the row instead of
-  // being lost in the void.
+    if (insertedRow) {
+      runId = insertedRow.id as string
+    } else if (isMissingTableError(insertErr)) {
+      pendingMigration = true
+    } else if (insertErr) {
+      return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    }
+  }
+
+  // Call Claude. We always do this; only the persistence layer is optional.
   const model = await getReportingAIModel()
   const maxTokens = Math.min(
     await getReportingAIMaxTokens(4000),
@@ -108,20 +127,23 @@ export async function POST(
       .join('\n')
       .trim()
 
-    await supabase
-      .from('report_agent_runs')
-      .update({
-        status: 'succeeded',
-        output_markdown: output,
-        model,
-        input_tokens: message.usage?.input_tokens ?? null,
-        output_tokens: message.usage?.output_tokens ?? null,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', runId)
+    if (runId) {
+      await supabase
+        .from('report_agent_runs')
+        .update({
+          status: 'succeeded',
+          output_markdown: output,
+          model,
+          input_tokens: message.usage?.input_tokens ?? null,
+          output_tokens: message.usage?.output_tokens ?? null,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', runId)
+    }
 
     return NextResponse.json({
       ok: true,
+      pending_migration: pendingMigration ? '018_report_agent_runs.sql' : null,
       run: {
         id: runId,
         status: 'succeeded',
@@ -130,19 +152,23 @@ export async function POST(
         period_end: context.timeframe.end,
         kpi_snapshot: context.kpi_snapshot,
         model,
+        input_tokens: message.usage?.input_tokens ?? null,
+        output_tokens: message.usage?.output_tokens ?? null,
       },
     })
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e)
-    await supabase
-      .from('report_agent_runs')
-      .update({
-        status: 'failed',
-        error_message: errMsg,
-        model,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', runId)
+    if (runId) {
+      await supabase
+        .from('report_agent_runs')
+        .update({
+          status: 'failed',
+          error_message: errMsg,
+          model,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', runId)
+    }
     return NextResponse.json({ error: errMsg }, { status: 500 })
   }
 }
@@ -182,9 +208,10 @@ export async function GET(
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) {
-    // If the table doesn't exist (migration 018 pending), report a friendly
-    // error instead of a 500 with a raw Postgres message.
-    if (/relation .*report_agent_runs.* does not exist/i.test(error.message)) {
+    // If the table doesn't exist or PostgREST hasn't refreshed its schema
+    // cache yet (migration 018 pending), report a friendly empty list
+    // instead of a 500 with a raw Postgres message.
+    if (isMissingTableError(error)) {
       return NextResponse.json(
         { runs: [], pending_migration: '018_report_agent_runs.sql' },
         { status: 200 }

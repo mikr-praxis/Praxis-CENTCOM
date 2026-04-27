@@ -40,6 +40,12 @@ export function WeeklyReportPanel({ slug, open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [pendingMigration, setPendingMigration] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  /**
+   * Holds the most recent generation when persistence is unavailable
+   * (migration 018 not yet applied). Acts as an in-memory pseudo-row so the
+   * user still sees the report in the right pane without a real run id.
+   */
+  const [ephemeralRun, setEphemeralRun] = useState<RunSummary | null>(null)
 
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true)
@@ -76,8 +82,32 @@ export function WeeklyReportPanel({ slug, open, onClose }: Props) {
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || `Generation failed (${res.status})`)
-      // Re-pull history so the new row + selection are fresh
-      await loadHistory()
+      const run = body.run as (RunSummary & { id: string | null }) | undefined
+      // If the API saved a row, refetch history and the latest run will auto-
+      // select. If migration 018 isn't applied (no id returned), fall back to
+      // showing the just-generated output ephemerally so the user still gets
+      // their report.
+      if (run && !run.id) {
+        const eph: RunSummary = {
+          id: 'ephemeral',
+          period_start: run.period_start ?? null,
+          period_end: run.period_end ?? null,
+          status: 'succeeded',
+          output_markdown: run.output_markdown ?? null,
+          error_message: null,
+          kpi_snapshot: run.kpi_snapshot ?? [],
+          created_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          model: run.model ?? null,
+          input_tokens: run.input_tokens ?? null,
+          output_tokens: run.output_tokens ?? null,
+        }
+        setEphemeralRun(eph)
+        setSelectedId('ephemeral')
+        if (body.pending_migration) setPendingMigration(body.pending_migration)
+      } else {
+        await loadHistory()
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generation failed')
     } finally {
@@ -85,10 +115,10 @@ export function WeeklyReportPanel({ slug, open, onClose }: Props) {
     }
   }, [slug, loadHistory])
 
-  const selected = useMemo(
-    () => runs.find((r) => r.id === selectedId) ?? null,
-    [runs, selectedId]
-  )
+  const selected = useMemo(() => {
+    if (selectedId === 'ephemeral' && ephemeralRun) return ephemeralRun
+    return runs.find((r) => r.id === selectedId) ?? null
+  }, [runs, selectedId, ephemeralRun])
 
   const copy = useCallback(() => {
     if (!selected?.output_markdown) return
@@ -149,11 +179,31 @@ export function WeeklyReportPanel({ slug, open, onClose }: Props) {
         </div>
 
         {pendingMigration && (
-          <div className="mx-5 mt-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200">
-            Run migration{' '}
-            <code className="font-mono">{pendingMigration}</code> in Supabase to
-            enable history. The Generate button still works without it but
-            results won&apos;t be saved.
+          <div className="mx-5 mt-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200 space-y-2">
+            <p>
+              Reports generate fine, but to <strong>save history</strong> run
+              migration{' '}
+              <code className="font-mono">{pendingMigration}</code> in your
+              Supabase SQL editor (one-time, ~30s).
+            </p>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(MIGRATION_018_SQL).catch(() => {})
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1500)
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-amber-100 bg-amber-500/20 hover:bg-amber-500/30"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3 w-3" /> Copy migration SQL
+                </>
+              )}
+            </button>
           </div>
         )}
 
@@ -167,14 +217,14 @@ export function WeeklyReportPanel({ slug, open, onClose }: Props) {
         <div className="flex flex-1 min-h-0">
           {/* History list */}
           <div className="w-56 border-r border-zinc-800 overflow-y-auto p-3 space-y-1">
-            {loadingHistory && runs.length === 0 ? (
+            {loadingHistory && runs.length === 0 && !ephemeralRun ? (
               <p className="text-xs text-slate-500 px-2 py-1">Loading…</p>
-            ) : runs.length === 0 ? (
+            ) : runs.length === 0 && !ephemeralRun ? (
               <p className="text-xs text-slate-500 px-2 py-1">
                 No reports yet. Click Generate now to create the first one.
               </p>
             ) : (
-              runs.map((r) => {
+              [...(ephemeralRun ? [ephemeralRun] : []), ...runs].map((r) => {
                 const dateLabel = r.created_at
                   ? f.dateTime(r.created_at, {
                       month: 'short',
@@ -202,8 +252,13 @@ export function WeeklyReportPanel({ slug, open, onClose }: Props) {
                       <Clock className="h-3 w-3" />
                       {dateLabel}
                     </div>
-                    <div className="text-[10px] mt-0.5">
+                    <div className="text-[10px] mt-0.5 flex items-center gap-1">
                       <StatusPill status={r.status} />
+                      {r.id === 'ephemeral' && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium text-amber-300 bg-amber-500/10">
+                          Not saved
+                        </span>
+                      )}
                     </div>
                   </button>
                 )
@@ -392,3 +447,41 @@ function renderInline(text: string): React.ReactNode {
   if (lastIndex < text.length) parts.push(text.slice(lastIndex))
   return parts
 }
+
+/**
+ * Migration 018 — kept inline so the user can copy it straight to the
+ * Supabase SQL editor without leaving the app. Mirrors
+ * supabase/migrations/018_report_agent_runs.sql verbatim.
+ */
+const MIGRATION_018_SQL = `create table if not exists report_agent_runs (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  period_start date,
+  period_end date,
+  kpi_snapshot jsonb not null default '[]'::jsonb,
+  prompt text not null,
+  output_markdown text,
+  model text,
+  status text not null default 'queued'
+    check (status in ('queued', 'running', 'succeeded', 'failed')),
+  error_message text,
+  input_tokens int,
+  output_tokens int,
+  created_by text,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index if not exists report_agent_runs_client_idx
+  on report_agent_runs (client_id, created_at desc);
+create index if not exists report_agent_runs_status_idx
+  on report_agent_runs (status);
+
+alter table report_agent_runs enable row level security;
+
+drop policy if exists report_agent_runs_service_role on report_agent_runs;
+create policy report_agent_runs_service_role on report_agent_runs
+  for all
+  using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+`
