@@ -165,13 +165,16 @@ export async function POST(
         target: k.target ?? null,
         viz_type: k.viz_type ?? 'card',
         display_order: k.display_order ?? order++,
-        group_by_column: k.group_by_column ?? null,
-        group_by_source: k.group_by_source ?? null,
-        compare_to: k.compare_to ?? null,
-        forecast_periods: k.forecast_periods ?? 0,
-        forecast_method: k.forecast_method ?? null,
-        // Only include chart_options if explicitly set; the column may not
-        // exist yet on databases that haven't run migration 017.
+        // Migration 016 columns: only include when explicitly set so DBs
+        // that haven't run migration 016 yet still accept the insert.
+        ...(k.group_by_column ? { group_by_column: k.group_by_column } : {}),
+        ...(k.group_by_source ? { group_by_source: k.group_by_source } : {}),
+        ...(k.compare_to ? { compare_to: k.compare_to } : {}),
+        ...(k.forecast_periods && k.forecast_periods > 0
+          ? { forecast_periods: k.forecast_periods }
+          : {}),
+        ...(k.forecast_method ? { forecast_method: k.forecast_method } : {}),
+        // Migration 017 column: same pattern.
         ...(k.chart_options && Object.keys(k.chart_options).length > 0
           ? { chart_options: k.chart_options }
           : {}),
@@ -180,15 +183,25 @@ export async function POST(
     if (inserts.length === 0) {
       return NextResponse.json({ error: 'No valid KPIs in request' }, { status: 400 })
     }
-    // Defensive strip: guarantee chart_options never lands on the wire even
-    // if upstream code adds it. Migration 017 may be pending → column doesn't
-    // exist → any mention causes PostgREST to reject the whole request.
+    // Defensive: PostgREST rejects the whole request if any field references
+    // a column missing from the schema cache. We strip migration-016 and
+    // migration-017 columns whenever they would carry default/empty values,
+    // and keep them only when the caller explicitly populated them.
     const cleanInserts = inserts.map((row) => {
-      const { chart_options: _co, ...rest } = row as Record<string, unknown> & {
-        chart_options?: unknown
+      const r = { ...row } as Record<string, unknown>
+      if (r.group_by_column == null || r.group_by_column === '') delete r.group_by_column
+      if (r.group_by_source == null || r.group_by_source === '') delete r.group_by_source
+      if (r.compare_to == null || r.compare_to === '') delete r.compare_to
+      if (r.forecast_periods == null || r.forecast_periods === 0) delete r.forecast_periods
+      if (r.forecast_method == null || r.forecast_method === '') delete r.forecast_method
+      if (
+        r.chart_options == null ||
+        (typeof r.chart_options === 'object' &&
+          Object.keys(r.chart_options as object).length === 0)
+      ) {
+        delete r.chart_options
       }
-      void _co
-      return rest
+      return r
     })
     // Bypass supabase-js: raw POST to PostgREST so no typed-client magic can
     // inject columns we don't explicitly send.
@@ -220,7 +233,7 @@ export async function POST(
     )
   }
 
-  const insert = {
+  const insert: Record<string, unknown> = {
     client_id: client.id,
     key: single.key,
     display_name: single.display_name,
@@ -230,31 +243,46 @@ export async function POST(
     target: single.target ?? null,
     viz_type: single.viz_type ?? 'card',
     display_order: single.display_order ?? 0,
-    group_by_column: single.group_by_column ?? null,
-    group_by_source: single.group_by_source ?? null,
-    compare_to: single.compare_to ?? null,
-    forecast_periods: single.forecast_periods ?? 0,
-    forecast_method: single.forecast_method ?? null,
-    // Only include chart_options if explicitly set (migration 017 may be pending)
+    // Migration 016 columns: only include when explicitly set.
+    ...(single.group_by_column ? { group_by_column: single.group_by_column } : {}),
+    ...(single.group_by_source ? { group_by_source: single.group_by_source } : {}),
+    ...(single.compare_to ? { compare_to: single.compare_to } : {}),
+    ...(single.forecast_periods && single.forecast_periods > 0
+      ? { forecast_periods: single.forecast_periods }
+      : {}),
+    ...(single.forecast_method ? { forecast_method: single.forecast_method } : {}),
+    // Migration 017 column.
     ...(single.chart_options && Object.keys(single.chart_options).length > 0
       ? { chart_options: single.chart_options }
       : {}),
   }
 
-  // Use explicit column list in .select() so PostgREST never references
-  // chart_options (which may not exist yet on databases without migration 017).
+  // Bypass supabase-js: raw POST so we never accidentally reference columns
+  // that don't exist yet (migrations 016/017 may be pending).
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  // Only request columns guaranteed by migration 015.
   const SAFE_COLS =
-    'id, client_id, key, display_name, description, formula, format, target, viz_type, display_order, group_by_column, group_by_source, compare_to, forecast_periods, forecast_method, created_at, updated_at'
-
-  const { data, error: insertErr } = await supabase
-    .from('report_kpis')
-    .insert(insert)
-    .select(SAFE_COLS)
-    .single()
-
-  if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    'id,client_id,key,display_name,description,formula,format,target,viz_type,display_order,created_at,updated_at'
+  const rawRes = await fetch(
+    `${supabaseUrl}/rest/v1/report_kpis?select=${SAFE_COLS}`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(insert),
+    }
+  )
+  if (!rawRes.ok) {
+    const errText = await rawRes.text()
+    return NextResponse.json({ error: errText }, { status: 500 })
   }
+  const rows = (await rawRes.json()) as unknown[]
+  const data = Array.isArray(rows) ? rows[0] : rows
 
   return NextResponse.json({ ok: true, kpi: data })
 }

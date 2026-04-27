@@ -31,7 +31,10 @@ export async function PATCH(
     return NextResponse.json({ error: `Client not found: ${slug}` }, { status: 404 })
   }
 
-  const update: Partial<ReportKPI> = {
+  // Build update payload. Migration 016/017 columns are only included when
+  // the caller actually populated a non-empty value, so DBs that haven't run
+  // those migrations still accept the PATCH.
+  const update: Record<string, unknown> = {
     ...(body.key !== undefined ? { key: body.key } : {}),
     ...(body.display_name !== undefined ? { display_name: body.display_name } : {}),
     ...(body.description !== undefined ? { description: body.description } : {}),
@@ -40,36 +43,48 @@ export async function PATCH(
     ...(body.target !== undefined ? { target: body.target } : {}),
     ...(body.viz_type !== undefined ? { viz_type: body.viz_type } : {}),
     ...(body.display_order !== undefined ? { display_order: body.display_order } : {}),
-    ...(body.group_by_column !== undefined ? { group_by_column: body.group_by_column } : {}),
-    ...(body.group_by_source !== undefined ? { group_by_source: body.group_by_source } : {}),
-    ...(body.compare_to !== undefined ? { compare_to: body.compare_to } : {}),
-    ...(body.forecast_periods !== undefined ? { forecast_periods: body.forecast_periods } : {}),
-    ...(body.forecast_method !== undefined ? { forecast_method: body.forecast_method } : {}),
-    ...(body.chart_options !== undefined ? { chart_options: body.chart_options } : {}),
+    ...(body.group_by_column ? { group_by_column: body.group_by_column } : {}),
+    ...(body.group_by_source ? { group_by_source: body.group_by_source } : {}),
+    ...(body.compare_to ? { compare_to: body.compare_to } : {}),
+    ...(body.forecast_periods && body.forecast_periods > 0
+      ? { forecast_periods: body.forecast_periods }
+      : {}),
+    ...(body.forecast_method ? { forecast_method: body.forecast_method } : {}),
+    ...(body.chart_options && Object.keys(body.chart_options).length > 0
+      ? { chart_options: body.chart_options }
+      : {}),
     updated_at: new Date().toISOString(),
   }
 
-  // Explicit column list so PostgREST doesn't reference chart_options when
-  // migration 017 is still pending on the DB.
+  // Bypass supabase-js: raw PATCH so no typed-client magic injects columns
+  // that may not exist yet on databases pending migrations 016/017.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  // Only ask for columns guaranteed by migration 015.
   const SAFE_COLS =
-    'id, client_id, key, display_name, description, formula, format, target, viz_type, display_order, group_by_column, group_by_source, compare_to, forecast_periods, forecast_method, created_at, updated_at'
-
-  const { data, error } = await supabase
-    .from('report_kpis')
-    .update(update)
-    .eq('id', kpiId)
-    .eq('client_id', client.id)
-    .select(SAFE_COLS)
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    'id,client_id,key,display_name,description,formula,format,target,viz_type,display_order,created_at,updated_at'
+  const rawRes = await fetch(
+    `${supabaseUrl}/rest/v1/report_kpis?id=eq.${encodeURIComponent(kpiId)}&client_id=eq.${encodeURIComponent(client.id)}&select=${SAFE_COLS}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(update),
+    }
+  )
+  if (!rawRes.ok) {
+    const errText = await rawRes.text()
+    return NextResponse.json({ error: errText }, { status: 500 })
   }
-  if (!data) {
+  const rows = (await rawRes.json()) as unknown[]
+  if (!Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: 'KPI not found for this client' }, { status: 404 })
   }
-
-  return NextResponse.json({ ok: true, kpi: data })
+  return NextResponse.json({ ok: true, kpi: rows[0] })
 }
 
 export async function DELETE(
