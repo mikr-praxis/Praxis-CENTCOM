@@ -180,12 +180,35 @@ export async function POST(
     if (inserts.length === 0) {
       return NextResponse.json({ error: 'No valid KPIs in request' }, { status: 400 })
     }
-    // Don't .select() — PostgREST's schema cache may reference chart_options
-    // (when migration 017 is pending), which makes returning rows fail even
-    // though the insert itself is fine. Caller (clients-home) refetches after.
-    const { error: insErr } = await supabase.from('report_kpis').insert(inserts)
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
-    return NextResponse.json({ ok: true, inserted: inserts.length })
+    // Defensive strip: guarantee chart_options never lands on the wire even
+    // if upstream code adds it. Migration 017 may be pending → column doesn't
+    // exist → any mention causes PostgREST to reject the whole request.
+    const cleanInserts = inserts.map((row) => {
+      const { chart_options: _co, ...rest } = row as Record<string, unknown> & {
+        chart_options?: unknown
+      }
+      void _co
+      return rest
+    })
+    // Bypass supabase-js: raw POST to PostgREST so no typed-client magic can
+    // inject columns we don't explicitly send.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const rawRes = await fetch(`${supabaseUrl}/rest/v1/report_kpis`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(cleanInserts),
+    })
+    if (!rawRes.ok) {
+      const errText = await rawRes.text()
+      return NextResponse.json({ error: errText }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, inserted: cleanInserts.length })
   }
 
   // Single path
