@@ -49,6 +49,10 @@ interface Props {
   /** Pre-fill values when editing. */
   initialState?: Record<string, CatalogInputValue>
   initialVariantId?: string
+  /** Pre-fill viz type when editing an existing KPI. */
+  initialVizType?: KPIVizType
+  /** Pre-fill chart options when editing. */
+  initialChartOptions?: ChartOptions
   onClose: () => void
   onSaved: () => void
 }
@@ -60,6 +64,8 @@ export function KPIConfigModal({
   existingKpiId,
   initialState,
   initialVariantId,
+  initialVizType,
+  initialChartOptions,
   onClose,
   onSaved,
 }: Props) {
@@ -78,8 +84,8 @@ export function KPIConfigModal({
 
   // Visualization type + chart options — exposed for non-card viz, persisted
   // alongside the formula on save.
-  const [vizType, setVizType] = useState<KPIVizType>(entry.viz_type)
-  const [chartOptions, setChartOptions] = useState<ChartOptions>({})
+  const [vizType, setVizType] = useState<KPIVizType>(initialVizType ?? entry.viz_type)
+  const [chartOptions, setChartOptions] = useState<ChartOptions>(initialChartOptions ?? {})
 
   // Per-input state. For non-repeatable, holds a single object. For repeatable, an array.
   const [state, setState] = useState<Record<string, CatalogInputValue>>(() => {
@@ -332,6 +338,14 @@ export function KPIConfigModal({
 
         {/* Input mapping */}
         <div className="p-5 space-y-5">
+          {isEdit && !initialState && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong>Editing.</strong> Re-select the source file + column for each input below to update the formula. Viz type + chart options below pre-fill from the saved tile.
+              </div>
+            </div>
+          )}
           {filenames.length === 0 && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200 flex items-start gap-2">
               <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />

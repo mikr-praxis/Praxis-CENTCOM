@@ -36,9 +36,10 @@ import { DriveFolderConfigurator } from '@/components/reporting/DriveFolderConfi
 import { WeeklyReportPanel } from '@/components/reporting/WeeklyReportPanel'
 import { StandardKPITiles } from '@/components/reporting/StandardKPITiles'
 import { AddKPITileMenu } from '@/components/reporting/AddKPITileMenu'
-import { isStandardKey } from '@/lib/reporting/kpi-catalog'
+import { KPIConfigModal } from '@/components/reporting/KPIConfigModal'
+import { isStandardKey, ALL_CATALOG, type CatalogEntry } from '@/lib/reporting/kpi-catalog'
 import type { KPIResult, Slicer, Formula } from '@/lib/reporting/types'
-import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
+import type { KPIFormat, KPIVizType, ChartOptions } from '@/lib/supabase/types'
 
 export interface ClientSummary {
   id: string
@@ -372,6 +373,14 @@ function Workspace({
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
+  // Editing an existing tile: catalog entry + KPI metadata for pre-fill.
+  const [editingKpi, setEditingKpi] = useState<{
+    entry: CatalogEntry
+    kpiId: string
+    initialVizType: KPIVizType
+    initialChartOptions: ChartOptions
+  } | null>(null)
+
   // Listen for header actions
   useEffect(() => {
     const onSync = () => syncNow()
@@ -560,6 +569,26 @@ function Workspace({
   const existingKeys = useMemo(() => new Set(results.map((r) => r.key)), [results])
   const hasCustomKpis = nonStandardResults.length > 0
 
+  // Per-tile config: open the catalog modal for catalog-keyed KPIs, or punt
+  // to the existing free-form configure page for AI/template-generated ones.
+  const onConfigureKPI = useCallback(
+    (result: KPIResult) => {
+      const entry = ALL_CATALOG.find((e) => e.catalog_key === result.key)
+      if (entry) {
+        setEditingKpi({
+          entry,
+          kpiId: result.kpi_id,
+          initialVizType: result.viz_type,
+          initialChartOptions: result.chart_options ?? {},
+        })
+      } else {
+        // Non-catalog tile — full editor lives at /reporting/[slug]/configure.
+        window.location.href = `/reporting/${client.slug}/configure`
+      }
+    },
+    [client.slug]
+  )
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px] mx-auto">
       {/* Sync feedback toast */}
@@ -684,13 +713,14 @@ function Workspace({
             slug={client.slug}
             timeframe={timeframe}
             slicers={effectiveSlicers}
+            onConfigure={onConfigureKPI}
           />
           {gaugeResults.length > 0 && (
             <div className="mt-4">
               <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Gauges</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {gaugeResults.map((r) => (
-                  <GaugeBlock key={r.kpi_id} result={r} />
+                  <GaugeBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
                 ))}
               </div>
             </div>
@@ -700,7 +730,7 @@ function Workspace({
               <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Trends</h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {trendResults.map((r) => (
-                  <ChartBlock key={r.kpi_id} result={r} />
+                  <ChartBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
                 ))}
               </div>
             </div>
@@ -710,7 +740,7 @@ function Workspace({
               <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Breakdowns</h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {pieResults.map((r) => (
-                  <PieBlock key={r.kpi_id} result={r} />
+                  <PieBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
                 ))}
               </div>
             </div>
@@ -719,7 +749,7 @@ function Workspace({
             <div className="mt-4 space-y-3">
               <h3 className="text-xs uppercase tracking-wide text-slate-500">Tables</h3>
               {tableResults.map((r) => (
-                <TableBlock key={r.kpi_id} result={r} />
+                <TableBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
               ))}
             </div>
           )}
@@ -776,6 +806,22 @@ function Workspace({
           slug={client.slug}
           open={weeklyReportOpen}
           onClose={() => setWeeklyReportOpen(false)}
+        />
+      )}
+
+      {editingKpi && (
+        <KPIConfigModal
+          slug={client.slug}
+          entry={editingKpi.entry}
+          filenames={client.filenames}
+          existingKpiId={editingKpi.kpiId}
+          initialVizType={editingKpi.initialVizType}
+          initialChartOptions={editingKpi.initialChartOptions}
+          onClose={() => setEditingKpi(null)}
+          onSaved={() => {
+            setEditingKpi(null)
+            fetchKpis()
+          }}
         />
       )}
 
