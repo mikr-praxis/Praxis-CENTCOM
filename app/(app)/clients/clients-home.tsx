@@ -34,6 +34,9 @@ import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViews
 import { ShareDialog } from '@/components/reporting/ShareDialog'
 import { DriveFolderConfigurator } from '@/components/reporting/DriveFolderConfigurator'
 import { WeeklyReportPanel } from '@/components/reporting/WeeklyReportPanel'
+import { StandardKPITiles } from '@/components/reporting/StandardKPITiles'
+import { AddKPITileMenu } from '@/components/reporting/AddKPITileMenu'
+import { isStandardKey } from '@/lib/reporting/kpi-catalog'
 import type { KPIResult, Slicer, Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
@@ -369,6 +372,7 @@ function Workspace({
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
+
   // Listen for header actions
   useEffect(() => {
     const onSync = () => syncNow()
@@ -540,13 +544,32 @@ function Workspace({
     }
   }
 
-  const cardResults = visibleResults.filter((r) => r.viz_type === 'card')
-  const trendResults = visibleResults.filter(
+  // Standard tiles (std_*) render in their own row above the grid; filter them
+  // out of the regular grid so they don't appear twice (once with timeframe
+  // applied, once lifetime).
+  const nonStandardResults = visibleResults.filter((r) => !isStandardKey(r.key))
+  const cardResults = nonStandardResults.filter((r) => r.viz_type === 'card')
+  const trendResults = nonStandardResults.filter(
     (r) => r.viz_type === 'line' || r.viz_type === 'bar' || r.viz_type === 'area'
   )
-  const pieResults = visibleResults.filter((r) => r.viz_type === 'pie')
-  const tableResults = visibleResults.filter((r) => r.viz_type === 'table')
-  const gaugeResults = visibleResults.filter((r) => r.viz_type === 'gauge')
+  const pieResults = nonStandardResults.filter((r) => r.viz_type === 'pie')
+  const tableResults = nonStandardResults.filter((r) => r.viz_type === 'table')
+  const gaugeResults = nonStandardResults.filter((r) => r.viz_type === 'gauge')
+
+  // Catalog keys already configured for this client — drives the "added"
+  // badge in AddKPITileMenu and prevents duplicate-add flows.
+  const existingKeys = useMemo(() => new Set(results.map((r) => r.key)), [results])
+  const hasCustomKpis = nonStandardResults.length > 0
+
+  // Per-tile config: navigate to the dedicated single-KPI editor at
+  // /kpi-config/[slug]/[kpiId]. Each tile gets its own focused view —
+  // formula, viz type, advanced options + chart options for one tile only.
+  const onConfigureKPI = useCallback(
+    (result: KPIResult) => {
+      window.location.href = `/kpi-config/${client.slug}/${result.kpi_id}`
+    },
+    [client.slug]
+  )
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px] mx-auto">
@@ -573,6 +596,11 @@ function Workspace({
             defaultOpen
           />
         </div>
+      )}
+
+      {/* Standard (lifetime) tiles — always-on, ignore the timeframe picker */}
+      {client.drive_folder_id && client.file_count > 0 && (
+        <StandardKPITiles slug={client.slug} filenames={client.filenames} />
       )}
 
       {/* Filter strip */}
@@ -640,7 +668,18 @@ function Workspace({
       </div>
 
       {/* KPI Grid */}
-      {kpiCount === 0 && !loading ? (
+      {client.file_count > 0 && (
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-slate-500">Custom tiles</h3>
+          <AddKPITileMenu
+            slug={client.slug}
+            filenames={client.filenames}
+            existingKeys={existingKeys}
+            onAdded={fetchKpis}
+          />
+        </div>
+      )}
+      {!hasCustomKpis && !loading ? (
         <EmptyKPIs
           fileCount={client.file_count}
           onBuild={() => setBuildOpen(true)}
@@ -656,13 +695,14 @@ function Workspace({
             slug={client.slug}
             timeframe={timeframe}
             slicers={effectiveSlicers}
+            onConfigure={onConfigureKPI}
           />
           {gaugeResults.length > 0 && (
             <div className="mt-4">
               <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Gauges</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {gaugeResults.map((r) => (
-                  <GaugeBlock key={r.kpi_id} result={r} />
+                  <GaugeBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
                 ))}
               </div>
             </div>
@@ -672,7 +712,7 @@ function Workspace({
               <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Trends</h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {trendResults.map((r) => (
-                  <ChartBlock key={r.kpi_id} result={r} />
+                  <ChartBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
                 ))}
               </div>
             </div>
@@ -682,7 +722,7 @@ function Workspace({
               <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Breakdowns</h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {pieResults.map((r) => (
-                  <PieBlock key={r.kpi_id} result={r} />
+                  <PieBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
                 ))}
               </div>
             </div>
@@ -691,7 +731,7 @@ function Workspace({
             <div className="mt-4 space-y-3">
               <h3 className="text-xs uppercase tracking-wide text-slate-500">Tables</h3>
               {tableResults.map((r) => (
-                <TableBlock key={r.kpi_id} result={r} />
+                <TableBlock key={r.kpi_id} result={r} onConfigure={() => onConfigureKPI(r)} />
               ))}
             </div>
           )}
@@ -750,6 +790,7 @@ function Workspace({
           onClose={() => setWeeklyReportOpen(false)}
         />
       )}
+
 
       {buildOpen && (
         <BuildModal

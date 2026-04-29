@@ -16,15 +16,18 @@ import {
   ReferenceArea,
   Legend,
 } from 'recharts'
+import { Settings2 } from 'lucide-react'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
 import { useBranding } from '@/components/providers/BrandingProvider'
 
 interface Props {
   result: KPIResult
+  /** When provided, renders a Settings2 icon in the header. */
+  onConfigure?: () => void
 }
 
-export function ChartBlock({ result }: Props) {
+export function ChartBlock({ result, onConfigure }: Props) {
   const branding = useBranding()
   const fmtOpts = { currency: branding.kpi_currency_code, locale: branding.kpi_currency_locale }
   const opts = result.chart_options ?? {}
@@ -49,7 +52,8 @@ export function ChartBlock({ result }: Props) {
 
   if (!hasData && series.length === 0) {
     return (
-      <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900">
+      <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900 relative">
+        {onConfigure && <ConfigButton onClick={onConfigure} />}
         <h3 className="text-sm font-semibold text-white mb-1">{result.display_name}</h3>
         <p className="text-xs text-slate-500">
           {result.error
@@ -74,8 +78,9 @@ export function ChartBlock({ result }: Props) {
   }
 
   return (
-    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900">
-      <div className="flex items-baseline justify-between mb-2">
+    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900 relative">
+      {onConfigure && <ConfigButton onClick={onConfigure} />}
+      <div className="flex items-baseline justify-between mb-2 pr-7">
         <h3 className="text-sm font-semibold text-white">{result.display_name}</h3>
         <span className="text-lg font-semibold text-slate-200">
           {formatKPIValue(result.value, result.format, fmtOpts)}
@@ -173,5 +178,18 @@ export function ChartBlock({ result }: Props) {
         </p>
       )}
     </div>
+  )
+}
+
+function ConfigButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="absolute top-3 right-3 p-1.5 rounded text-amber-400 hover:text-amber-300 hover:bg-slate-800 z-10"
+      title="Configure formula + viz"
+      aria-label="Configure KPI"
+    >
+      <Settings2 className="h-5 w-5" />
+    </button>
   )
 }

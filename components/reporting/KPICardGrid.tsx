@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Target, AlertCircle, ArrowDown, ArrowUp, ChevronRight, Database, Info } from 'lucide-react'
+import { Target, AlertCircle, ArrowDown, ArrowUp, ChevronRight, Database, Info, Settings2 } from 'lucide-react'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
 import { useBranding } from '@/components/providers/BrandingProvider'
@@ -15,9 +15,11 @@ interface Props {
   timeframe?: { start: string | null; end: string | null }
   /** Active slicers — passed to drill-down so contributing rows match the dashboard. */
   slicers?: { filename: string; column: string; values: string[] }[]
+  /** When provided, renders a Settings2 icon on each card; clicking calls back with the result. */
+  onConfigure?: (result: KPIResult) => void
 }
 
-export function KPICardGrid({ results, loading, slug, timeframe, slicers }: Props) {
+export function KPICardGrid({ results, loading, slug, timeframe, slicers, onConfigure }: Props) {
   const [drillKpiId, setDrillKpiId] = useState<string | null>(null)
 
   if (loading) {
@@ -43,6 +45,7 @@ export function KPICardGrid({ results, loading, slug, timeframe, slicers }: Prop
             key={r.kpi_id}
             result={r}
             onDrillDown={slug ? () => setDrillKpiId(r.kpi_id) : undefined}
+            onConfigure={onConfigure ? () => onConfigure(r) : undefined}
           />
         ))}
       </div>
@@ -59,7 +62,15 @@ export function KPICardGrid({ results, loading, slug, timeframe, slicers }: Prop
   )
 }
 
-function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () => void }) {
+function KPICard({
+  result,
+  onDrillDown,
+  onConfigure,
+}: {
+  result: KPIResult
+  onDrillDown?: () => void
+  onConfigure?: () => void
+}) {
   const [infoOpen, setInfoOpen] = useState(false)
   const branding = useBranding()
   const fmtOpts = { currency: branding.kpi_currency_code, locale: branding.kpi_currency_locale }
@@ -105,6 +116,16 @@ function KPICard({ result, onDrillDown }: { result: KPIResult; onDrillDown?: () 
           >
             <Info className="h-3.5 w-3.5" />
           </button>
+          {onConfigure && (
+            <button
+              onClick={onConfigure}
+              className="p-1 rounded text-amber-400 hover:text-amber-300 hover:bg-slate-800"
+              title="Configure formula + viz"
+              aria-label="Configure KPI"
+            >
+              <Settings2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
       <button

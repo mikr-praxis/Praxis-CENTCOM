@@ -1,0 +1,70 @@
+{
+  "integrations": [
+    {
+      "name": "Supabase",
+      "required_env": ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
+      "code_patterns": ["@supabase/supabase-js", "createServerClient", "createBrowserClient"],
+      "notes": "Migrations require manual SQL Editor run before deploy. Defensive insert pattern for migration-016/017/018 columns."
+    },
+    {
+      "name": "Clerk Auth",
+      "required_env": ["CLERK_SECRET_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"],
+      "code_patterns": ["@clerk/nextjs", "clerkMiddleware", "auth()"],
+      "notes": "Server routes must use auth() from @clerk/nextjs/server."
+    },
+    {
+      "name": "Anthropic AI",
+      "required_env": ["ANTHROPIC_API_KEY"],
+      "code_patterns": ["@anthropic-ai/sdk", "Anthropic("],
+      "notes": "Use prompt caching for long contexts. Default to claude-opus / claude-sonnet 4.x."
+    },
+    {
+      "name": "Google Drive / Sheets / Calendar",
+      "required_env": ["GOOGLE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_SERVICE_ACCOUNT_KEY"],
+      "code_patterns": ["googleapis", "lib/google/"],
+      "notes": "Service account must be shared on each calendar / drive folder by user."
+    },
+    {
+      "name": "Slack",
+      "required_env": ["SLACK_BOT_TOKEN"],
+      "code_patterns": ["@slack/web-api", "lib/slack.ts"],
+      "notes": "Bot token requires chat:write + channels:read scopes."
+    },
+    {
+      "name": "PostHog",
+      "required_env": ["NEXT_PUBLIC_POSTHOG_HOST", "NEXT_PUBLIC_POSTHOG_KEY"],
+      "code_patterns": ["posthog-js", "lib/posthog/"],
+      "notes": "Client-side telemetry. PII must be scrubbed before capture."
+    },
+    {
+      "name": "Upstash Redis",
+      "required_env": ["UPSTASH_REDIS_REST_TOKEN", "UPSTASH_REDIS_REST_URL"],
+      "code_patterns": ["@upstash/redis"],
+      "notes": "Used for caching + rate limits."
+    },
+    {
+      "name": "Monday.com",
+      "required_env": ["MONDAY_API_TOKEN"],
+      "code_patterns": ["lib/monday/"],
+      "notes": "Stored in app_config table, not env. Check getMondayApiToken()."
+    },
+    {
+      "name": "ActiveCampaign",
+      "required_env": ["ACTIVECAMPAIGN_API_TOKEN", "ACTIVECAMPAIGN_API_URL"],
+      "code_patterns": ["lib/activecampaign/"],
+      "notes": "Stored in app_config table."
+    },
+    {
+      "name": "HubSpot",
+      "required_env": ["HUBSPOT_API_TOKEN"],
+      "code_patterns": ["lib/hubspot/"],
+      "notes": "Stored in app_config table."
+    },
+    {
+      "name": "Vercel deploy",
+      "required_env": ["VERCEL_API_TOKEN", "VERCEL_PROJECT_ID"],
+      "code_patterns": ["app/api/deploy-status"],
+      "notes": "Auto-deploys on push. Branch -> preview, main -> production."
+    }
+  ]
+}

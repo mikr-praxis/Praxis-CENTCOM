@@ -11,13 +11,28 @@ import {
   RadialBar,
   PolarAngleAxis,
 } from 'recharts'
-import { AlertCircle, Database } from 'lucide-react'
+import { AlertCircle, Database, Settings2 } from 'lucide-react'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import type { KPIResult } from '@/lib/reporting/types'
 import { useBranding } from '@/components/providers/BrandingProvider'
 
 interface Props {
   result: KPIResult
+  /** When provided, renders a Settings2 icon in the header. */
+  onConfigure?: () => void
+}
+
+function ConfigButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="absolute top-3 right-3 p-1.5 rounded text-amber-400 hover:text-amber-300 hover:bg-slate-800 z-10"
+      title="Configure formula + viz"
+      aria-label="Configure KPI"
+    >
+      <Settings2 className="h-5 w-5" />
+    </button>
+  )
 }
 
 function fmtOptsFromBranding(b: { kpi_currency_code: string; kpi_currency_locale: string }) {
@@ -46,7 +61,7 @@ function mixHexWithWhite(hex: string, t: number): string {
 
 /* ─────────────────────────── Pie ─────────────────────────── */
 
-export function PieBlock({ result }: Props) {
+export function PieBlock({ result, onConfigure }: Props) {
   const branding = useBranding()
   const fmtOpts = fmtOptsFromBranding(branding)
   const opts = result.chart_options ?? {}
@@ -58,6 +73,7 @@ export function PieBlock({ result }: Props) {
     return (
       <EmptyVizCard
         title={result.display_name}
+        onConfigure={onConfigure}
         icon={<Database className="h-4 w-4" />}
         message="Pie chart needs a Group By column on the KPI. Open Configure → Advanced."
         error={result.error}
@@ -72,8 +88,9 @@ export function PieBlock({ result }: Props) {
   const total = data.reduce((a, d) => a + d.value, 0)
 
   return (
-    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900">
-      <div className="flex items-baseline justify-between mb-2">
+    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900 relative">
+      {onConfigure && <ConfigButton onClick={onConfigure} />}
+      <div className="flex items-baseline justify-between mb-2 pr-7">
         <h3 className="text-sm font-semibold text-white truncate">{result.display_name}</h3>
         <span className="text-lg font-semibold text-slate-200">
           {formatKPIValue(result.value, result.format, fmtOpts)}
@@ -116,7 +133,7 @@ export function PieBlock({ result }: Props) {
 
 /* ─────────────────────────── Table ─────────────────────────── */
 
-export function TableBlock({ result }: Props) {
+export function TableBlock({ result, onConfigure }: Props) {
   const branding = useBranding()
   const fmtOpts = fmtOptsFromBranding(branding)
   const opts = result.chart_options ?? {}
@@ -128,6 +145,7 @@ export function TableBlock({ result }: Props) {
     return (
       <EmptyVizCard
         title={result.display_name}
+        onConfigure={onConfigure}
         icon={<Database className="h-4 w-4" />}
         message="Table needs a Group By column on the KPI. Open Configure → Advanced."
         error={result.error}
@@ -136,8 +154,9 @@ export function TableBlock({ result }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-700/50 bg-slate-900 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-700/50 flex items-baseline justify-between">
+    <div className="rounded-xl border border-slate-700/50 bg-slate-900 overflow-hidden relative">
+      {onConfigure && <ConfigButton onClick={onConfigure} />}
+      <div className="px-4 py-3 border-b border-slate-700/50 flex items-baseline justify-between pr-12">
         <h3 className="text-sm font-semibold text-white truncate">{result.display_name}</h3>
         <span className="text-lg font-semibold text-slate-200">
           {formatKPIValue(result.value, result.format, fmtOpts)}
@@ -176,7 +195,7 @@ export function TableBlock({ result }: Props) {
 
 /* ─────────────────────────── Gauge ─────────────────────────── */
 
-export function GaugeBlock({ result }: Props) {
+export function GaugeBlock({ result, onConfigure }: Props) {
   const branding = useBranding()
   const fmtOpts = fmtOptsFromBranding(branding)
   const opts = result.chart_options ?? {}
@@ -186,6 +205,7 @@ export function GaugeBlock({ result }: Props) {
     return (
       <EmptyVizCard
         title={result.display_name}
+        onConfigure={onConfigure}
         icon={<AlertCircle className="h-4 w-4" />}
         message="No value to plot."
         error={result.error}
@@ -196,6 +216,7 @@ export function GaugeBlock({ result }: Props) {
     return (
       <EmptyVizCard
         title={result.display_name}
+        onConfigure={onConfigure}
         icon={<AlertCircle className="h-4 w-4" />}
         message="Gauge needs a Target on the KPI. Open Configure → set a target."
         error={result.error}
@@ -208,8 +229,9 @@ export function GaugeBlock({ result }: Props) {
   const data = [{ name: 'progress', value: clamped, fill: accent }]
 
   return (
-    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900">
-      <div className="flex items-baseline justify-between mb-2">
+    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900 relative">
+      {onConfigure && <ConfigButton onClick={onConfigure} />}
+      <div className="flex items-baseline justify-between mb-2 pr-7">
         <h3 className="text-sm font-semibold text-white truncate">{result.display_name}</h3>
         <span className="text-[10px] uppercase tracking-wide text-slate-500">
           target {formatKPIValue(result.target, result.format, fmtOpts)}
@@ -258,15 +280,18 @@ function EmptyVizCard({
   icon,
   message,
   error,
+  onConfigure,
 }: {
   title: string
   icon: React.ReactNode
   message: string
   error: string | null
+  onConfigure?: () => void
 }) {
   return (
-    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900">
-      <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
+    <div className="p-4 rounded-xl border border-slate-700/50 bg-slate-900 relative">
+      {onConfigure && <ConfigButton onClick={onConfigure} />}
+      <h3 className="text-sm font-semibold text-white mb-2 pr-7">{title}</h3>
       <p className="text-xs text-slate-500 inline-flex items-start gap-1.5">
         <span className="mt-0.5 text-slate-600">{icon}</span>
         <span>{error ?? message}</span>

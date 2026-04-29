@@ -90,6 +90,7 @@ const DEFAULT_ROUTE_PERMISSIONS: RoutePermission[] = [
   { href: '/agents',    roles: ['exec'] },
   { href: '/memory',    roles: ['exec'] },
   { href: '/clients',   roles: ['exec'] },
+  { href: '/kpi-config', roles: ['exec'] },
   { href: '/reporting', roles: ['exec', 'am'] },
   { href: '/hardcoded', roles: ['exec'] },
   { href: '/health',    roles: ['exec'] },
