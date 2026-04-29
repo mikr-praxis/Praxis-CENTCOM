@@ -34,6 +34,16 @@ semantic pass that bash + grep can't do.
   a plain string can compile-fail in strict mode.
 - **`any` in changed code.** Flag every `any`. Most should be a real type.
 - **Unused imports / variables** — remove them, don't just `_ =`.
+- **Signature-change call-site verification.** Whenever you suggest changing
+  a function's signature (renaming/dropping a param, narrowing a return
+  type, etc.), grep for every call site FIRST. Suggesting "drop the unused
+  arg" is wrong if any caller still passes it — Vercel will fail with
+  `Expected N arguments, but got N+1`. Always run:
+  ```
+  grep -rn "<funcName>(" app/ components/ lib/
+  ```
+  Only suggest the change if every call site is consistent. If callers vary,
+  recommend keeping the broader signature with `_`-prefix to silence ESLint.
 
 ### Supabase patterns (project-specific)
 - **Defensive migration-016/017/018 column handling.** Inserts to
