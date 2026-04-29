@@ -34,6 +34,9 @@ import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViews
 import { ShareDialog } from '@/components/reporting/ShareDialog'
 import { DriveFolderConfigurator } from '@/components/reporting/DriveFolderConfigurator'
 import { WeeklyReportPanel } from '@/components/reporting/WeeklyReportPanel'
+import { StandardKPITiles } from '@/components/reporting/StandardKPITiles'
+import { AddKPITileMenu } from '@/components/reporting/AddKPITileMenu'
+import { isStandardKey } from '@/lib/reporting/kpi-catalog'
 import type { KPIResult, Slicer, Formula } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
@@ -540,13 +543,22 @@ function Workspace({
     }
   }
 
-  const cardResults = visibleResults.filter((r) => r.viz_type === 'card')
-  const trendResults = visibleResults.filter(
+  // Standard tiles (std_*) render in their own row above the grid; filter them
+  // out of the regular grid so they don't appear twice (once with timeframe
+  // applied, once lifetime).
+  const nonStandardResults = visibleResults.filter((r) => !isStandardKey(r.key))
+  const cardResults = nonStandardResults.filter((r) => r.viz_type === 'card')
+  const trendResults = nonStandardResults.filter(
     (r) => r.viz_type === 'line' || r.viz_type === 'bar' || r.viz_type === 'area'
   )
-  const pieResults = visibleResults.filter((r) => r.viz_type === 'pie')
-  const tableResults = visibleResults.filter((r) => r.viz_type === 'table')
-  const gaugeResults = visibleResults.filter((r) => r.viz_type === 'gauge')
+  const pieResults = nonStandardResults.filter((r) => r.viz_type === 'pie')
+  const tableResults = nonStandardResults.filter((r) => r.viz_type === 'table')
+  const gaugeResults = nonStandardResults.filter((r) => r.viz_type === 'gauge')
+
+  // Catalog keys already configured for this client — drives the "added"
+  // badge in AddKPITileMenu and prevents duplicate-add flows.
+  const existingKeys = useMemo(() => new Set(results.map((r) => r.key)), [results])
+  const hasCustomKpis = nonStandardResults.length > 0
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px] mx-auto">
@@ -573,6 +585,11 @@ function Workspace({
             defaultOpen
           />
         </div>
+      )}
+
+      {/* Standard (lifetime) tiles — always-on, ignore the timeframe picker */}
+      {client.drive_folder_id && client.file_count > 0 && (
+        <StandardKPITiles slug={client.slug} filenames={client.filenames} />
       )}
 
       {/* Filter strip */}
@@ -640,7 +657,18 @@ function Workspace({
       </div>
 
       {/* KPI Grid */}
-      {kpiCount === 0 && !loading ? (
+      {client.file_count > 0 && (
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-slate-500">Custom tiles</h3>
+          <AddKPITileMenu
+            slug={client.slug}
+            filenames={client.filenames}
+            existingKeys={existingKeys}
+            onAdded={fetchKpis}
+          />
+        </div>
+      )}
+      {!hasCustomKpis && !loading ? (
         <EmptyKPIs
           fileCount={client.file_count}
           onBuild={() => setBuildOpen(true)}
