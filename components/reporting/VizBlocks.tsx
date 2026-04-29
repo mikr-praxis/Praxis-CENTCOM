@@ -26,11 +26,11 @@ function ConfigButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="absolute top-3 right-3 p-1 rounded text-slate-600 hover:text-amber-300 hover:bg-slate-800"
-      title="Configure KPI"
+      className="absolute top-3 right-3 p-1.5 rounded text-amber-400 hover:text-amber-300 hover:bg-slate-800 z-10"
+      title="Configure formula + viz"
       aria-label="Configure KPI"
     >
-      <Settings2 className="h-4 w-4" />
+      <Settings2 className="h-5 w-5" />
     </button>
   )
 }

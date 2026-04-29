@@ -36,10 +36,9 @@ import { DriveFolderConfigurator } from '@/components/reporting/DriveFolderConfi
 import { WeeklyReportPanel } from '@/components/reporting/WeeklyReportPanel'
 import { StandardKPITiles } from '@/components/reporting/StandardKPITiles'
 import { AddKPITileMenu } from '@/components/reporting/AddKPITileMenu'
-import { KPIConfigModal } from '@/components/reporting/KPIConfigModal'
-import { isStandardKey, ALL_CATALOG, type CatalogEntry } from '@/lib/reporting/kpi-catalog'
+import { isStandardKey } from '@/lib/reporting/kpi-catalog'
 import type { KPIResult, Slicer, Formula } from '@/lib/reporting/types'
-import type { KPIFormat, KPIVizType, ChartOptions } from '@/lib/supabase/types'
+import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
 
 export interface ClientSummary {
   id: string
@@ -373,13 +372,6 @@ function Workspace({
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
-  // Editing an existing tile: catalog entry + KPI metadata for pre-fill.
-  const [editingKpi, setEditingKpi] = useState<{
-    entry: CatalogEntry
-    kpiId: string
-    initialVizType: KPIVizType
-    initialChartOptions: ChartOptions
-  } | null>(null)
 
   // Listen for header actions
   useEffect(() => {
@@ -569,25 +561,13 @@ function Workspace({
   const existingKeys = useMemo(() => new Set(results.map((r) => r.key)), [results])
   const hasCustomKpis = nonStandardResults.length > 0
 
-  // Per-tile config: open the catalog modal for catalog-keyed KPIs, or punt
-  // to the existing free-form configure page for AI/template-generated ones.
-  const onConfigureKPI = useCallback(
-    (result: KPIResult) => {
-      const entry = ALL_CATALOG.find((e) => e.catalog_key === result.key)
-      if (entry) {
-        setEditingKpi({
-          entry,
-          kpiId: result.kpi_id,
-          initialVizType: result.viz_type,
-          initialChartOptions: result.chart_options ?? {},
-        })
-      } else {
-        // Non-catalog tile — full editor lives at /reporting/[slug]/configure.
-        window.location.href = `/reporting/${client.slug}/configure`
-      }
-    },
-    [client.slug]
-  )
+  // Per-tile config: navigate to the full free-form editor at
+  // /reporting/[slug]/configure. The catalog modal stays only for the "+ Add
+  // tile" guided first-setup flow — once a tile exists, the configure page
+  // is the canonical place to edit formula / viz / advanced options.
+  const onConfigureKPI = useCallback(() => {
+    window.location.href = `/reporting/${client.slug}/configure`
+  }, [client.slug])
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px] mx-auto">
@@ -809,21 +789,6 @@ function Workspace({
         />
       )}
 
-      {editingKpi && (
-        <KPIConfigModal
-          slug={client.slug}
-          entry={editingKpi.entry}
-          filenames={client.filenames}
-          existingKpiId={editingKpi.kpiId}
-          initialVizType={editingKpi.initialVizType}
-          initialChartOptions={editingKpi.initialChartOptions}
-          onClose={() => setEditingKpi(null)}
-          onSaved={() => {
-            setEditingKpi(null)
-            fetchKpis()
-          }}
-        />
-      )}
 
       {buildOpen && (
         <BuildModal

@@ -119,11 +119,11 @@ function KPICard({
           {onConfigure && (
             <button
               onClick={onConfigure}
-              className="p-0.5 rounded text-slate-600 hover:text-amber-300 hover:bg-slate-800"
-              title="Configure KPI"
+              className="p-1 rounded text-amber-400 hover:text-amber-300 hover:bg-slate-800"
+              title="Configure formula + viz"
               aria-label="Configure KPI"
             >
-              <Settings2 className="h-3.5 w-3.5" />
+              <Settings2 className="h-4 w-4" />
             </button>
           )}
         </div>

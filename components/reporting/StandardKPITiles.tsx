@@ -67,6 +67,15 @@ export function StandardKPITiles({ slug, filenames }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {STANDARD_CATALOG.map((entry) => {
             const result = byKey.get(entry.catalog_key)
+            const onConfigure = () => {
+              if (result?.kpi_id) {
+                // Already set up — go to the full free-form editor.
+                window.location.href = `/reporting/${slug}/configure`
+              } else {
+                // First setup — open the structured catalog modal.
+                setEditing({ entry, existingId: result?.kpi_id })
+              }
+            }
             return (
               <StandardTile
                 key={entry.catalog_key}
@@ -74,7 +83,7 @@ export function StandardKPITiles({ slug, filenames }: Props) {
                 result={result}
                 loading={loading}
                 fmtOpts={fmtOpts}
-                onConfigure={() => setEditing({ entry, existingId: result?.kpi_id })}
+                onConfigure={onConfigure}
               />
             )
           })}
@@ -123,11 +132,11 @@ function StandardTile({
         <div className="text-xs font-medium text-slate-400">{entry.display_name}</div>
         <button
           onClick={onConfigure}
-          className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-amber-300 flex-shrink-0"
+          className="p-1 rounded hover:bg-slate-800 text-amber-400 hover:text-amber-300 flex-shrink-0"
           aria-label={configured ? 'Edit' : 'Configure'}
-          title={configured ? 'Edit mapping' : 'Configure'}
+          title={configured ? 'Configure formula + viz' : 'Set up'}
         >
-          <Settings2 className="h-3.5 w-3.5" />
+          <Settings2 className="h-4 w-4" />
         </button>
       </div>
 
