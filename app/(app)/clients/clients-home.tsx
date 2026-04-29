@@ -565,7 +565,9 @@ function Workspace({
   // /reporting/[slug]/configure. The catalog modal stays only for the "+ Add
   // tile" guided first-setup flow — once a tile exists, the configure page
   // is the canonical place to edit formula / viz / advanced options.
-  const onConfigureKPI = useCallback(() => {
+  // Param is kept (`_result`) so JSX call sites passing the result object
+  // compile cleanly. The arg is unused — `_`-prefix silences ESLint.
+  const onConfigureKPI = useCallback((_result: KPIResult) => {
     window.location.href = `/reporting/${client.slug}/configure`
   }, [client.slug])
 
