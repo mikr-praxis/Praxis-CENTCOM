@@ -20,6 +20,18 @@ import type {
   CatalogVariant,
 } from '@/lib/reporting/kpi-catalog'
 import type { Filter } from '@/lib/reporting/types'
+import type { KPIVizType, ChartOptions } from '@/lib/supabase/types'
+import { VizOptionsEditor } from './VizOptionsEditor'
+
+const VIZ_TYPES: { value: KPIVizType; label: string }[] = [
+  { value: 'card', label: 'Card (single number)' },
+  { value: 'line', label: 'Line chart' },
+  { value: 'bar', label: 'Bar chart' },
+  { value: 'area', label: 'Area chart' },
+  { value: 'pie', label: 'Pie chart' },
+  { value: 'table', label: 'Table' },
+  { value: 'gauge', label: 'Gauge' },
+]
 
 interface InspectColumn {
   name: string
@@ -63,6 +75,11 @@ export function KPIConfigModal({
   }, [entry.variants, variantId])
 
   const inputs: CatalogInput[] = variant ? variant.inputs : entry.inputs ?? []
+
+  // Visualization type + chart options — exposed for non-card viz, persisted
+  // alongside the formula on save.
+  const [vizType, setVizType] = useState<KPIVizType>(entry.viz_type)
+  const [chartOptions, setChartOptions] = useState<ChartOptions>({})
 
   // Per-input state. For non-repeatable, holds a single object. For repeatable, an array.
   const [state, setState] = useState<Record<string, CatalogInputValue>>(() => {
@@ -239,8 +256,9 @@ export function KPIConfigModal({
         display_name: entry.display_name,
         description: entry.description,
         format: entry.format,
-        viz_type: entry.viz_type,
+        viz_type: vizType,
         formula,
+        ...(Object.keys(chartOptions).length > 0 ? { chart_options: chartOptions } : {}),
       }
       const url = isEdit
         ? `/api/reporting/${slug}/kpis/${existingKpiId}`
@@ -382,6 +400,34 @@ export function KPIConfigModal({
               </div>
             )
           })}
+        </div>
+
+        {/* Visualization */}
+        <div className="px-5 pb-5 space-y-3">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-slate-500 mb-1">Viz type</label>
+            <select
+              value={vizType}
+              onChange={(e) => setVizType(e.target.value as KPIVizType)}
+              className="w-full rounded-md bg-slate-900 border border-slate-700 px-2 py-1.5 text-sm text-white"
+            >
+              {VIZ_TYPES.map((v) => (
+                <option key={v.value} value={v.value}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <details className="rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+            <summary className="cursor-pointer text-xs uppercase tracking-wide text-slate-500 hover:text-slate-300">
+              Visualization options — color, axis, legend, top-N
+            </summary>
+            <VizOptionsEditor
+              vizType={vizType}
+              options={chartOptions}
+              onChange={setChartOptions}
+            />
+          </details>
         </div>
 
         {error && (
