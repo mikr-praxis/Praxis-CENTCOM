@@ -43,6 +43,13 @@ interface Props {
   forecastDefaultMethod?: 'linear' | 'moving_avg'
   /** Default forecast period count for new KPIs (from REPORTING_FORECAST_DEFAULT_PERIODS). */
   forecastDefaultPeriods?: number
+  /** When set, the page renders ONLY this KPI's editor — used by the
+   *  per-tile config route /kpi-config/[slug]/[kpiId]. Hides the AI builder,
+   *  the Add KPI button, and the empty-state CTA. */
+  focusKpiId?: string
+  /** Optional back link override (e.g. /clients) for the per-tile flow. */
+  backHref?: string
+  backLabel?: string
 }
 
 const FORMAT_OPTIONS: KPIFormat[] = ['count', 'currency', 'percent', 'ratio']
@@ -131,9 +138,18 @@ export function ConfigureClient({
   files,
   forecastDefaultMethod = 'linear',
   forecastDefaultPeriods = 0,
+  focusKpiId,
+  backHref,
+  backLabel,
 }: Props) {
   const [kpis, setKpis] = useState<KPIRow[]>(initialKpis)
   const [adding, setAdding] = useState(false)
+  const isFocused = !!focusKpiId
+  // Source from local `kpis` state (not initialKpis) so live edits via
+  // updateKpi flow back into the rendered KPIEditor.
+  const visibleKpis = isFocused
+    ? kpis.filter((k) => k.id === focusKpiId)
+    : kpis
   const defaultFile = files[0]?.filename ?? ''
   const [draft, setDraft] = useState<Omit<KPIRow, 'id' | 'client_id'>>(
     emptyKPI(defaultFile, forecastDefaultPeriods, forecastDefaultMethod)
@@ -199,44 +215,58 @@ export function ConfigureClient({
     setKpis((prev) => prev.map((k) => (k.id === id ? { ...k, ...patch } : k)))
   }
 
+  const focusedKpi = isFocused ? kpis.find((k) => k.id === focusKpiId) : null
+  const headerTitle = isFocused
+    ? focusedKpi
+      ? `Configure: ${focusedKpi.display_name}`
+      : 'KPI not found'
+    : `Configure KPIs — ${client.name}`
+  const headerSubtitle = isFocused
+    ? `${client.name} — formula, viz type, advanced options + chart options for this single tile.`
+    : 'Define metrics computed from synced raw files.'
+  const backTo = backHref ?? `/reporting/${client.slug}`
+  const backText = backLabel ?? `Back to ${client.name} report`
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto">
-      <Link href={`/reporting/${client.slug}`} className="inline-flex items-center text-sm text-slate-400 hover:text-slate-200 mb-4">
-        <ChevronLeft className="h-4 w-4 mr-1" /> Back to {client.name} report
+      <Link href={backTo} className="inline-flex items-center text-sm text-slate-400 hover:text-slate-200 mb-4">
+        <ChevronLeft className="h-4 w-4 mr-1" /> {backText}
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Configure KPIs — {client.name}</h1>
-          <p className="text-slate-400 text-sm mt-1">Define metrics computed from synced raw files.</p>
+          <h1 className="text-2xl font-bold text-white">{headerTitle}</h1>
+          <p className="text-slate-400 text-sm mt-1">{headerSubtitle}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <FileBrowser slug={client.slug} filenames={files.map((f) => f.filename)} />
-          <AIKPIBuilder
-            slug={client.slug}
-            filenames={files.map((f) => f.filename)}
-            onAccept={(d: AIDraft) => {
-              setDraft({
-                key: d.key,
-                display_name: d.display_name,
-                description: d.description,
-                formula: d.formula,
-                format: d.format,
-                target: d.target,
-                viz_type: d.viz_type,
-                display_order: kpis.length,
-              })
-              setAdding(true)
-            }}
-          />
-          <button
-            onClick={() => setAdding(true)}
-            disabled={adding || files.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" /> Add KPI
-          </button>
-        </div>
+        {!isFocused && (
+          <div className="flex flex-wrap gap-2">
+            <FileBrowser slug={client.slug} filenames={files.map((f) => f.filename)} />
+            <AIKPIBuilder
+              slug={client.slug}
+              filenames={files.map((f) => f.filename)}
+              onAccept={(d: AIDraft) => {
+                setDraft({
+                  key: d.key,
+                  display_name: d.display_name,
+                  description: d.description,
+                  formula: d.formula,
+                  format: d.format,
+                  target: d.target,
+                  viz_type: d.viz_type,
+                  display_order: kpis.length,
+                })
+                setAdding(true)
+              }}
+            />
+            <button
+              onClick={() => setAdding(true)}
+              disabled={adding || files.length === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" /> Add KPI
+            </button>
+          </div>
+        )}
       </div>
 
       {files.length === 0 && (
@@ -253,7 +283,7 @@ export function ConfigureClient({
         </div>
       )}
 
-      {adding && (
+      {adding && !isFocused && (
         <KPIEditor
           slug={client.slug}
           value={draft}
@@ -269,12 +299,14 @@ export function ConfigureClient({
       )}
 
       <div className="space-y-3 mt-4">
-        {kpis.length === 0 && !adding ? (
+        {visibleKpis.length === 0 && !adding ? (
           <div className="p-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/30 text-slate-400 text-sm">
-            No KPIs configured yet. Click "Add KPI" to create one.
+            {isFocused
+              ? 'KPI not found for this client. The tile may have been deleted — go back and pick another.'
+              : 'No KPIs configured yet. Click "Add KPI" to create one.'}
           </div>
         ) : (
-          kpis.map((kpi) => (
+          visibleKpis.map((kpi) => (
             <KPIEditor
               key={kpi.id}
               slug={client.slug}

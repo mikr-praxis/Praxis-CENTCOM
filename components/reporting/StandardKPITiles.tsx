@@ -69,8 +69,8 @@ export function StandardKPITiles({ slug, filenames }: Props) {
             const result = byKey.get(entry.catalog_key)
             const onConfigure = () => {
               if (result?.kpi_id) {
-                // Already set up — go to the full free-form editor.
-                window.location.href = `/reporting/${slug}/configure`
+                // Already set up — open the dedicated single-KPI editor.
+                window.location.href = `/kpi-config/${slug}/${result.kpi_id}`
               } else {
                 // First setup — open the structured catalog modal.
                 setEditing({ entry, existingId: result?.kpi_id })

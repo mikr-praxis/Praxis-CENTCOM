@@ -561,15 +561,15 @@ function Workspace({
   const existingKeys = useMemo(() => new Set(results.map((r) => r.key)), [results])
   const hasCustomKpis = nonStandardResults.length > 0
 
-  // Per-tile config: navigate to the full free-form editor at
-  // /reporting/[slug]/configure. The catalog modal stays only for the "+ Add
-  // tile" guided first-setup flow — once a tile exists, the configure page
-  // is the canonical place to edit formula / viz / advanced options.
-  // Param is kept (`_result`) so JSX call sites passing the result object
-  // compile cleanly. The arg is unused — `_`-prefix silences ESLint.
-  const onConfigureKPI = useCallback((_result: KPIResult) => {
-    window.location.href = `/reporting/${client.slug}/configure`
-  }, [client.slug])
+  // Per-tile config: navigate to the dedicated single-KPI editor at
+  // /kpi-config/[slug]/[kpiId]. Each tile gets its own focused view —
+  // formula, viz type, advanced options + chart options for one tile only.
+  const onConfigureKPI = useCallback(
+    (result: KPIResult) => {
+      window.location.href = `/kpi-config/${client.slug}/${result.kpi_id}`
+    },
+    [client.slug]
+  )
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px] mx-auto">
