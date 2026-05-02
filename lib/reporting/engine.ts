@@ -164,34 +164,60 @@ function applySlicers(file: RawFileForEngine, slicers: Slicer[] | undefined, row
 }
 
 function evaluateAgg(node: AggOp, ctx: EvalContext): number | null {
-  const file = findSource(ctx.files, node.source)
-  if (!file) return null
-  ctx.sourcesUsed.add(file.filename)
+  // Build the list of files to aggregate over. With `all_files: true`, scan
+  // every synced file that contains `column` (or every file, for plain
+  // `count` which doesn't need a column). Otherwise, single source by name.
+  let files: RawFileForEngine[]
+  if (node.all_files) {
+    if (node.op === 'count' && !node.column) {
+      files = ctx.files
+    } else if (node.column) {
+      files = ctx.files.filter((f) => f.columns.includes(node.column!))
+    } else {
+      return null
+    }
+  } else {
+    const single = findSource(ctx.files, node.source)
+    if (!single) return null
+    files = [single]
+  }
 
-  const matching = file.rows.filter(
-    (row) =>
-      rowMatchesFilters(row, node.filters) &&
-      isInTimeframe(row, node.timeframe_column, ctx.timeframe) &&
-      applySlicers(file, ctx.slicers, row)
-  )
-  ctx.rowsUsed.value += matching.length
+  // Collect matching rows from every chosen file.
+  const matchingPerFile: { file: RawFileForEngine; rows: Record<string, unknown>[] }[] = []
+  for (const file of files) {
+    ctx.sourcesUsed.add(file.filename)
+    const rows = file.rows.filter(
+      (row) =>
+        rowMatchesFilters(row, node.filters) &&
+        isInTimeframe(row, node.timeframe_column, ctx.timeframe) &&
+        applySlicers(file, ctx.slicers, row)
+    )
+    ctx.rowsUsed.value += rows.length
+    matchingPerFile.push({ file, rows })
+  }
 
-  if (node.op === 'count') return matching.length
+  if (node.op === 'count') {
+    return matchingPerFile.reduce((acc, { rows }) => acc + rows.length, 0)
+  }
   if (node.op === 'count_distinct') {
     if (!node.column) return null
     const seen = new Set<string>()
-    for (const row of matching) {
-      const v = row[node.column]
-      if (v != null && v !== '') seen.add(String(v))
+    for (const { rows } of matchingPerFile) {
+      for (const row of rows) {
+        const v = row[node.column]
+        if (v != null && v !== '') seen.add(String(v))
+      }
     }
     return seen.size
   }
 
   if (!node.column) return null
   const values: number[] = []
-  for (const row of matching) {
-    const n = toNumber(row[node.column])
-    if (n != null) values.push(n)
+  for (const { rows } of matchingPerFile) {
+    for (const row of rows) {
+      const n = toNumber(row[node.column])
+      if (n != null) values.push(n)
+    }
   }
   if (values.length === 0) return node.op === 'sum' ? 0 : null
 

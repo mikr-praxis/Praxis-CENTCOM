@@ -125,6 +125,18 @@ export async function GET(
     )
   }
   const agg = formula as AggOp
+  // Cross-file aggregations (all_files: true) span every synced sheet — there
+  // isn't a single source file to drill into. Surface a friendly explanation
+  // rather than 404'ing on the sentinel "*" source.
+  if (agg.all_files) {
+    return NextResponse.json(
+      {
+        error:
+          'Drill-down isn\'t supported for cross-file aggregations. This tile sums across every synced Drive file.',
+      },
+      { status: 400 }
+    )
+  }
 
   const { data: fileRow } = await supabase
     .from('report_raw_files')

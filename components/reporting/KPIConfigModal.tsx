@@ -141,16 +141,43 @@ export function KPIConfigModal({
   )
 
   // Pre-warm the cache for any file already referenced in initialState.
+  // Skip the sentinel "*" used by all_files inputs — it's not a real file.
   useEffect(() => {
     if (!initialState) return
     const seen = new Set<string>()
     for (const v of Object.values(initialState)) {
       const list = Array.isArray(v) ? v : [v]
-      for (const s of list) if (s.source) seen.add(s.source)
+      for (const s of list) if (s.source && s.source !== '*') seen.add(s.source)
     }
     seen.forEach((f) => inspectFile(f))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // For all_files inputs we need the column union across every synced file —
+  // pre-inspect them all so the column dropdown is populated.
+  const hasAllFilesInput = inputs.some((i) => i.scope === 'all_files')
+  useEffect(() => {
+    if (!hasAllFilesInput) return
+    for (const f of filenames) inspectFile(f)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAllFilesInput, filenames.join('|')])
+
+  /** Distinct column names across every inspected file, with the count of
+   *  files each appears in. Used by the all_files column picker. */
+  const allFilesColumns = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const cols of Object.values(columnsByFile)) {
+      const seen = new Set<string>()
+      for (const c of cols) {
+        if (seen.has(c.name)) continue
+        seen.add(c.name)
+        counts.set(c.name, (counts.get(c.name) ?? 0) + 1)
+      }
+    }
+    return [...counts.entries()]
+      .map(([name, fileCount]) => ({ name, fileCount }))
+      .sort((a, b) => b.fileCount - a.fileCount || a.name.localeCompare(b.name))
+  }, [columnsByFile])
 
   function updateSingle(inputId: string, patch: Partial<CatalogInputState>) {
     setState((prev) => {
@@ -355,6 +382,49 @@ export function KPIConfigModal({
 
           {inputs.map((input) => {
             const value = state[input.id]
+
+            // all_files mode — single column picker, deduped across every
+            // synced file. No source-file dropdown, no per-source rows.
+            if (input.scope === 'all_files') {
+              const single = !Array.isArray(value) ? value : { source: '', column: '' }
+              const inspectingAll = filenames.some((f) => inspecting.has(f) && !columnsByFile[f])
+              return (
+                <div key={input.id} className="space-y-2">
+                  <div>
+                    <div className="text-sm font-medium text-white">{input.label}</div>
+                    {input.hint && <div className="text-[11px] text-slate-400 mt-0.5">{input.hint}</div>}
+                  </div>
+                  <div className="rounded-lg border border-slate-700/50 bg-slate-800/40 p-3">
+                    <label className="block text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+                      Column (across all Drive files)
+                    </label>
+                    <select
+                      value={single.column}
+                      onChange={(e) => updateSingle(input.id, { column: e.target.value, source: '*' })}
+                      disabled={inspectingAll || allFilesColumns.length === 0}
+                      className="w-full rounded-md bg-slate-900 border border-slate-700 px-2 py-1.5 text-sm text-white disabled:opacity-50"
+                    >
+                      <option value="">
+                        {inspectingAll
+                          ? 'Loading columns…'
+                          : allFilesColumns.length === 0
+                            ? 'No columns found'
+                            : '—'}
+                      </option>
+                      {allFilesColumns.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name} ({c.fileCount} {c.fileCount === 1 ? 'file' : 'files'})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1.5 text-[10px] text-slate-500">
+                      The engine sums this column across every synced Drive file that has it.
+                    </p>
+                  </div>
+                </div>
+              )
+            }
+
             if (input.repeatable) {
               const list = Array.isArray(value) ? value : [{ source: '', column: '' }]
               return (

@@ -30,6 +30,13 @@ export interface CatalogInput {
   repeatable?: boolean
   /** When true, the user is encouraged to add row filters (e.g. status = qualified). */
   filterable?: boolean
+  /** Aggregation scope.
+   *  - `'file'` (default): user picks a specific source file + column.
+   *  - `'all_files'`: user picks ONLY a column name; engine pulls the column
+   *    from every synced file in the Drive folder that contains it. Used by
+   *    the standard lifetime tiles so setup is one column-pick, not one per
+   *    file. */
+  scope?: 'file' | 'all_files'
 }
 
 /** The shape of user input the modal collects per slot. */
@@ -83,6 +90,19 @@ function makeAgg(s: CatalogInputState, op: CatalogInput['agg_op']): AggOp {
   }
 }
 
+/** Build an `all_files` AggOp — engine aggregates the column across every
+ *  synced file that has it. Used by the standard lifetime tiles. */
+function makeAllFilesAgg(s: CatalogInputState, op: CatalogInput['agg_op']): AggOp {
+  return {
+    op,
+    source: '*', // ignored when all_files is true; kept for type safety
+    column: s.column,
+    all_files: true,
+    ...(s.filters && s.filters.length > 0 ? { filters: s.filters } : {}),
+    ...(s.timeframe_column ? { timeframe_column: s.timeframe_column } : {}),
+  }
+}
+
 function asSingle(v: CatalogInputValue | undefined): CatalogInputState | null {
   if (!v) return null
   if (Array.isArray(v)) return v[0] ?? null
@@ -110,53 +130,53 @@ function sumAggs(aggs: AggOp[]): Formula | null {
 const STANDARD_REVENUE: CatalogEntry = {
   catalog_key: 'std_lifetime_revenue',
   display_name: 'Total Lifetime Revenue',
-  description: 'Sum of all collected revenue across the client\'s files. Lifetime — ignores timeframe picker.',
+  description: 'Sum of the chosen revenue column across every synced Drive file that has it. Lifetime — ignores the timeframe picker.',
   category: 'standard',
   format: 'currency',
   viz_type: 'card',
   inputs: [
     {
       id: 'revenue',
-      label: 'Revenue source(s)',
-      hint: 'Pick the column(s) holding cash collected. Add multiple sources if revenue lives in more than one sheet.',
+      label: 'Revenue column',
+      hint: 'Pick a column name. The engine sums it wherever it appears across the Drive folder.',
       agg_op: 'sum',
-      repeatable: true,
+      scope: 'all_files',
     },
   ],
   build: (state) => {
-    const sources = asList(state.revenue)
-    if (sources.length === 0) return null
-    return sumAggs(sources.map((s) => makeAgg(s, 'sum')))
+    const s = asSingle(state.revenue)
+    if (!s || !s.column) return null
+    return makeAllFilesAgg(s, 'sum')
   },
 }
 
 const STANDARD_CALLS_BOOKED: CatalogEntry = {
   catalog_key: 'std_lifetime_calls_booked',
   display_name: 'Total Calls Booked',
-  description: 'Total calls booked across all sources. Lifetime — ignores timeframe picker.',
+  description: 'Total calls booked, summed from the chosen column across every synced Drive file. Lifetime — ignores the timeframe picker.',
   category: 'standard',
   format: 'count',
   viz_type: 'card',
   inputs: [
     {
       id: 'calls',
-      label: 'Calls booked source(s)',
-      hint: 'Pick a count column, or use a row-count column. Add multiple sources if needed.',
+      label: 'Calls booked column',
+      hint: 'Pick the column. The engine pulls it from every Drive file that contains it.',
       agg_op: 'sum',
-      repeatable: true,
+      scope: 'all_files',
     },
   ],
   build: (state) => {
-    const sources = asList(state.calls)
-    if (sources.length === 0) return null
-    return sumAggs(sources.map((s) => makeAgg(s, 'sum')))
+    const s = asSingle(state.calls)
+    if (!s || !s.column) return null
+    return makeAllFilesAgg(s, 'sum')
   },
 }
 
 const STANDARD_CONVERSION_RATE: CatalogEntry = {
   catalog_key: 'std_lifetime_conversion_rate',
   display_name: 'Total Conversion Rate',
-  description: 'Lifetime conversion rate. Pick which conversion you want to track at setup.',
+  description: 'Lifetime conversion rate, summed across every synced Drive file. Pick numerator + denominator columns; the engine pulls each from any file that has it.',
   category: 'standard',
   format: 'percent',
   viz_type: 'card',
@@ -166,16 +186,18 @@ const STANDARD_CONVERSION_RATE: CatalogEntry = {
       label: 'Lead → Close (closes / leads)',
       description: 'What share of all leads become closed deals.',
       inputs: [
-        { id: 'closes', label: 'Closes / sales source(s)', agg_op: 'sum', repeatable: true },
-        { id: 'leads', label: 'Leads / opt-ins source(s)', agg_op: 'sum', repeatable: true },
+        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
+        { id: 'leads', label: 'Leads / opt-ins column', agg_op: 'sum', scope: 'all_files' },
       ],
       build: (state) => {
-        const numAggs = asList(state.closes).map((s) => makeAgg(s, 'sum'))
-        const denAggs = asList(state.leads).map((s) => makeAgg(s, 'sum'))
-        const numerator = sumAggs(numAggs)
-        const denominator = sumAggs(denAggs)
-        if (!numerator || !denominator) return null
-        return { op: 'divide', numerator, denominator }
+        const num = asSingle(state.closes)
+        const den = asSingle(state.leads)
+        if (!num?.column || !den?.column) return null
+        return {
+          op: 'divide',
+          numerator: makeAllFilesAgg(num, 'sum'),
+          denominator: makeAllFilesAgg(den, 'sum'),
+        }
       },
     },
     {
@@ -183,16 +205,18 @@ const STANDARD_CONVERSION_RATE: CatalogEntry = {
       label: 'Book → Close (closes / calls booked)',
       description: 'What share of booked calls turn into closes.',
       inputs: [
-        { id: 'closes', label: 'Closes / sales source(s)', agg_op: 'sum', repeatable: true },
-        { id: 'calls', label: 'Calls booked source(s)', agg_op: 'sum', repeatable: true },
+        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
+        { id: 'calls', label: 'Calls booked column', agg_op: 'sum', scope: 'all_files' },
       ],
       build: (state) => {
-        const numAggs = asList(state.closes).map((s) => makeAgg(s, 'sum'))
-        const denAggs = asList(state.calls).map((s) => makeAgg(s, 'sum'))
-        const numerator = sumAggs(numAggs)
-        const denominator = sumAggs(denAggs)
-        if (!numerator || !denominator) return null
-        return { op: 'divide', numerator, denominator }
+        const num = asSingle(state.closes)
+        const den = asSingle(state.calls)
+        if (!num?.column || !den?.column) return null
+        return {
+          op: 'divide',
+          numerator: makeAllFilesAgg(num, 'sum'),
+          denominator: makeAllFilesAgg(den, 'sum'),
+        }
       },
     },
     {
@@ -200,16 +224,18 @@ const STANDARD_CONVERSION_RATE: CatalogEntry = {
       label: 'Show → Close (closes / calls showed)',
       description: 'What share of attended calls close. (Same numerator/denominator as the Close Rate KPI.)',
       inputs: [
-        { id: 'closes', label: 'Closes / sales source(s)', agg_op: 'sum', repeatable: true },
-        { id: 'shows', label: 'Calls showed source(s)', agg_op: 'sum', repeatable: true },
+        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
+        { id: 'shows', label: 'Calls showed column', agg_op: 'sum', scope: 'all_files' },
       ],
       build: (state) => {
-        const numAggs = asList(state.closes).map((s) => makeAgg(s, 'sum'))
-        const denAggs = asList(state.shows).map((s) => makeAgg(s, 'sum'))
-        const numerator = sumAggs(numAggs)
-        const denominator = sumAggs(denAggs)
-        if (!numerator || !denominator) return null
-        return { op: 'divide', numerator, denominator }
+        const num = asSingle(state.closes)
+        const den = asSingle(state.shows)
+        if (!num?.column || !den?.column) return null
+        return {
+          op: 'divide',
+          numerator: makeAllFilesAgg(num, 'sum'),
+          denominator: makeAllFilesAgg(den, 'sum'),
+        }
       },
     },
   ],
