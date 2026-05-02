@@ -15,6 +15,7 @@
 
 import type { Formula, AggOp, Filter } from './types'
 import type { KPIFormat, KPIVizType } from '@/lib/supabase/types'
+import type { CanonicalMetric, DetectedColumns } from './auto-detect'
 
 /* ───────────────────────────── Types ───────────────────────────── */
 
@@ -69,6 +70,9 @@ export interface CatalogEntry {
   display_name: string
   description: string
   category: 'standard' | 'paid_media' | 'funnel' | 'sales'
+  /** Sub-grouping for the Standard tiles UI: volumes / costs / rates / averages.
+   *  Only set on `category === 'standard'` entries. */
+  std_group?: 'volumes' | 'costs' | 'rates' | 'averages'
   format: KPIFormat
   viz_type: KPIVizType
   /** Either a flat input list OR variants (mutually exclusive). */
@@ -76,6 +80,15 @@ export interface CatalogEntry {
   variants?: CatalogVariant[]
   /** Formula builder for the flat case. Variants override this. */
   build?: (state: Record<string, CatalogInputValue>) => Formula | null
+  /** Zero-config formula builder. When present, the /standard-tiles route uses
+   *  this to compose a Formula from auto-detected canonical column names —
+   *  no user setup required. Returns null when one of the required canonical
+   *  metrics couldn't be detected, in which case the tile renders as "—".
+   *  Only set on standard tiles. */
+  auto_build?: (detected: DetectedColumns) => {
+    formula: Formula
+    used: CanonicalMetric[]
+  } | null
 }
 
 /* ──────────────────────── Helpers ──────────────────────── */
@@ -125,120 +138,396 @@ function sumAggs(aggs: AggOp[]): Formula | null {
   return acc
 }
 
+/* ──────────────────────── Auto-build helpers (zero-config) ──────────────────────── */
+
+/** Build an `all_files: true` sum of a column. */
+function allFilesSum(column: string): AggOp {
+  return { op: 'sum', source: '*', column, all_files: true }
+}
+
+/** Build a divide(num, den) formula. */
+function divide(num: Formula, den: Formula): Formula {
+  return { op: 'divide', numerator: num, denominator: den }
+}
+
+/** Helper: compose an auto_build that requires all listed metrics, sums the
+ *  first one (for "totals" tiles like spend/leads/etc). */
+function autoSumOf(metric: CanonicalMetric) {
+  return (detected: DetectedColumns) => {
+    const col = detected[metric]
+    if (!col) return null
+    return { formula: allFilesSum(col), used: [metric] }
+  }
+}
+
+/** Helper: compose an auto_build for ratio tiles (numerator / denominator). */
+function autoRatioOf(num: CanonicalMetric, den: CanonicalMetric) {
+  return (detected: DetectedColumns) => {
+    const numCol = detected[num]
+    const denCol = detected[den]
+    if (!numCol || !denCol) return null
+    return {
+      formula: divide(allFilesSum(numCol), allFilesSum(denCol)),
+      used: [num, den],
+    }
+  }
+}
+
 /* ──────────────────────── Standard tiles ──────────────────────── */
 
-const STANDARD_REVENUE: CatalogEntry = {
-  catalog_key: 'std_lifetime_revenue',
-  display_name: 'Total Lifetime Revenue',
-  description: 'Sum of the chosen revenue column across every synced Drive file that has it. Lifetime — ignores the timeframe picker.',
+/* Standard tiles — the always-on, zero-config tiles at the top of the client
+ * view. Each has both:
+ *   - a `build()` for the manual "Configure" modal (existing override path),
+ *   - an `auto_build()` that turns auto-detected canonical columns into a
+ *     Formula with no user input. The /standard-tiles route prefers any
+ *     existing override row, falling back to auto_build.
+ */
+
+// Volumes
+const STANDARD_SPEND: CatalogEntry = {
+  catalog_key: 'std_lifetime_spend',
+  display_name: 'Total Spend',
+  description: 'Lifetime ad spend, summed across every synced Drive file that has a spend column.',
   category: 'standard',
+  std_group: 'volumes',
   format: 'currency',
   viz_type: 'card',
-  inputs: [
-    {
-      id: 'revenue',
-      label: 'Revenue column',
-      hint: 'Pick a column name. The engine sums it wherever it appears across the Drive folder.',
-      agg_op: 'sum',
-      scope: 'all_files',
-    },
-  ],
+  inputs: [{ id: 'spend', label: 'Spend column', agg_op: 'sum', scope: 'all_files' }],
   build: (state) => {
-    const s = asSingle(state.revenue)
-    if (!s || !s.column) return null
-    return makeAllFilesAgg(s, 'sum')
+    const s = asSingle(state.spend)
+    return s?.column ? makeAllFilesAgg(s, 'sum') : null
   },
+  auto_build: autoSumOf('spend'),
+}
+
+const STANDARD_LEADS: CatalogEntry = {
+  catalog_key: 'std_lifetime_leads',
+  display_name: 'Total Leads',
+  description: 'Total opt-ins / leads. Summed across every synced file that has the column.',
+  category: 'standard',
+  std_group: 'volumes',
+  format: 'count',
+  viz_type: 'card',
+  inputs: [{ id: 'leads', label: 'Leads column', agg_op: 'sum', scope: 'all_files' }],
+  build: (state) => {
+    const s = asSingle(state.leads)
+    return s?.column ? makeAllFilesAgg(s, 'sum') : null
+  },
+  auto_build: autoSumOf('leads'),
 }
 
 const STANDARD_CALLS_BOOKED: CatalogEntry = {
   catalog_key: 'std_lifetime_calls_booked',
   display_name: 'Total Calls Booked',
-  description: 'Total calls booked, summed from the chosen column across every synced Drive file. Lifetime — ignores the timeframe picker.',
+  description: 'Lifetime calls booked, summed across every synced Drive file.',
   category: 'standard',
+  std_group: 'volumes',
   format: 'count',
   viz_type: 'card',
-  inputs: [
-    {
-      id: 'calls',
-      label: 'Calls booked column',
-      hint: 'Pick the column. The engine pulls it from every Drive file that contains it.',
-      agg_op: 'sum',
-      scope: 'all_files',
-    },
-  ],
+  inputs: [{ id: 'calls', label: 'Calls booked column', agg_op: 'sum', scope: 'all_files' }],
   build: (state) => {
     const s = asSingle(state.calls)
-    if (!s || !s.column) return null
-    return makeAllFilesAgg(s, 'sum')
+    return s?.column ? makeAllFilesAgg(s, 'sum') : null
   },
+  auto_build: autoSumOf('calls_booked'),
+}
+
+const STANDARD_CALLS_SHOWED: CatalogEntry = {
+  catalog_key: 'std_lifetime_calls_showed',
+  display_name: 'Total Calls Showed',
+  description: 'Lifetime calls showed / attended.',
+  category: 'standard',
+  std_group: 'volumes',
+  format: 'count',
+  viz_type: 'card',
+  inputs: [{ id: 'shows', label: 'Calls showed column', agg_op: 'sum', scope: 'all_files' }],
+  build: (state) => {
+    const s = asSingle(state.shows)
+    return s?.column ? makeAllFilesAgg(s, 'sum') : null
+  },
+  auto_build: autoSumOf('calls_showed'),
+}
+
+const STANDARD_CLOSES: CatalogEntry = {
+  catalog_key: 'std_lifetime_closes',
+  display_name: 'Total Closes',
+  description: 'Lifetime closed deals / sales.',
+  category: 'standard',
+  std_group: 'volumes',
+  format: 'count',
+  viz_type: 'card',
+  inputs: [{ id: 'closes', label: 'Closes column', agg_op: 'sum', scope: 'all_files' }],
+  build: (state) => {
+    const s = asSingle(state.closes)
+    return s?.column ? makeAllFilesAgg(s, 'sum') : null
+  },
+  auto_build: autoSumOf('closes'),
+}
+
+const STANDARD_REVENUE: CatalogEntry = {
+  catalog_key: 'std_lifetime_revenue',
+  display_name: 'Total Revenue',
+  description: 'Lifetime revenue, summed across every synced Drive file that has a revenue column.',
+  category: 'standard',
+  std_group: 'volumes',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [{ id: 'revenue', label: 'Revenue column', agg_op: 'sum', scope: 'all_files' }],
+  build: (state) => {
+    const s = asSingle(state.revenue)
+    return s?.column ? makeAllFilesAgg(s, 'sum') : null
+  },
+  auto_build: autoSumOf('revenue'),
+}
+
+const STANDARD_CASH_COLLECTED: CatalogEntry = {
+  catalog_key: 'std_lifetime_cash_collected',
+  display_name: 'Total Cash Collected',
+  description: 'Lifetime cash actually collected (vs contracted revenue).',
+  category: 'standard',
+  std_group: 'volumes',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [{ id: 'cash', label: 'Cash collected column', agg_op: 'sum', scope: 'all_files' }],
+  build: (state) => {
+    const s = asSingle(state.cash)
+    return s?.column ? makeAllFilesAgg(s, 'sum') : null
+  },
+  auto_build: autoSumOf('cash_collected'),
+}
+
+// Costs
+const STANDARD_CPL: CatalogEntry = {
+  catalog_key: 'std_lifetime_cpl',
+  display_name: 'CPL',
+  description: 'Cost per lead — lifetime spend ÷ leads.',
+  category: 'standard',
+  std_group: 'costs',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [
+    { id: 'spend', label: 'Spend column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'leads', label: 'Leads column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const sp = asSingle(state.spend)
+    const ld = asSingle(state.leads)
+    if (!sp?.column || !ld?.column) return null
+    return divide(makeAllFilesAgg(sp, 'sum'), makeAllFilesAgg(ld, 'sum'))
+  },
+  auto_build: autoRatioOf('spend', 'leads'),
+}
+
+const STANDARD_CPB: CatalogEntry = {
+  catalog_key: 'std_lifetime_cpb',
+  display_name: 'Cost per Booking',
+  description: 'Spend ÷ calls booked.',
+  category: 'standard',
+  std_group: 'costs',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [
+    { id: 'spend', label: 'Spend column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'calls', label: 'Calls booked column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const sp = asSingle(state.spend)
+    const cb = asSingle(state.calls)
+    if (!sp?.column || !cb?.column) return null
+    return divide(makeAllFilesAgg(sp, 'sum'), makeAllFilesAgg(cb, 'sum'))
+  },
+  auto_build: autoRatioOf('spend', 'calls_booked'),
+}
+
+const STANDARD_CPS: CatalogEntry = {
+  catalog_key: 'std_lifetime_cps',
+  display_name: 'Cost per Show',
+  description: 'Spend ÷ calls showed.',
+  category: 'standard',
+  std_group: 'costs',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [
+    { id: 'spend', label: 'Spend column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'shows', label: 'Calls showed column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const sp = asSingle(state.spend)
+    const sh = asSingle(state.shows)
+    if (!sp?.column || !sh?.column) return null
+    return divide(makeAllFilesAgg(sp, 'sum'), makeAllFilesAgg(sh, 'sum'))
+  },
+  auto_build: autoRatioOf('spend', 'calls_showed'),
+}
+
+const STANDARD_CPA: CatalogEntry = {
+  catalog_key: 'std_lifetime_cpa',
+  display_name: 'CPA',
+  description: 'Cost per acquisition — spend ÷ closes.',
+  category: 'standard',
+  std_group: 'costs',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [
+    { id: 'spend', label: 'Spend column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'closes', label: 'Closes column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const sp = asSingle(state.spend)
+    const cl = asSingle(state.closes)
+    if (!sp?.column || !cl?.column) return null
+    return divide(makeAllFilesAgg(sp, 'sum'), makeAllFilesAgg(cl, 'sum'))
+  },
+  auto_build: autoRatioOf('spend', 'closes'),
+}
+
+const STANDARD_ROAS: CatalogEntry = {
+  catalog_key: 'std_lifetime_roas',
+  display_name: 'ROAS',
+  description: 'Return on ad spend — revenue ÷ spend.',
+  category: 'standard',
+  std_group: 'costs',
+  format: 'ratio',
+  viz_type: 'card',
+  inputs: [
+    { id: 'revenue', label: 'Revenue column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'spend', label: 'Spend column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const rv = asSingle(state.revenue)
+    const sp = asSingle(state.spend)
+    if (!rv?.column || !sp?.column) return null
+    return divide(makeAllFilesAgg(rv, 'sum'), makeAllFilesAgg(sp, 'sum'))
+  },
+  auto_build: autoRatioOf('revenue', 'spend'),
+}
+
+// Rates
+const STANDARD_BOOKING_RATE: CatalogEntry = {
+  catalog_key: 'std_lifetime_booking_rate',
+  display_name: 'Booking Rate',
+  description: 'Calls booked ÷ leads.',
+  category: 'standard',
+  std_group: 'rates',
+  format: 'percent',
+  viz_type: 'card',
+  inputs: [
+    { id: 'calls', label: 'Calls booked column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'leads', label: 'Leads column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const cb = asSingle(state.calls)
+    const ld = asSingle(state.leads)
+    if (!cb?.column || !ld?.column) return null
+    return divide(makeAllFilesAgg(cb, 'sum'), makeAllFilesAgg(ld, 'sum'))
+  },
+  auto_build: autoRatioOf('calls_booked', 'leads'),
+}
+
+const STANDARD_SHOW_RATE: CatalogEntry = {
+  catalog_key: 'std_lifetime_show_rate',
+  display_name: 'Show Rate',
+  description: 'Calls showed ÷ calls booked.',
+  category: 'standard',
+  std_group: 'rates',
+  format: 'percent',
+  viz_type: 'card',
+  inputs: [
+    { id: 'shows', label: 'Calls showed column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'calls', label: 'Calls booked column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const sh = asSingle(state.shows)
+    const cb = asSingle(state.calls)
+    if (!sh?.column || !cb?.column) return null
+    return divide(makeAllFilesAgg(sh, 'sum'), makeAllFilesAgg(cb, 'sum'))
+  },
+  auto_build: autoRatioOf('calls_showed', 'calls_booked'),
+}
+
+const STANDARD_CLOSE_RATE: CatalogEntry = {
+  catalog_key: 'std_lifetime_close_rate',
+  display_name: 'Close Rate',
+  description: 'Closes ÷ calls showed.',
+  category: 'standard',
+  std_group: 'rates',
+  format: 'percent',
+  viz_type: 'card',
+  inputs: [
+    { id: 'closes', label: 'Closes column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'shows', label: 'Calls showed column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const cl = asSingle(state.closes)
+    const sh = asSingle(state.shows)
+    if (!cl?.column || !sh?.column) return null
+    return divide(makeAllFilesAgg(cl, 'sum'), makeAllFilesAgg(sh, 'sum'))
+  },
+  auto_build: autoRatioOf('closes', 'calls_showed'),
 }
 
 const STANDARD_CONVERSION_RATE: CatalogEntry = {
   catalog_key: 'std_lifetime_conversion_rate',
-  display_name: 'Total Conversion Rate',
-  description: 'Lifetime conversion rate, summed across every synced Drive file. Pick numerator + denominator columns; the engine pulls each from any file that has it.',
+  display_name: 'Lead → Close Rate',
+  description: 'End-to-end conversion: closes ÷ leads.',
   category: 'standard',
+  std_group: 'rates',
   format: 'percent',
   viz_type: 'card',
-  variants: [
-    {
-      id: 'lead_to_close',
-      label: 'Lead → Close (closes / leads)',
-      description: 'What share of all leads become closed deals.',
-      inputs: [
-        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
-        { id: 'leads', label: 'Leads / opt-ins column', agg_op: 'sum', scope: 'all_files' },
-      ],
-      build: (state) => {
-        const num = asSingle(state.closes)
-        const den = asSingle(state.leads)
-        if (!num?.column || !den?.column) return null
-        return {
-          op: 'divide',
-          numerator: makeAllFilesAgg(num, 'sum'),
-          denominator: makeAllFilesAgg(den, 'sum'),
-        }
-      },
-    },
-    {
-      id: 'book_to_close',
-      label: 'Book → Close (closes / calls booked)',
-      description: 'What share of booked calls turn into closes.',
-      inputs: [
-        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
-        { id: 'calls', label: 'Calls booked column', agg_op: 'sum', scope: 'all_files' },
-      ],
-      build: (state) => {
-        const num = asSingle(state.closes)
-        const den = asSingle(state.calls)
-        if (!num?.column || !den?.column) return null
-        return {
-          op: 'divide',
-          numerator: makeAllFilesAgg(num, 'sum'),
-          denominator: makeAllFilesAgg(den, 'sum'),
-        }
-      },
-    },
-    {
-      id: 'show_to_close',
-      label: 'Show → Close (closes / calls showed)',
-      description: 'What share of attended calls close. (Same numerator/denominator as the Close Rate KPI.)',
-      inputs: [
-        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
-        { id: 'shows', label: 'Calls showed column', agg_op: 'sum', scope: 'all_files' },
-      ],
-      build: (state) => {
-        const num = asSingle(state.closes)
-        const den = asSingle(state.shows)
-        if (!num?.column || !den?.column) return null
-        return {
-          op: 'divide',
-          numerator: makeAllFilesAgg(num, 'sum'),
-          denominator: makeAllFilesAgg(den, 'sum'),
-        }
-      },
-    },
+  inputs: [
+    { id: 'closes', label: 'Closes column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'leads', label: 'Leads column', agg_op: 'sum', scope: 'all_files' },
   ],
+  build: (state) => {
+    const cl = asSingle(state.closes)
+    const ld = asSingle(state.leads)
+    if (!cl?.column || !ld?.column) return null
+    return divide(makeAllFilesAgg(cl, 'sum'), makeAllFilesAgg(ld, 'sum'))
+  },
+  auto_build: autoRatioOf('closes', 'leads'),
+}
+
+// Averages
+const STANDARD_AOV: CatalogEntry = {
+  catalog_key: 'std_lifetime_aov',
+  display_name: 'AOV',
+  description: 'Average order value — revenue ÷ closes.',
+  category: 'standard',
+  std_group: 'averages',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [
+    { id: 'revenue', label: 'Revenue column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'closes', label: 'Closes column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const rv = asSingle(state.revenue)
+    const cl = asSingle(state.closes)
+    if (!rv?.column || !cl?.column) return null
+    return divide(makeAllFilesAgg(rv, 'sum'), makeAllFilesAgg(cl, 'sum'))
+  },
+  auto_build: autoRatioOf('revenue', 'closes'),
+}
+
+const STANDARD_CASH_PER_CLOSE: CatalogEntry = {
+  catalog_key: 'std_lifetime_cash_per_close',
+  display_name: 'Cash per Close',
+  description: 'Cash collected ÷ closes — what each closed deal actually paid.',
+  category: 'standard',
+  std_group: 'averages',
+  format: 'currency',
+  viz_type: 'card',
+  inputs: [
+    { id: 'cash', label: 'Cash collected column', agg_op: 'sum', scope: 'all_files' },
+    { id: 'closes', label: 'Closes column', agg_op: 'sum', scope: 'all_files' },
+  ],
+  build: (state) => {
+    const ca = asSingle(state.cash)
+    const cl = asSingle(state.closes)
+    if (!ca?.column || !cl?.column) return null
+    return divide(makeAllFilesAgg(ca, 'sum'), makeAllFilesAgg(cl, 'sum'))
+  },
+  auto_build: autoRatioOf('cash_collected', 'closes'),
 }
 
 /* ──────────────────────── Customizable catalog ──────────────────────── */
@@ -491,9 +780,28 @@ const PITCH_CLOSE_RATE: CatalogEntry = {
 /* ──────────────────────── Exports ──────────────────────── */
 
 export const STANDARD_CATALOG: CatalogEntry[] = [
-  STANDARD_REVENUE,
+  // Volumes
+  STANDARD_SPEND,
+  STANDARD_LEADS,
   STANDARD_CALLS_BOOKED,
+  STANDARD_CALLS_SHOWED,
+  STANDARD_CLOSES,
+  STANDARD_REVENUE,
+  STANDARD_CASH_COLLECTED,
+  // Costs
+  STANDARD_CPL,
+  STANDARD_CPB,
+  STANDARD_CPS,
+  STANDARD_CPA,
+  STANDARD_ROAS,
+  // Rates
+  STANDARD_BOOKING_RATE,
+  STANDARD_SHOW_RATE,
+  STANDARD_CLOSE_RATE,
   STANDARD_CONVERSION_RATE,
+  // Averages
+  STANDARD_AOV,
+  STANDARD_CASH_PER_CLOSE,
 ]
 
 export const CUSTOMIZABLE_CATALOG: CatalogEntry[] = [
