@@ -68,7 +68,7 @@ interface Props {
   clients: ClientSummary[]
   /** From app_config REPORTING_DEFAULT_KPI_COUNT (Hardcoded tab). Defaults to 6. */
   defaultKpiCount?: number
-  /** From app_config REPORTING_DEFAULT_TIMEFRAME (Hardcoded tab). Defaults to '30d'. */
+  /** From app_config REPORTING_DEFAULT_TIMEFRAME (Hardcoded tab). Defaults to 'data_30d' — last 30 days OF DATA, not last 30 calendar days. */
   defaultTimeframe?: string
   /** From app_config REPORTING_DEFAULT_FUNNEL_TYPE. Defaults to 'call'. */
   defaultFunnelType?: 'call' | 'webinar' | 'challenge'
@@ -77,7 +77,7 @@ interface Props {
 export function ClientsHome({
   clients,
   defaultKpiCount = 6,
-  defaultTimeframe = '30d',
+  defaultTimeframe = 'data_30d',
   defaultFunnelType = 'call',
 }: Props) {
   const [activeId, setActiveId] = useState<string | null>(clients[0]?.id ?? null)
@@ -626,7 +626,7 @@ function Workspace({
               <span className="text-emerald-100">=</span>
               <span className="truncate max-w-[200px]">{timeframe.event.value}</span>
               <button
-                onClick={() => setTimeframe(computeTimeframe('30d', null, null))}
+                onClick={() => setTimeframe(computeTimeframe('data_30d', null, null))}
                 className="ml-1 text-emerald-300 hover:text-emerald-100"
                 title="Clear event filter and reset timeframe"
               >

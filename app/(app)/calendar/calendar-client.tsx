@@ -328,19 +328,35 @@ export function CalendarClient() {
     }
 
     try {
-      const [calendarRes, mondayRes] = await Promise.all([
-        fetch(`/api/calendar?start=${start.toISOString()}&end=${end.toISOString()}`),
-        fetch('/api/monday'),
-      ])
+      // Hard 8-second timeout per request — Google + Monday API hangs are not
+      // uncommon, and we don't want to leave the user staring at a perpetual
+      // skeleton. Each request has its own AbortController so a slow Monday
+      // doesn't block the calendar grid.
+      const calCtrl = new AbortController()
+      const monCtrl = new AbortController()
+      const calTimer = setTimeout(() => calCtrl.abort(), 8000)
+      const monTimer = setTimeout(() => monCtrl.abort(), 8000)
 
-      if (calendarRes.ok) {
-        const json = await calendarRes.json()
+      const [calendarRes, mondayRes] = await Promise.allSettled([
+        fetch(`/api/calendar?start=${start.toISOString()}&end=${end.toISOString()}`, { signal: calCtrl.signal }),
+        fetch('/api/monday', { signal: monCtrl.signal }),
+      ])
+      clearTimeout(calTimer)
+      clearTimeout(monTimer)
+
+      if (calendarRes.status === 'fulfilled' && calendarRes.value.ok) {
+        const json = await calendarRes.value.json()
         setData(json)
+      } else if (calendarRes.status === 'rejected') {
+        console.error('Calendar fetch failed:', calendarRes.reason)
       }
 
-      if (mondayRes.ok) {
-        const json = await mondayRes.json()
+      if (mondayRes.status === 'fulfilled' && mondayRes.value.ok) {
+        const json = await mondayRes.value.json()
         setMondayData(json)
+      } else if (mondayRes.status === 'rejected') {
+        // Non-fatal — TaskDeadlineModule has its own retry UI; just log here.
+        console.error('Monday fetch failed:', mondayRes.reason)
       }
 
       lastFetchRef.current = Date.now()

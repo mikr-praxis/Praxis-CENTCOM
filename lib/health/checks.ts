@@ -33,6 +33,10 @@ export interface HealthCheck {
     auto_fix?: AutoFixAction
     /** External link the user should open to remediate (e.g. GCP console). */
     doc_link?: string
+    /** Migration filename (e.g. '016_reporting_v2.sql') the UI can fetch
+     *  + copy from /api/admin/migrations/[file] for one-click paste into
+     *  the Supabase SQL editor. */
+    migration?: string
   }
 }
 
@@ -123,7 +127,10 @@ async function checkColumn(
         name: `Column: ${table}.${column}`,
         status: 'fail',
         message: error.message,
-        fix: { description: `Run migration ${migration} in the Supabase SQL editor.` },
+        fix: {
+          description: `Run migration ${migration} in the Supabase SQL editor.`,
+          migration,
+        },
       }
     }
     return {
@@ -140,7 +147,10 @@ async function checkColumn(
       name: `Column: ${table}.${column}`,
       status: 'fail',
       message: e instanceof Error ? e.message : 'Unreachable',
-      fix: { description: `Run migration ${migration} in the Supabase SQL editor.` },
+      fix: {
+        description: `Run migration ${migration} in the Supabase SQL editor.`,
+        migration,
+      },
     }
   }
 }

@@ -21,9 +21,19 @@ export async function PUT(request: Request) {
   if (!key) return NextResponse.json({ error: 'key is required' }, { status: 400 })
 
   const supabase = createServerClient()
-  const { error } = await supabase
+  const updated_at = new Date().toISOString()
+  let { error } = await supabase
     .from('app_config')
-    .upsert({ key, value, updated_by: userId, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+    .upsert({ key, value, updated_by: userId, updated_at }, { onConflict: 'key' })
+
+  // Defensive fallback for live DBs whose app_config.updated_by column is
+  // missing (schema drift vs migration 010).
+  if (error && /updated_by/i.test(error.message)) {
+    const retry = await supabase
+      .from('app_config')
+      .upsert({ key, value, updated_at }, { onConflict: 'key' })
+    error = retry.error
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ saved: true, key })

@@ -14,6 +14,8 @@ import {
   ExternalLink,
   Zap,
   Send,
+  Copy,
+  Check,
 } from 'lucide-react'
 import type { HealthCheck, HealthReport, HealthStatus } from '@/lib/health/checks'
 
@@ -257,10 +259,13 @@ export function HealthClient({ initialReport }: Props) {
                           </code>
                         </div>
                         <p className="text-xs text-slate-400 mt-0.5 break-words">{c.message}</p>
-                        {c.fix && (c.fix.description || c.fix.doc_link || c.fix.auto_fix) && (
+                        {c.fix && (c.fix.description || c.fix.doc_link || c.fix.auto_fix || c.fix.migration) && (
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             {c.fix.description && (
                               <p className="text-[11px] text-slate-500">{c.fix.description}</p>
+                            )}
+                            {c.fix.migration && (
+                              <CopyMigrationButton file={c.fix.migration} />
                             )}
                             {c.fix.doc_link && (
                               <a
@@ -294,6 +299,73 @@ export function HealthClient({ initialReport }: Props) {
         })}
       </div>
     </div>
+  )
+}
+
+/** Inline button that fetches a migration's SQL from /api/admin/migrations/[file]
+ *  and copies it to the clipboard, then offers a one-click link to open the
+ *  Supabase SQL editor. Replaces the previous "go run this manually" prose with
+ *  an actual copy-paste flow. */
+function CopyMigrationButton({ file }: { file: string }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'copied' | 'error'>('idle')
+  const [errMsg, setErrMsg] = useState<string | null>(null)
+
+  async function copy() {
+    setState('loading')
+    setErrMsg(null)
+    try {
+      const res = await fetch(`/api/admin/migrations/${encodeURIComponent(file)}`)
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(body.error || `${res.status}`)
+      }
+      const sql = await res.text()
+      await navigator.clipboard.writeText(sql)
+      setState('copied')
+      setTimeout(() => setState('idle'), 2200)
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : 'Copy failed')
+      setState('error')
+      setTimeout(() => setState('idle'), 3000)
+    }
+  }
+
+  const supabaseSqlUrl =
+    'https://supabase.com/dashboard/project/_/sql/new'
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <button
+        onClick={copy}
+        disabled={state === 'loading'}
+        className={
+          state === 'copied'
+            ? 'inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+            : state === 'error'
+            ? 'inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md bg-red-500/10 border border-red-500/30 text-red-300'
+            : 'inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 disabled:opacity-50'
+        }
+        title={errMsg ?? `Copy ${file} to clipboard, then paste into the Supabase SQL editor`}
+      >
+        {state === 'copied' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {state === 'loading'
+          ? 'Loading…'
+          : state === 'copied'
+          ? 'Copied'
+          : state === 'error'
+          ? errMsg
+          : `Copy ${file}`}
+      </button>
+      <a
+        href={supabaseSqlUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-0.5 text-[11px] text-amber-400 hover:text-amber-300"
+        title="Open the Supabase SQL editor in a new tab"
+      >
+        Supabase <ExternalLink className="h-3 w-3" />
+      </a>
+    </span>
   )
 }
 

@@ -18,6 +18,7 @@ export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools, tasksTr
         subtitle="across all stack tools"
         icon={DollarSign}
         color="red"
+        emptyAction={{ label: 'Add stack tools', href: '/budget' }}
       />
       <MetricCard
         title="Active Tasks"
@@ -26,6 +27,7 @@ export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools, tasksTr
         icon={CheckSquare}
         trend={tasksTrend !== undefined && tasksTrend !== 0 ? { value: tasksTrend, label: 'vs last week' } : undefined}
         color="blue"
+        emptyAction={{ label: 'Connect Monday.com', href: '/health' }}
       />
       <MetricCard
         title="Events This Week"
@@ -33,6 +35,7 @@ export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools, tasksTr
         subtitle="internal + client"
         icon={Calendar}
         color="green"
+        emptyAction={{ label: 'Add an event', href: '/calendar' }}
       />
       <MetricCard
         title="Stack Tools"
@@ -40,6 +43,7 @@ export function KPIGrid({ burn, activeTasks, eventsThisWeek, stackTools, tasksTr
         subtitle="services in budget"
         icon={Layers}
         color="amber"
+        emptyAction={{ label: 'Add stack tools', href: '/budget' }}
       />
     </div>
   )
