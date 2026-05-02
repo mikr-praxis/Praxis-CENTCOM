@@ -59,15 +59,29 @@ export async function hasConfig(key: string): Promise<boolean> {
 
 /**
  * Save a config value to Supabase. Busts the cache immediately.
+ *
+ * Defensive: when the live `app_config.updated_by` column is missing (schema
+ * drift between migration 010 and what's actually deployed), retry the upsert
+ * without that field. The column is purely an audit trail; we'd rather lose
+ * the audit info than fail the write.
  */
 export async function setConfig(key: string, value: string, userId?: string): Promise<void> {
   const supabase = createServerClient()
-  const { error } = await supabase
+  const updated_at = new Date().toISOString()
+
+  const fullPayload = { key, value, updated_by: userId || null, updated_at }
+  let { error } = await supabase
     .from('app_config')
-    .upsert(
-      { key, value, updated_by: userId || null, updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
-    )
+    .upsert(fullPayload, { onConflict: 'key' })
+
+  // If the missing column is `updated_by`, retry without it.
+  if (error && /updated_by/i.test(error.message)) {
+    const minimal = { key, value, updated_at }
+    const retry = await supabase
+      .from('app_config')
+      .upsert(minimal, { onConflict: 'key' })
+    error = retry.error
+  }
 
   if (error) throw new Error(`Failed to save config "${key}": ${error.message}`)
 
