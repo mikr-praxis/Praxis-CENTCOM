@@ -22,10 +22,11 @@ export interface Filter {
   value?: string | number | (string | number)[]
 }
 
-/** Column-level aggregations (single source file). */
+/** Column-level aggregations. */
 export interface AggOp {
   op: 'sum' | 'count' | 'count_distinct' | 'avg' | 'min' | 'max'
-  /** Source filename in report_raw_files. Match by exact filename. */
+  /** Source filename in report_raw_files. Match by exact filename. Ignored
+   *  when `all_files` is true. */
   source: string
   /** Column to aggregate. Required for sum/avg/min/max/count_distinct. Optional for count (= row count). */
   column?: string
@@ -33,6 +34,13 @@ export interface AggOp {
   filters?: Filter[]
   /** Date column to apply timeframe filtering against. Required if timeframe filtering is desired. */
   timeframe_column?: string
+  /** When true, the evaluator aggregates `column` across EVERY synced file
+   *  that has it (or every file, for plain `count`). Used by the standard
+   *  lifetime tiles so the user can pick one column and have the engine
+   *  pull from the entire Drive folder. Supported ops: sum, count,
+   *  count_distinct. avg/min/max in this mode operate on the union of
+   *  values, not per-file averages. */
+  all_files?: boolean
 }
 
 /** Composite operations between sub-expressions. */
