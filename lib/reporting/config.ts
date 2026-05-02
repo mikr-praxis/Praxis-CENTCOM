@@ -14,7 +14,10 @@ export const REPORTING_CONFIG_DEFAULTS = {
   WEEKLY_SYNC_ENABLED: 'true',
   REPORTING_MAX_CACHED_ROWS: '50000',
   REPORTING_TOP_VALUES_PER_COLUMN: '30',
-  REPORTING_DEFAULT_TIMEFRAME: '30d',
+  // 'data_30d' = last 30 days OF DATA (relative to most recent row in the
+  // synced files), not last 30 calendar days. Keeps tiles populated for clients
+  // whose data isn't live-streaming.
+  REPORTING_DEFAULT_TIMEFRAME: 'data_30d',
   REPORTING_GRANULARITY_THRESHOLDS_JSON: '{"day_max":14,"week_max":120}',
   REPORTING_SYNC_NOTIFY_CHANNEL_ID: '',
   SHARE_TOKEN_DEFAULT_EXPIRY_DAYS: '30',
@@ -73,7 +76,7 @@ export async function getReportingDefaultTimeframe(): Promise<string> {
   const v = await getConfig('REPORTING_DEFAULT_TIMEFRAME')
   const valid = ['7d', '30d', '90d', 'qtd', 'ytd', 'all', 'data_7d', 'data_30d', 'data_90d', 'data_all']
   if (v && valid.includes(v.trim())) return v.trim()
-  return '30d'
+  return 'data_30d'
 }
 
 export async function getReportingSyncNotifyChannelId(): Promise<string | null> {

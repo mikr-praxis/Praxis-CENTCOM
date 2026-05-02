@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
 import { AppShell } from '@/components/layout/AppShell'
+import { DevKeysBanner } from '@/components/layout/DevKeysBanner'
 import { DeployStatus } from '@/components/ui/DeployStatus'
 import { RoleProvider } from '@/components/providers/RoleProvider'
 import { BrandingProvider } from '@/components/providers/BrandingProvider'
@@ -32,6 +33,7 @@ export default async function AppLayout({
     <RoleProvider role={role} email={email}>
       <BrandingProvider value={branding}>
         <div className="min-h-screen bg-slate-950">
+          <DevKeysBanner />
           <Sidebar />
           <div className="md:pl-64">
             <TopBar />

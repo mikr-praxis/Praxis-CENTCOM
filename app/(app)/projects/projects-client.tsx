@@ -719,14 +719,22 @@ export function ProjectsClient() {
   const [snapshots, setSnapshots] = useState<KPISnapshot[]>([])
   const [kpiLoading, setKpiLoading] = useState(false)
 
-  // Fetch boards list on mount
+  // Fetch boards list on mount, and auto-select the first board so the page
+  // doesn't render a useless "Select a board" empty state on first load.
   useEffect(() => {
     async function loadBoards() {
       setBoardsLoading(true)
       try {
         const res = await fetch('/api/projects/board-detail')
         const data = await res.json()
-        setBoards(data.boards || [])
+        const list = data.boards || []
+        setBoards(list)
+        // Auto-select the first board if nothing is selected yet. Subsequent
+        // user picks (via the dropdown) call setSelectedBoardId directly so
+        // we don't clobber their choice on remount.
+        if (list.length > 0) {
+          setSelectedBoardId((current) => current ?? list[0].id)
+        }
       } catch {
         console.error('Failed to load boards')
       } finally {

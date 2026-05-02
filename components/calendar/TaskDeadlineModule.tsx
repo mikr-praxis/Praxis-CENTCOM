@@ -148,27 +148,46 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
   const f = useFormatters()
   const [mondayData, setMondayData] = useState<MondayData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(true)
   const [activeUsers, setActiveUsers] = useState<Set<string>>(new Set(['all']))
   const [showMatched, setShowMatched] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
       setLoading(true)
+      setLoadError(null)
+      // Hard 6-second timeout — Monday.com API occasionally hangs and we don't
+      // want to leave the user staring at a perpetual spinner.
+      const ctrl = new AbortController()
+      const timeoutId = setTimeout(() => ctrl.abort(), 6000)
       try {
-        const res = await fetch('/api/monday')
+        const res = await fetch('/api/monday', { signal: ctrl.signal })
+        clearTimeout(timeoutId)
+        if (cancelled) return
         if (res.ok) {
           const json = await res.json()
           setMondayData(json)
+        } else {
+          setLoadError(`Monday API returned ${res.status}`)
         }
       } catch (err) {
+        clearTimeout(timeoutId)
+        if (cancelled) return
+        const aborted = err instanceof DOMException && err.name === 'AbortError'
+        setLoadError(aborted ? 'Monday.com timed out (>6s)' : 'Couldn\'t reach Monday.com')
         console.error('Failed to fetch Monday.com tasks:', err)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     load()
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [retryCount])
 
   // Build matched tasks
   const matchedTasks: MatchedTask[] = useMemo(() => {
@@ -271,10 +290,31 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
       {expanded && (
         <div className="px-5 py-4">
           {loading && (
-            <p className="text-sm text-slate-500">Loading Monday.com tasks...</p>
+            <p className="text-sm text-slate-500">Loading Monday.com tasks…</p>
           )}
 
-          {!loading && !mondayData?.connected && (
+          {!loading && loadError && (
+            <div className="text-center py-6">
+              <ListChecks className="h-8 w-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">{loadError}</p>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setRetryCount((c) => c + 1)}
+                  className="px-3 py-1.5 text-xs rounded-md bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30"
+                >
+                  Retry
+                </button>
+                <a
+                  href="/health"
+                  className="px-3 py-1.5 text-xs rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+                >
+                  Check integrations
+                </a>
+              </div>
+            </div>
+          )}
+
+          {!loading && !loadError && !mondayData?.connected && (
             <div className="text-center py-6">
               <ListChecks className="h-8 w-8 text-slate-600 mx-auto mb-2" />
               <p className="text-sm text-slate-400">Monday.com not connected</p>
@@ -284,7 +324,7 @@ export function TaskDeadlineModule({ calendarEvents }: Props) {
             </div>
           )}
 
-          {!loading && mondayData?.connected && matchedTasks.length === 0 && (
+          {!loading && !loadError && mondayData?.connected && matchedTasks.length === 0 && (
             <p className="text-sm text-slate-500 py-4">No active tasks found.</p>
           )}
 
