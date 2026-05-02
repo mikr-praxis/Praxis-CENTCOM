@@ -69,6 +69,8 @@ export interface CatalogEntry {
   display_name: string
   description: string
   category: 'standard' | 'paid_media' | 'funnel' | 'sales'
+  /** Sub-grouping for the Standard tiles UI (only on category === 'standard'). */
+  std_group?: 'volumes' | 'costs' | 'rates' | 'averages'
   format: KPIFormat
   viz_type: KPIVizType
   /** Either a flat input list OR variants (mutually exclusive). */
@@ -127,119 +129,205 @@ function sumAggs(aggs: AggOp[]): Formula | null {
 
 /* ──────────────────────── Standard tiles ──────────────────────── */
 
-const STANDARD_REVENUE: CatalogEntry = {
-  catalog_key: 'std_lifetime_revenue',
-  display_name: 'Total Lifetime Revenue',
-  description: 'Sum of the chosen revenue column across every synced Drive file that has it. Lifetime — ignores the timeframe picker.',
-  category: 'standard',
-  format: 'currency',
-  viz_type: 'card',
-  inputs: [
-    {
-      id: 'revenue',
-      label: 'Revenue column',
-      hint: 'Pick a column name. The engine sums it wherever it appears across the Drive folder.',
-      agg_op: 'sum',
-      scope: 'all_files',
+/* Standard tiles are mapped automatically by the AI mapper at
+ * /api/reporting/[slug]/standard-tiles. The `inputs` + `build` here are only
+ * used by the manual-override path (KPIConfigModal opened via the gear icon)
+ * — they let the user pick a column by hand when the AI got it wrong.
+ *
+ * Display order in this array = render order in the StandardKPITiles UI.
+ */
+
+/** Single-column "sum across all files" tile (volumes). */
+function stdSumTile(args: {
+  key: string
+  display_name: string
+  description: string
+  std_group: 'volumes'
+  format: KPIFormat
+  inputId: string
+  inputLabel: string
+}): CatalogEntry {
+  return {
+    catalog_key: args.key,
+    display_name: args.display_name,
+    description: args.description,
+    category: 'standard',
+    std_group: args.std_group,
+    format: args.format,
+    viz_type: 'card',
+    inputs: [
+      { id: args.inputId, label: args.inputLabel, agg_op: 'sum', scope: 'all_files' },
+    ],
+    build: (state) => {
+      const s = asSingle(state[args.inputId])
+      return s?.column ? makeAllFilesAgg(s, 'sum') : null
     },
-  ],
-  build: (state) => {
-    const s = asSingle(state.revenue)
-    if (!s || !s.column) return null
-    return makeAllFilesAgg(s, 'sum')
-  },
+  }
 }
 
-const STANDARD_CALLS_BOOKED: CatalogEntry = {
-  catalog_key: 'std_lifetime_calls_booked',
-  display_name: 'Total Calls Booked',
-  description: 'Total calls booked, summed from the chosen column across every synced Drive file. Lifetime — ignores the timeframe picker.',
-  category: 'standard',
-  format: 'count',
-  viz_type: 'card',
-  inputs: [
-    {
-      id: 'calls',
-      label: 'Calls booked column',
-      hint: 'Pick the column. The engine pulls it from every Drive file that contains it.',
-      agg_op: 'sum',
-      scope: 'all_files',
+/** Two-column ratio tile (costs/rates/averages). */
+function stdRatioTile(args: {
+  key: string
+  display_name: string
+  description: string
+  std_group: 'costs' | 'rates' | 'averages'
+  format: KPIFormat
+  numId: string
+  numLabel: string
+  denId: string
+  denLabel: string
+}): CatalogEntry {
+  return {
+    catalog_key: args.key,
+    display_name: args.display_name,
+    description: args.description,
+    category: 'standard',
+    std_group: args.std_group,
+    format: args.format,
+    viz_type: 'card',
+    inputs: [
+      { id: args.numId, label: args.numLabel, agg_op: 'sum', scope: 'all_files' },
+      { id: args.denId, label: args.denLabel, agg_op: 'sum', scope: 'all_files' },
+    ],
+    build: (state) => {
+      const num = asSingle(state[args.numId])
+      const den = asSingle(state[args.denId])
+      if (!num?.column || !den?.column) return null
+      return {
+        op: 'divide',
+        numerator: makeAllFilesAgg(num, 'sum'),
+        denominator: makeAllFilesAgg(den, 'sum'),
+      }
     },
-  ],
-  build: (state) => {
-    const s = asSingle(state.calls)
-    if (!s || !s.column) return null
-    return makeAllFilesAgg(s, 'sum')
-  },
+  }
 }
 
-const STANDARD_CONVERSION_RATE: CatalogEntry = {
-  catalog_key: 'std_lifetime_conversion_rate',
-  display_name: 'Total Conversion Rate',
-  description: 'Lifetime conversion rate, summed across every synced Drive file. Pick numerator + denominator columns; the engine pulls each from any file that has it.',
-  category: 'standard',
-  format: 'percent',
-  viz_type: 'card',
-  variants: [
-    {
-      id: 'lead_to_close',
-      label: 'Lead → Close (closes / leads)',
-      description: 'What share of all leads become closed deals.',
-      inputs: [
-        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
-        { id: 'leads', label: 'Leads / opt-ins column', agg_op: 'sum', scope: 'all_files' },
-      ],
-      build: (state) => {
-        const num = asSingle(state.closes)
-        const den = asSingle(state.leads)
-        if (!num?.column || !den?.column) return null
-        return {
-          op: 'divide',
-          numerator: makeAllFilesAgg(num, 'sum'),
-          denominator: makeAllFilesAgg(den, 'sum'),
-        }
-      },
-    },
-    {
-      id: 'book_to_close',
-      label: 'Book → Close (closes / calls booked)',
-      description: 'What share of booked calls turn into closes.',
-      inputs: [
-        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
-        { id: 'calls', label: 'Calls booked column', agg_op: 'sum', scope: 'all_files' },
-      ],
-      build: (state) => {
-        const num = asSingle(state.closes)
-        const den = asSingle(state.calls)
-        if (!num?.column || !den?.column) return null
-        return {
-          op: 'divide',
-          numerator: makeAllFilesAgg(num, 'sum'),
-          denominator: makeAllFilesAgg(den, 'sum'),
-        }
-      },
-    },
-    {
-      id: 'show_to_close',
-      label: 'Show → Close (closes / calls showed)',
-      description: 'What share of attended calls close. (Same numerator/denominator as the Close Rate KPI.)',
-      inputs: [
-        { id: 'closes', label: 'Closes / sales column', agg_op: 'sum', scope: 'all_files' },
-        { id: 'shows', label: 'Calls showed column', agg_op: 'sum', scope: 'all_files' },
-      ],
-      build: (state) => {
-        const num = asSingle(state.closes)
-        const den = asSingle(state.shows)
-        if (!num?.column || !den?.column) return null
-        return {
-          op: 'divide',
-          numerator: makeAllFilesAgg(num, 'sum'),
-          denominator: makeAllFilesAgg(den, 'sum'),
-        }
-      },
-    },
-  ],
-}
+// Volumes (7 tiles)
+const STANDARD_SPEND = stdSumTile({
+  key: 'std_lifetime_spend', display_name: 'Total Spend',
+  description: 'Lifetime ad spend across every synced file.',
+  std_group: 'volumes', format: 'currency',
+  inputId: 'spend', inputLabel: 'Spend column',
+})
+const STANDARD_LEADS = stdSumTile({
+  key: 'std_lifetime_leads', display_name: 'Total Leads',
+  description: 'Lifetime leads / opt-ins across every synced file.',
+  std_group: 'volumes', format: 'count',
+  inputId: 'leads', inputLabel: 'Leads / opt-ins column',
+})
+const STANDARD_CALLS_BOOKED = stdSumTile({
+  key: 'std_lifetime_calls_booked', display_name: 'Total Calls Booked',
+  description: 'Lifetime calls booked across every synced file.',
+  std_group: 'volumes', format: 'count',
+  inputId: 'calls', inputLabel: 'Calls booked column',
+})
+const STANDARD_CALLS_SHOWED = stdSumTile({
+  key: 'std_lifetime_calls_showed', display_name: 'Total Calls Showed',
+  description: 'Lifetime calls showed / attended.',
+  std_group: 'volumes', format: 'count',
+  inputId: 'shows', inputLabel: 'Calls showed column',
+})
+const STANDARD_CLOSES = stdSumTile({
+  key: 'std_lifetime_closes', display_name: 'Total Closes',
+  description: 'Lifetime closed deals.',
+  std_group: 'volumes', format: 'count',
+  inputId: 'closes', inputLabel: 'Closes column',
+})
+const STANDARD_REVENUE = stdSumTile({
+  key: 'std_lifetime_revenue', display_name: 'Total Revenue',
+  description: 'Lifetime contracted revenue across every synced file.',
+  std_group: 'volumes', format: 'currency',
+  inputId: 'revenue', inputLabel: 'Revenue column',
+})
+const STANDARD_CASH_COLLECTED = stdSumTile({
+  key: 'std_lifetime_cash_collected', display_name: 'Total Cash Collected',
+  description: 'Lifetime cash actually received.',
+  std_group: 'volumes', format: 'currency',
+  inputId: 'cash', inputLabel: 'Cash collected column',
+})
+
+// Costs (5 tiles)
+const STANDARD_CPL = stdRatioTile({
+  key: 'std_lifetime_cpl', display_name: 'CPL',
+  description: 'Cost per lead — spend ÷ leads.',
+  std_group: 'costs', format: 'currency',
+  numId: 'spend', numLabel: 'Spend column',
+  denId: 'leads', denLabel: 'Leads column',
+})
+const STANDARD_CPB = stdRatioTile({
+  key: 'std_lifetime_cpb', display_name: 'Cost per Booking',
+  description: 'Spend ÷ calls booked.',
+  std_group: 'costs', format: 'currency',
+  numId: 'spend', numLabel: 'Spend column',
+  denId: 'calls', denLabel: 'Calls booked column',
+})
+const STANDARD_CPS = stdRatioTile({
+  key: 'std_lifetime_cps', display_name: 'Cost per Show',
+  description: 'Spend ÷ calls showed.',
+  std_group: 'costs', format: 'currency',
+  numId: 'spend', numLabel: 'Spend column',
+  denId: 'shows', denLabel: 'Calls showed column',
+})
+const STANDARD_CPA = stdRatioTile({
+  key: 'std_lifetime_cpa', display_name: 'CPA',
+  description: 'Cost per acquisition — spend ÷ closes.',
+  std_group: 'costs', format: 'currency',
+  numId: 'spend', numLabel: 'Spend column',
+  denId: 'closes', denLabel: 'Closes column',
+})
+const STANDARD_ROAS = stdRatioTile({
+  key: 'std_lifetime_roas', display_name: 'ROAS',
+  description: 'Return on ad spend — revenue ÷ spend.',
+  std_group: 'costs', format: 'ratio',
+  numId: 'revenue', numLabel: 'Revenue column',
+  denId: 'spend', denLabel: 'Spend column',
+})
+
+// Rates (4 tiles)
+const STANDARD_BOOKING_RATE = stdRatioTile({
+  key: 'std_lifetime_booking_rate', display_name: 'Booking Rate',
+  description: 'Calls booked ÷ leads.',
+  std_group: 'rates', format: 'percent',
+  numId: 'calls', numLabel: 'Calls booked column',
+  denId: 'leads', denLabel: 'Leads column',
+})
+const STANDARD_SHOW_RATE = stdRatioTile({
+  key: 'std_lifetime_show_rate', display_name: 'Show Rate',
+  description: 'Calls showed ÷ calls booked.',
+  std_group: 'rates', format: 'percent',
+  numId: 'shows', numLabel: 'Calls showed column',
+  denId: 'calls', denLabel: 'Calls booked column',
+})
+const STANDARD_CLOSE_RATE = stdRatioTile({
+  key: 'std_lifetime_close_rate', display_name: 'Close Rate',
+  description: 'Closes ÷ calls showed.',
+  std_group: 'rates', format: 'percent',
+  numId: 'closes', numLabel: 'Closes column',
+  denId: 'shows', denLabel: 'Calls showed column',
+})
+const STANDARD_LEAD_TO_CLOSE = stdRatioTile({
+  key: 'std_lifetime_lead_to_close', display_name: 'Lead → Close',
+  description: 'End-to-end conversion — closes ÷ leads.',
+  std_group: 'rates', format: 'percent',
+  numId: 'closes', numLabel: 'Closes column',
+  denId: 'leads', denLabel: 'Leads column',
+})
+
+// Averages (2 tiles)
+const STANDARD_AOV = stdRatioTile({
+  key: 'std_lifetime_aov', display_name: 'AOV',
+  description: 'Average order value — revenue ÷ closes.',
+  std_group: 'averages', format: 'currency',
+  numId: 'revenue', numLabel: 'Revenue column',
+  denId: 'closes', denLabel: 'Closes column',
+})
+const STANDARD_CASH_PER_CLOSE = stdRatioTile({
+  key: 'std_lifetime_cash_per_close', display_name: 'Cash per Close',
+  description: 'Cash collected ÷ closes.',
+  std_group: 'averages', format: 'currency',
+  numId: 'cash', numLabel: 'Cash collected column',
+  denId: 'closes', denLabel: 'Closes column',
+})
 
 /* ──────────────────────── Customizable catalog ──────────────────────── */
 
@@ -491,9 +579,28 @@ const PITCH_CLOSE_RATE: CatalogEntry = {
 /* ──────────────────────── Exports ──────────────────────── */
 
 export const STANDARD_CATALOG: CatalogEntry[] = [
-  STANDARD_REVENUE,
+  // Volumes
+  STANDARD_SPEND,
+  STANDARD_LEADS,
   STANDARD_CALLS_BOOKED,
-  STANDARD_CONVERSION_RATE,
+  STANDARD_CALLS_SHOWED,
+  STANDARD_CLOSES,
+  STANDARD_REVENUE,
+  STANDARD_CASH_COLLECTED,
+  // Costs
+  STANDARD_CPL,
+  STANDARD_CPB,
+  STANDARD_CPS,
+  STANDARD_CPA,
+  STANDARD_ROAS,
+  // Rates
+  STANDARD_BOOKING_RATE,
+  STANDARD_SHOW_RATE,
+  STANDARD_CLOSE_RATE,
+  STANDARD_LEAD_TO_CLOSE,
+  // Averages
+  STANDARD_AOV,
+  STANDARD_CASH_PER_CLOSE,
 ]
 
 export const CUSTOMIZABLE_CATALOG: CatalogEntry[] = [

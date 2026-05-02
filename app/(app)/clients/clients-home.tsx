@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   BarChart3,
@@ -371,7 +371,23 @@ function Workspace({
 
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  // Track which client IDs we've already auto-synced this page load.
+  const autoSyncedRef = useRef<Set<string>>(new Set())
 
+  // Auto-sync on first open of a client when its data is missing or > 1h old.
+  // Fire-and-forget — render cached data immediately, refresh tiles via
+  // 'praxis:synced' event after the sync resolves.
+  useEffect(() => {
+    if (autoSyncedRef.current.has(client.id)) return
+    if (!client.drive_folder_id) return
+    const stale =
+      !client.last_synced ||
+      Date.now() - new Date(client.last_synced).getTime() > 60 * 60 * 1000
+    if (!stale) return
+    autoSyncedRef.current.add(client.id)
+    void syncNow({ silent: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id, client.drive_folder_id, client.last_synced])
 
   // Listen for header actions
   useEffect(() => {
@@ -446,20 +462,31 @@ function Workspace({
     })
   }
 
-  async function syncNow() {
+  async function syncNow(opts: { silent?: boolean } = {}) {
     setSyncing(true)
-    setSyncMsg(null)
+    if (!opts.silent) setSyncMsg(null)
     try {
       const res = await fetch(`/api/reporting/${client.slug}/sync`, { method: 'POST' })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'Sync failed')
       const r = body.result
-      setSyncMsg(
-        `Synced ${r.files_synced ?? 0} of ${r.files_seen ?? 0} files (${r.files_skipped ?? 0} unchanged, ${r.files_unsupported ?? 0} unsupported)`
-      )
-      setTimeout(() => window.location.reload(), 1200)
+      const summary = `Synced ${r.files_synced ?? 0} of ${r.files_seen ?? 0} files (${r.files_skipped ?? 0} unchanged, ${r.files_unsupported ?? 0} unsupported)`
+      // Tell standard tiles + KPI grid to refetch in place.
+      window.dispatchEvent(new CustomEvent('praxis:synced', { detail: { slug: client.slug, result: r } }))
+      if (opts.silent) {
+        // Auto-sync path — only reload when files actually changed, so a quick
+        // background "nothing-new" sync doesn't blow away client state.
+        if ((r.files_synced ?? 0) > 0) {
+          setSyncMsg(summary)
+          setTimeout(() => window.location.reload(), 600)
+        }
+      } else {
+        setSyncMsg(summary)
+        setTimeout(() => window.location.reload(), 1200)
+      }
     } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : 'Sync failed')
+      // Surface manual-sync errors only — silent failures stay quiet.
+      if (!opts.silent) setSyncMsg(e instanceof Error ? e.message : 'Sync failed')
     } finally {
       setSyncing(false)
     }
