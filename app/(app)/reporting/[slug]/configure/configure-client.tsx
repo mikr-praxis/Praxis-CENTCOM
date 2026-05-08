@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Plus, Trash2, Save, Activity } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2, Save, Activity, Wand2 } from 'lucide-react'
 import type { AggOp, Formula, Filter, CompositeOp, ConstOp } from '@/lib/reporting/types'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import { useBranding } from '@/components/providers/BrandingProvider'
@@ -156,6 +156,38 @@ export function ConfigureClient({
   )
   const [error, setError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [seedingRecommended, setSeedingRecommended] = useState(false)
+  const [seedNotice, setSeedNotice] = useState<string | null>(null)
+
+  async function seedRecommendedKPIs() {
+    setError(null)
+    setSeedNotice(null)
+    setSeedingRecommended(true)
+    try {
+      const res = await fetch(`/api/reporting/${client.slug}/kpis/recommended`, {
+        method: 'POST',
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Set up failed')
+      const inserted: KPIRow[] = body.kpis ?? []
+      if (inserted.length > 0) {
+        setKpis((prev) => [...prev, ...inserted])
+      }
+      const skipped = body.skipped ?? 0
+      if (inserted.length > 0) {
+        setSeedNotice(
+          `Configured ${inserted.length} KPI${inserted.length === 1 ? '' : 's'} from your synced files` +
+            (skipped > 0 ? ` (${skipped} already existed).` : '.')
+        )
+      } else if (body.message) {
+        setSeedNotice(body.message)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Set up failed')
+    } finally {
+      setSeedingRecommended(false)
+    }
+  }
 
   async function createKPI() {
     setError(null)
@@ -259,6 +291,15 @@ export function ConfigureClient({
               }}
             />
             <button
+              onClick={seedRecommendedKPIs}
+              disabled={seedingRecommended || files.length === 0}
+              title="Auto-configure catalog KPIs by matching your file columns to known metric names."
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              <Wand2 className="h-4 w-4" />
+              {seedingRecommended ? 'Setting up…' : 'Set up recommended KPIs'}
+            </button>
+            <button
               onClick={() => setAdding(true)}
               disabled={adding || files.length === 0}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
@@ -280,6 +321,18 @@ export function ConfigureClient({
       {error && (
         <div className="mb-4 p-3 rounded-lg border border-red-500/30 bg-red-500/5 text-red-300 text-sm">
           {error}
+        </div>
+      )}
+
+      {seedNotice && (
+        <div className="mb-4 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 text-emerald-200 text-sm flex items-start justify-between gap-3">
+          <span>{seedNotice}</span>
+          <button
+            onClick={() => setSeedNotice(null)}
+            className="text-emerald-300/70 hover:text-emerald-100 text-xs"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
