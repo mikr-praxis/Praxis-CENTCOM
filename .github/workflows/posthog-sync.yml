@@ -48,11 +48,17 @@ on:
   schedule:
     - cron: "0 7 * * *"
 
+permissions:
+  # Needed so gh CLI in the run can post a comment back to issue #13.
+  issues: write
+  contents: read
+
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - name: Hit /api/integrations/posthog/sync
+        id: sync
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SLUG: ${{ github.event.inputs.slug }}
@@ -63,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::CRON_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions."
+            echo "::error::CRON_SECRET repo secret is not set."
             exit 1
           fi
           BASE="https://praxis-centcom.vercel.app/api/integrations/posthog/sync"
@@ -80,31 +86,51 @@ jobs:
             -X POST "${URL}" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json")
-          echo "----- response (HTTP ${HTTP_CODE}) -----"
+          echo "HTTP ${HTTP_CODE}"
+          echo "----- response -----"
           if command -v jq >/dev/null 2>&1; then
             jq . response.json || cat response.json
           else
             cat response.json
           fi
-          echo
-          if [ "${HTTP_CODE}" != "200" ]; then
-            echo "::error::Sync failed with HTTP ${HTTP_CODE}"
-            exit 1
-          fi
-          # Extract a one-line summary into the Actions step summary panel.
+          echo "http_code=${HTTP_CODE}" >> "$GITHUB_OUTPUT"
+          # Step summary (visible at the bottom of the run page)
           if command -v jq >/dev/null 2>&1; then
-            UPSERTED=$(jq -r '.total_upserted // 0' response.json)
-            FAILED=$(jq -r '.failed // 0' response.json)
-            CLIENTS=$(jq -r '(.clients // []) | length' response.json)
+            UPSERTED=$(jq -r '.total_upserted // 0' response.json 2>/dev/null || echo 0)
+            FAILED=$(jq -r '.failed // 0' response.json 2>/dev/null || echo 0)
+            CLIENTS=$(jq -r '(.clients // []) | length' response.json 2>/dev/null || echo 0)
             {
               echo "## PostHog → opt_ins sync"
               echo ""
+              echo "- HTTP: \`${HTTP_CODE}\`"
               echo "- Clients processed: \`${CLIENTS}\`"
               echo "- Daily facts upserted: \`${UPSERTED}\`"
               echo "- Failures: \`${FAILED}\`"
-              echo ""
-              if [ "${UPSERTED}" = "0" ] && [ "${FAILED}" = "0" ]; then
-                echo "> ⚠️  Zero facts upserted. Either no events match the configured filter (\`event=${EVENT}\`, \`${PROPERTY}=<slug>\`), or PostHog has no data in the last ${LOOKBACK} days. See the response JSON above."
-              fi
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+          # Fail loudly if HTTP wasn't 2xx
+          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+            echo "::error::Sync HTTP ${HTTP_CODE}"
+            exit 1
+          fi
+
+      - name: Post result to tracking issue #13
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HTTP_CODE: ${{ steps.sync.outputs.http_code }}
+        run: |
+          set -euo pipefail
+          BODY_FILE=$(mktemp)
+          {
+            echo "### Run [${{ github.run_id }}/${{ github.run_attempt }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})"
+            echo ""
+            echo "- Event: \`${{ github.event.inputs.event || 'opt_in_submitted' }}\` · Property: \`${{ github.event.inputs.property || 'client_slug' }}\` · Kind: \`${{ github.event.inputs.kind || 'opt_ins' }}\` · Lookback: \`${{ github.event.inputs.lookback || '90' }}d\` · Slug: \`${{ github.event.inputs.slug || '*all*' }}\`"
+            echo "- HTTP: \`${HTTP_CODE:-?}\`"
+            echo ""
+            echo '```json'
+            cat response.json 2>/dev/null || echo '{ "error": "no response.json — sync step likely failed before request" }'
+            echo ''
+            echo '```'
+          } > "$BODY_FILE"
+          gh issue comment 13 --repo "${{ github.repository }}" --body-file "$BODY_FILE"
