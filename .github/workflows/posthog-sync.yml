@@ -1,0 +1,110 @@
+name: PostHog → opt_ins sync
+
+# Manual-only trigger. Hits the deployed sync route on praxis-centcom.vercel.app
+# from a GitHub-hosted runner (which has network access to Vercel — this Claude
+# session does not, hence the workflow). The route writes daily fact rows into
+# report_external_facts so the reporting engine can compute opt_ins KPIs from
+# PostHog data.
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   - CRON_SECRET    Same value you set as CRON_SECRET in Vercel env. Used to
+#                    authenticate the request without a Clerk session.
+#
+# Inputs:
+#   - slug      Client slug (optional). Empty = sync ALL clients.
+#   - event     PostHog event name. Default: opt_in_submitted.
+#   - property  PostHog property to filter on (matched against the slug).
+#               Default: client_slug.
+#   - kind      Logical KPI name written into report_external_facts.kind.
+#               Default: opt_ins.
+#   - lookback  Days of history to pull. Default: 90, max: 365.
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: "Client slug (leave blank to sync ALL clients)"
+        required: false
+        default: ""
+      event:
+        description: "PostHog event name"
+        required: false
+        default: "opt_in_submitted"
+      property:
+        description: "PostHog property to match the slug against"
+        required: false
+        default: "client_slug"
+      kind:
+        description: "report_external_facts.kind to write"
+        required: false
+        default: "opt_ins"
+      lookback:
+        description: "Days of history (max 365)"
+        required: false
+        default: "90"
+
+# Daily auto-run alongside Vercel cron — redundant but free, and surfaces
+# failures in the Actions log if the Vercel cron misfires.
+  schedule:
+    - cron: "0 7 * * *"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit /api/integrations/posthog/sync
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SLUG: ${{ github.event.inputs.slug }}
+          EVENT: ${{ github.event.inputs.event || 'opt_in_submitted' }}
+          PROPERTY: ${{ github.event.inputs.property || 'client_slug' }}
+          KIND: ${{ github.event.inputs.kind || 'opt_ins' }}
+          LOOKBACK: ${{ github.event.inputs.lookback || '90' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          BASE="https://praxis-centcom.vercel.app/api/integrations/posthog/sync"
+          QS="event=${EVENT}&property=${PROPERTY}&kind=${KIND}&lookback=${LOOKBACK}"
+          if [ -n "${SLUG}" ]; then
+            QS="slug=${SLUG}&${QS}"
+            echo "Syncing single client: ${SLUG}"
+          else
+            echo "Syncing ALL clients"
+          fi
+          URL="${BASE}?${QS}"
+          echo "POST ${URL}"
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST "${URL}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json")
+          echo "----- response (HTTP ${HTTP_CODE}) -----"
+          if command -v jq >/dev/null 2>&1; then
+            jq . response.json || cat response.json
+          else
+            cat response.json
+          fi
+          echo
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::error::Sync failed with HTTP ${HTTP_CODE}"
+            exit 1
+          fi
+          # Extract a one-line summary into the Actions step summary panel.
+          if command -v jq >/dev/null 2>&1; then
+            UPSERTED=$(jq -r '.total_upserted // 0' response.json)
+            FAILED=$(jq -r '.failed // 0' response.json)
+            CLIENTS=$(jq -r '(.clients // []) | length' response.json)
+            {
+              echo "## PostHog → opt_ins sync"
+              echo ""
+              echo "- Clients processed: \`${CLIENTS}\`"
+              echo "- Daily facts upserted: \`${UPSERTED}\`"
+              echo "- Failures: \`${FAILED}\`"
+              echo ""
+              if [ "${UPSERTED}" = "0" ] && [ "${FAILED}" = "0" ]; then
+                echo "> ⚠️  Zero facts upserted. Either no events match the configured filter (\`event=${EVENT}\`, \`${PROPERTY}=<slug>\`), or PostHog has no data in the last ${LOOKBACK} days. See the response JSON above."
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
