@@ -15,12 +15,19 @@ import type {
   RawFileForEngine,
   Slicer,
 } from './types'
+import type { ExternalFactRow } from './external-facts'
+import { factCacheKey } from './external-facts'
 
 interface EvalContext {
   files: RawFileForEngine[]
   timeframe: Timeframe
   /** Optional global slicers — applied to AggOps whose source has the column. */
   slicers?: Slicer[]
+  /** Pre-loaded external fact rows, keyed by factCacheKey(source_type, kind).
+   *  Populated by the route handler (see lib/reporting/external-facts.ts) so
+   *  the engine remains synchronous. AggOps with `source_type` set read from
+   *  this cache instead of from `files`. */
+  externalFacts?: Map<string, ExternalFactRow[]>
   rowsUsed: { value: number }
   sourcesUsed: Set<string>
 }
@@ -163,7 +170,68 @@ function applySlicers(file: RawFileForEngine, slicers: Slicer[] | undefined, row
   return true
 }
 
+function evaluateExternalAgg(node: AggOp, ctx: EvalContext): number | null {
+  // Facts-backed AggOp: pull pre-loaded rows from the request-scoped cache.
+  // The route handler is responsible for having populated ctx.externalFacts
+  // via preloadExternalFacts(); here we just aggregate. See
+  // content/memory/no-virtual-files.md — these rows stay typed as facts.
+  if (!node.source_type || !node.kind) return null
+  const cache = ctx.externalFacts
+  if (!cache) return null
+  const rows = cache.get(factCacheKey(node.source_type, node.kind))
+  if (!rows) return null
+
+  ctx.sourcesUsed.add(`${node.source_type}:${node.kind}`)
+
+  const tfCol = node.timeframe_column ?? 'ts'
+  const valueCol = node.column ?? 'value'
+
+  const matching = rows.filter((r) => {
+    // Build a row-shaped object so existing comparator logic just works.
+    const rowObj: Record<string, unknown> = { ts: r.ts, value: r.value, ...r.dimensions }
+    if (!rowMatchesFilters(rowObj, node.filters)) return false
+    if (!isInTimeframe(rowObj, tfCol, ctx.timeframe)) return false
+    return true
+  })
+  ctx.rowsUsed.value += matching.length
+
+  if (node.op === 'count') return matching.length
+  if (node.op === 'count_distinct') {
+    const seen = new Set<string>()
+    for (const r of matching) {
+      const v = valueCol === 'value' ? r.value : (r.dimensions[valueCol] as unknown)
+      if (v != null && v !== '') seen.add(String(v))
+    }
+    return seen.size
+  }
+  const nums: number[] = []
+  for (const r of matching) {
+    const raw = valueCol === 'value' ? r.value : r.dimensions[valueCol]
+    const n = toNumber(raw)
+    if (n != null) nums.push(n)
+  }
+  if (nums.length === 0) return node.op === 'sum' ? 0 : null
+  switch (node.op) {
+    case 'sum':
+      return nums.reduce((a, b) => a + b, 0)
+    case 'avg':
+      return nums.reduce((a, b) => a + b, 0) / nums.length
+    case 'min':
+      return Math.min(...nums)
+    case 'max':
+      return Math.max(...nums)
+  }
+  return null
+}
+
 function evaluateAgg(node: AggOp, ctx: EvalContext): number | null {
+  // External fact source (PostHog / Stripe / Meta / etc.) — query the
+  // pre-loaded cache instead of the file list. Fully separate code path so
+  // Drive eval is byte-for-byte unchanged.
+  if (node.source_type) {
+    return evaluateExternalAgg(node, ctx)
+  }
+
   // Build the list of files to aggregate over. With `all_files: true`, scan
   // every synced file that contains `column` (or every file, for plain
   // `count` which doesn't need a column). Otherwise, single source by name.
@@ -331,7 +399,7 @@ export function evaluateKPISeries(
   files: RawFileForEngine[],
   timeframe: Timeframe,
   granularity: Granularity,
-  options?: { slicers?: Slicer[] }
+  options?: { slicers?: Slicer[]; externalFacts?: Map<string, ExternalFactRow[]> }
 ): SeriesPoint[] {
   const formula = kpi.formula
   // Only top-level aggregations get a series in v1
@@ -356,6 +424,7 @@ export function evaluateKPISeries(
       files,
       timeframe: sliceTf,
       slicers: options?.slicers,
+      externalFacts: options?.externalFacts,
       rowsUsed: { value: 0 },
       sourcesUsed: new Set<string>(),
     }
@@ -394,7 +463,8 @@ function evaluateGroupBy(
   kpi: KPIDefinition,
   files: RawFileForEngine[],
   timeframe: Timeframe,
-  slicers: Slicer[] | undefined
+  slicers: Slicer[] | undefined,
+  externalFacts: Map<string, ExternalFactRow[]> | undefined
 ): { group: string; value: number | null; rows_used: number }[] | null {
   if (!kpi.group_by_column) return null
   const file = files.find((f) => f.filename === (kpi.group_by_source ?? ''))
@@ -423,6 +493,7 @@ function evaluateGroupBy(
       files,
       timeframe,
       slicers,
+      externalFacts,
       rowsUsed: { value: 0 },
       sourcesUsed: new Set<string>(),
     }
@@ -495,13 +566,15 @@ export function evaluateKPI(
   kpi: KPIDefinition,
   files: RawFileForEngine[],
   timeframe: Timeframe,
-  options?: { slicers?: Slicer[] }
+  options?: { slicers?: Slicer[]; externalFacts?: Map<string, ExternalFactRow[]> }
 ): KPIResult {
   const slicers = options?.slicers
+  const externalFacts = options?.externalFacts
   const ctx: EvalContext = {
     files,
     timeframe,
     slicers,
+    externalFacts,
     rowsUsed: { value: 0 },
     sourcesUsed: new Set<string>(),
   }
@@ -521,6 +594,7 @@ export function evaluateKPI(
       files,
       timeframe: priorTf,
       slicers,
+      externalFacts,
       rowsUsed: { value: 0 },
       sourcesUsed: new Set<string>(),
     }
@@ -540,7 +614,7 @@ export function evaluateKPI(
   }
 
   // Group-by
-  const groups = evaluateGroupBy(kpi, files, timeframe, slicers) ?? undefined
+  const groups = evaluateGroupBy(kpi, files, timeframe, slicers, externalFacts) ?? undefined
 
   return {
     kpi_id: kpi.id,

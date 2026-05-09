@@ -131,20 +131,66 @@ function tryBuild(
   return { formula, matched }
 }
 
+/** Per-source overrides — when an external integration is configured, the
+ *  matcher emits a typed source_type AggOp instead of falling back to Drive
+ *  column matching for that catalog entry. See content/memory/no-virtual-files.md
+ *  for why this is a typed source_type, not a fake filename. */
+export interface SourceAvailability {
+  /** True when POSTHOG_PERSONAL_API_KEY + POSTHOG_PROJECT_ID are set. */
+  posthog: boolean
+}
+
 /**
  * Returns one RecommendedKPI per catalog entry whose inputs were fully
  * matched. Entries with any unmatched input are silently skipped — the
  * user can still pick them manually. Variant entries (e.g. the conversion
  * rate three-way pick) emit at most one row, using the canonical
  * un-suffixed catalog_key so std_* dashboard logic still recognizes them.
+ *
+ * When `availability.posthog` is true, the `opt_ins` catalog entry emits a
+ * typed PostHog AggOp (source_type='posthog', kind='opt_ins') regardless of
+ * Drive column presence — facts written by /api/integrations/posthog/sync
+ * become the truth source.
  */
-export function buildRecommendedKPIs(files: FileColumns[]): RecommendedKPI[] {
-  if (files.length === 0) return []
-
+export function buildRecommendedKPIs(
+  files: FileColumns[],
+  availability: SourceAvailability = { posthog: false }
+): RecommendedKPI[] {
   const all: CatalogEntry[] = [...STANDARD_CATALOG, ...CUSTOMIZABLE_CATALOG]
   const out: RecommendedKPI[] = []
 
+  if (availability.posthog) {
+    // PostHog → opt_ins. Engine reads from report_external_facts via the
+    // typed source_type path. No filename, no virtual file.
+    const optInsEntry = all.find((e) => e.catalog_key === 'opt_ins')
+    if (optInsEntry) {
+      out.push({
+        catalog_key: optInsEntry.catalog_key,
+        display_name: `${optInsEntry.display_name} (PostHog)`,
+        description: `${optInsEntry.description} Sourced from PostHog events via /api/integrations/posthog/sync.`,
+        format: optInsEntry.format,
+        viz_type: optInsEntry.viz_type,
+        formula: {
+          op: 'sum',
+          source: '',
+          source_type: 'posthog',
+          kind: 'opt_ins',
+          column: 'value',
+          timeframe_column: 'ts',
+        },
+        inputs_matched: { optins: { filename: 'posthog:opt_ins', column: 'value' } },
+      })
+    }
+  }
+
+  if (files.length === 0) return out
+
+  // Catalog keys we already emitted via an external source — skip them in the
+  // Drive-column scan so we don't double-recommend the same KPI.
+  const alreadyEmitted = new Set(out.map((r) => r.catalog_key))
+
   for (const entry of all) {
+    if (alreadyEmitted.has(entry.catalog_key)) continue
     if (entry.variants && entry.variants.length > 0) {
       for (const variant of entry.variants) {
         const result = tryBuild(entry, variant.inputs, variant.build, files)

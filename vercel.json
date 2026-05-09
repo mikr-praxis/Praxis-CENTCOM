@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sync-drive-reports",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/integrations/posthog/sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }

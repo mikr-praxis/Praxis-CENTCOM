@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Plus, Trash2, Save, Activity, Wand2 } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2, Save, Activity, Wand2, RefreshCw } from 'lucide-react'
 import type { AggOp, Formula, Filter, CompositeOp, ConstOp } from '@/lib/reporting/types'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import { useBranding } from '@/components/providers/BrandingProvider'
@@ -158,6 +158,32 @@ export function ConfigureClient({
   const [savingId, setSavingId] = useState<string | null>(null)
   const [seedingRecommended, setSeedingRecommended] = useState(false)
   const [seedNotice, setSeedNotice] = useState<string | null>(null)
+  const [syncingPosthog, setSyncingPosthog] = useState(false)
+
+  async function syncPostHog() {
+    setError(null)
+    setSeedNotice(null)
+    setSyncingPosthog(true)
+    try {
+      const res = await fetch(
+        `/api/integrations/posthog/sync?slug=${encodeURIComponent(client.slug)}`,
+        { method: 'POST' }
+      )
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'PostHog sync failed')
+      const upserted = body.total_upserted ?? 0
+      const failed = body.failed ?? 0
+      const note =
+        upserted > 0
+          ? `Pulled ${upserted} daily fact${upserted === 1 ? '' : 's'} from PostHog into report_external_facts.`
+          : 'PostHog sync ran but found no events for this client. Check your event name + property filter.'
+      setSeedNotice(failed > 0 ? `${note} (${failed} failed — check server logs.)` : note)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'PostHog sync failed')
+    } finally {
+      setSyncingPosthog(false)
+    }
+  }
 
   async function seedRecommendedKPIs() {
     setError(null)
@@ -291,9 +317,18 @@ export function ConfigureClient({
               }}
             />
             <button
+              onClick={syncPostHog}
+              disabled={syncingPosthog}
+              title="Pull daily opt_in_submitted event counts from PostHog into report_external_facts. Filtered by properties.client_slug = this client's slug."
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300 text-sm font-medium hover:bg-sky-500/20 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncingPosthog ? 'animate-spin' : ''}`} />
+              {syncingPosthog ? 'Syncing…' : 'Sync from PostHog'}
+            </button>
+            <button
               onClick={seedRecommendedKPIs}
-              disabled={seedingRecommended || files.length === 0}
-              title="Auto-configure catalog KPIs by matching your file columns to known metric names."
+              disabled={seedingRecommended}
+              title="Auto-configure catalog KPIs by matching your file columns (and connected sources like PostHog) to known metric names."
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 disabled:opacity-50"
             >
               <Wand2 className="h-4 w-4" />

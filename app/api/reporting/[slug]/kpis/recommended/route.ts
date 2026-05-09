@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { buildRecommendedKPIs, type FileColumns } from '@/lib/reporting/recommended-kpis'
+import { isPostHogConfigured } from '@/lib/integrations/posthog-server'
 import type { ReportKPI } from '@/lib/supabase/types'
 
 export async function POST(
@@ -35,14 +36,20 @@ export async function POST(
     .eq('client_id', client.id)
     .order('modified_time', { ascending: false })
 
-  if (!filesRaw || filesRaw.length === 0) {
+  const posthog = isPostHogConfigured()
+  // Drive files are optional now: an external source like PostHog can power
+  // a recommendation on its own. Only block when both are unavailable.
+  if ((!filesRaw || filesRaw.length === 0) && !posthog) {
     return NextResponse.json(
-      { error: 'No files synced yet. Sync the Drive folder first.' },
+      {
+        error:
+          'Nothing to recommend from. Sync the Drive folder, or set POSTHOG_PERSONAL_API_KEY + POSTHOG_PROJECT_ID to enable PostHog-backed KPIs.',
+      },
       { status: 400 }
     )
   }
 
-  const files: FileColumns[] = filesRaw.map((f) => ({
+  const files: FileColumns[] = (filesRaw ?? []).map((f) => ({
     filename: (f.filename as string) ?? '',
     columns: Array.isArray(f.columns) ? (f.columns as string[]) : [],
   }))
@@ -57,7 +64,7 @@ export async function POST(
     -1
   )
 
-  const recommendations = buildRecommendedKPIs(files)
+  const recommendations = buildRecommendedKPIs(files, { posthog })
 
   type KPIInsert = Pick<ReportKPI, 'key' | 'display_name' | 'formula'> & Partial<ReportKPI>
   const inserts: KPIInsert[] = []
