@@ -752,11 +752,29 @@ function AggEditor({
   const sourceFile = files.find((f) => f.filename === agg.source) ?? null
   const filters = agg.filters ?? []
 
+  // Columns available to the column / timeframe / filter dropdowns. Three shapes:
+  //  - source_type set (PostHog / Stripe / Meta etc.): facts always carry
+  //    `ts` + `value`; dimension keys aren't known at edit time, so the user
+  //    can pick those two and hand-edit the JSON for dimension filters.
+  //  - all_files: union of columns across every synced Drive file.
+  //  - normal: the matched source file's columns.
+  // This unblocks the "Add filter" button + column dropdowns for std lifetime
+  // tiles and any AggOp whose `source` doesn't match a Drive filename.
+  const availableColumns = (() => {
+    if (agg.source_type) return ['ts', 'value']
+    if (agg.all_files) {
+      const union = new Set<string>()
+      for (const f of files) for (const c of f.columns) union.add(c)
+      return Array.from(union).sort()
+    }
+    return sourceFile?.columns ?? []
+  })()
+
   function patch(p: Partial<AggOp>) {
     onChange({ ...agg, ...p })
   }
   function addFilter() {
-    patch({ filters: [...filters, { column: sourceFile?.columns[0] ?? '', op: 'eq', value: '' }] })
+    patch({ filters: [...filters, { column: availableColumns[0] ?? '', op: 'eq', value: '' }] })
   }
   function removeFilter(i: number) {
     patch({ filters: filters.filter((_, idx) => idx !== i) })
@@ -765,9 +783,9 @@ function AggEditor({
     patch({ filters: filters.map((f, idx) => (idx === i ? { ...f, ...p } : f)) })
   }
 
-  const dateColumns = sourceFile?.columns.filter((c) =>
-    /date|time|created|modified|at$|when/i.test(c)
-  ) ?? []
+  const dateColumns = availableColumns.filter((c) =>
+    /date|time|created|modified|at$|when|^ts$/i.test(c)
+  )
 
   return (
     <div className="space-y-2">
@@ -795,7 +813,7 @@ function AggEditor({
             disabled={agg.op === 'count'}
           >
             <option value="">— none —</option>
-            {sourceFile?.columns.map((c) => (
+            {availableColumns.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -809,7 +827,7 @@ function AggEditor({
           className={inputCls}
         >
           <option value="">— none (timeframe filter ignored) —</option>
-          {(dateColumns.length > 0 ? dateColumns : sourceFile?.columns ?? []).map((c) => (
+          {(dateColumns.length > 0 ? dateColumns : availableColumns).map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
@@ -818,7 +836,11 @@ function AggEditor({
       <div>
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-slate-400">Filters (AND)</span>
-          <button onClick={addFilter} className="text-xs text-amber-400 hover:text-amber-300" disabled={!sourceFile}>
+          <button
+            onClick={addFilter}
+            className="text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50"
+            disabled={availableColumns.length === 0}
+          >
             + Add filter
           </button>
         </div>
@@ -830,7 +852,8 @@ function AggEditor({
               <div key={i} className="grid grid-cols-12 gap-2 items-end">
                 <div className="col-span-4">
                   <select value={f.column} onChange={(e) => updateFilter(i, { column: e.target.value })} className={inputCls}>
-                    {sourceFile?.columns.map((c) => (
+                    <option value="">— column —</option>
+                    {availableColumns.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
