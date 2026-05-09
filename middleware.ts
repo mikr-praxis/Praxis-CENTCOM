@@ -6,6 +6,10 @@ const isPublicRoute = createRouteMatcher([
   '/api/auth/google/callback',
   '/reporting/share/(.*)',
   '/api/reporting/share/(.*)',
+  // Integration sync endpoints enforce their own auth (Clerk session OR
+  // Bearer CRON_SECRET) inside the route handlers — Clerk middleware would
+  // 404 cron-triggered requests that lack a Clerk session.
+  '/api/integrations/(.*)',
 ])
 
 export default clerkMiddleware(async (auth, req) => {
