@@ -81,7 +81,12 @@ export async function POST(
       key: rec.catalog_key,
       display_name: rec.display_name,
       description: `Auto-configured from synced files. ${rec.description}`,
-      formula: rec.formula,
+      // Formula is a tagged union (AggOp | CompositeOp | ConstOp) but the
+      // report_kpis.formula column is typed as Record<string, unknown> for
+      // JSONB flexibility. TS won't auto-widen a tagged union through an
+      // index signature, so we cast structurally — the runtime shape is
+      // identical, and the engine validates the union on read.
+      formula: rec.formula as unknown as Record<string, unknown>,
       format: rec.format,
       target: null,
       viz_type: rec.viz_type,
