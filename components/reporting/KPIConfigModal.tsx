@@ -568,7 +568,20 @@ function SourceColumnRow({
   removable?: boolean
   onRemove?: () => void
 }) {
-  const cols = state.source ? columnsByFile[state.source] ?? [] : []
+  // For all_files-scoped inputs the source picker is hidden upstream and
+  // `state.source` stays as `*` — its columns aren't keyed in columnsByFile.
+  // Fall back to the union of every inspected file's columns so the column
+  // dropdown AND the filter column dropdown render real options.
+  const cols = (() => {
+    if (input.scope === 'all_files') {
+      const union = new Map<string, InspectColumn>()
+      for (const list of Object.values(columnsByFile)) {
+        for (const c of list) if (!union.has(c.name)) union.set(c.name, c)
+      }
+      return Array.from(union.values())
+    }
+    return state.source ? columnsByFile[state.source] ?? [] : []
+  })()
   const isInspecting = state.source ? inspecting.has(state.source) : false
 
   return (

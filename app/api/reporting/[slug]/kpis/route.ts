@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { evaluateKPI, evaluateKPISeries, pickGranularity, forecastSeries } from '@/lib/reporting/engine'
 import { getReportingGranularityThresholds } from '@/lib/reporting/config'
+import { preloadExternalFacts } from '@/lib/reporting/external-facts'
 import type { Formula, KPIDefinition, RawFileForEngine, Timeframe, Slicer } from '@/lib/reporting/types'
 import type { ReportKPI, ReportRawFile, ChartOptions } from '@/lib/supabase/types'
 
@@ -87,12 +88,24 @@ export async function GET(
   const files = (fileRows ?? []).map(rowToFileForEngine)
   const definitions = (kpiRows ?? []).map(rowToDefinition)
 
+  // Pre-load external facts (PostHog / Stripe / Meta / etc.) referenced by
+  // any of the KPI formulas. Walks the formula trees, scopes the query to
+  // (client_id, source_type, kind, timeframe), and hands the typed rows
+  // to the engine via EvalContext. NEVER as virtual files —
+  // see content/memory/no-virtual-files.md.
+  const externalFacts = await preloadExternalFacts({
+    supabase,
+    clientId: client.id,
+    formulas: definitions.map((d) => d.formula),
+    timeframe,
+  })
+
   const granThresholds = await getReportingGranularityThresholds()
   const granularity = pickGranularity(timeframe, granThresholds)
   const results = definitions.map((d) => {
-    const r = evaluateKPI(d, files, timeframe, { slicers })
+    const r = evaluateKPI(d, files, timeframe, { slicers, externalFacts })
     if (d.viz_type === 'line' || d.viz_type === 'bar' || d.viz_type === 'area') {
-      r.series = evaluateKPISeries(d, files, timeframe, granularity, { slicers })
+      r.series = evaluateKPISeries(d, files, timeframe, granularity, { slicers, externalFacts })
       if ((d.forecast_periods ?? 0) > 0 && r.series && r.series.length > 1) {
         r.forecast = forecastSeries(
           r.series,

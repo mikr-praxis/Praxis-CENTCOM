@@ -8,6 +8,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { evaluateKPI, evaluateKPISeries, pickGranularity } from '@/lib/reporting/engine'
 import { getReportingGranularityThresholds } from '@/lib/reporting/config'
+import { preloadExternalFacts } from '@/lib/reporting/external-facts'
 import type { Formula, KPIDefinition, RawFileForEngine, Timeframe } from '@/lib/reporting/types'
 import type { KPIFormat, KPIVizType, ReportRawFile } from '@/lib/supabase/types'
 
@@ -82,10 +83,26 @@ export async function POST(
     chart_options: {},
   }
 
-  const result = evaluateKPI(fakeKpi, files, timeframe)
+  // Pre-load any external facts (PostHog / Stripe / etc.) the formula
+  // references — same path as the main GET. Drive-only formulas: this
+  // returns an empty map, no extra DB hit.
+  const externalFacts = await preloadExternalFacts({
+    supabase,
+    clientId: client.id,
+    formulas: [body.formula],
+    timeframe,
+  })
+
+  const result = evaluateKPI(fakeKpi, files, timeframe, { externalFacts })
   if (fakeKpi.viz_type === 'line' || fakeKpi.viz_type === 'bar' || fakeKpi.viz_type === 'area') {
     const granThresholds = await getReportingGranularityThresholds()
-    result.series = evaluateKPISeries(fakeKpi, files, timeframe, pickGranularity(timeframe, granThresholds))
+    result.series = evaluateKPISeries(
+      fakeKpi,
+      files,
+      timeframe,
+      pickGranularity(timeframe, granThresholds),
+      { externalFacts }
+    )
   }
   return NextResponse.json({ result })
 }

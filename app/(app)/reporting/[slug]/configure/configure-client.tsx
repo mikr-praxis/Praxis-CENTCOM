@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Plus, Trash2, Save, Activity } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2, Save, Activity, Wand2, RefreshCw } from 'lucide-react'
 import type { AggOp, Formula, Filter, CompositeOp, ConstOp } from '@/lib/reporting/types'
 import { formatKPIValue } from '@/lib/reporting/engine'
 import { useBranding } from '@/components/providers/BrandingProvider'
@@ -156,6 +156,64 @@ export function ConfigureClient({
   )
   const [error, setError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [seedingRecommended, setSeedingRecommended] = useState(false)
+  const [seedNotice, setSeedNotice] = useState<string | null>(null)
+  const [syncingPosthog, setSyncingPosthog] = useState(false)
+
+  async function syncPostHog() {
+    setError(null)
+    setSeedNotice(null)
+    setSyncingPosthog(true)
+    try {
+      const res = await fetch(
+        `/api/integrations/posthog/sync?slug=${encodeURIComponent(client.slug)}`,
+        { method: 'POST' }
+      )
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'PostHog sync failed')
+      const upserted = body.total_upserted ?? 0
+      const failed = body.failed ?? 0
+      const note =
+        upserted > 0
+          ? `Pulled ${upserted} daily fact${upserted === 1 ? '' : 's'} from PostHog into report_external_facts.`
+          : 'PostHog sync ran but found no events for this client. Check your event name + property filter.'
+      setSeedNotice(failed > 0 ? `${note} (${failed} failed — check server logs.)` : note)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'PostHog sync failed')
+    } finally {
+      setSyncingPosthog(false)
+    }
+  }
+
+  async function seedRecommendedKPIs() {
+    setError(null)
+    setSeedNotice(null)
+    setSeedingRecommended(true)
+    try {
+      const res = await fetch(`/api/reporting/${client.slug}/kpis/recommended`, {
+        method: 'POST',
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Set up failed')
+      const inserted: KPIRow[] = body.kpis ?? []
+      if (inserted.length > 0) {
+        setKpis((prev) => [...prev, ...inserted])
+      }
+      const skipped = body.skipped ?? 0
+      if (inserted.length > 0) {
+        setSeedNotice(
+          `Configured ${inserted.length} KPI${inserted.length === 1 ? '' : 's'} from your synced files` +
+            (skipped > 0 ? ` (${skipped} already existed).` : '.')
+        )
+      } else if (body.message) {
+        setSeedNotice(body.message)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Set up failed')
+    } finally {
+      setSeedingRecommended(false)
+    }
+  }
 
   async function createKPI() {
     setError(null)
@@ -259,6 +317,24 @@ export function ConfigureClient({
               }}
             />
             <button
+              onClick={syncPostHog}
+              disabled={syncingPosthog}
+              title="Pull daily opt_in_submitted event counts from PostHog into report_external_facts. Filtered by properties.client_slug = this client's slug."
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300 text-sm font-medium hover:bg-sky-500/20 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncingPosthog ? 'animate-spin' : ''}`} />
+              {syncingPosthog ? 'Syncing…' : 'Sync from PostHog'}
+            </button>
+            <button
+              onClick={seedRecommendedKPIs}
+              disabled={seedingRecommended}
+              title="Auto-configure catalog KPIs by matching your file columns (and connected sources like PostHog) to known metric names."
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              <Wand2 className="h-4 w-4" />
+              {seedingRecommended ? 'Setting up…' : 'Set up recommended KPIs'}
+            </button>
+            <button
               onClick={() => setAdding(true)}
               disabled={adding || files.length === 0}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/20 disabled:opacity-50"
@@ -280,6 +356,18 @@ export function ConfigureClient({
       {error && (
         <div className="mb-4 p-3 rounded-lg border border-red-500/30 bg-red-500/5 text-red-300 text-sm">
           {error}
+        </div>
+      )}
+
+      {seedNotice && (
+        <div className="mb-4 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 text-emerald-200 text-sm flex items-start justify-between gap-3">
+          <span>{seedNotice}</span>
+          <button
+            onClick={() => setSeedNotice(null)}
+            className="text-emerald-300/70 hover:text-emerald-100 text-xs"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -664,11 +752,29 @@ function AggEditor({
   const sourceFile = files.find((f) => f.filename === agg.source) ?? null
   const filters = agg.filters ?? []
 
+  // Columns available to the column / timeframe / filter dropdowns. Three shapes:
+  //  - source_type set (PostHog / Stripe / Meta etc.): facts always carry
+  //    `ts` + `value`; dimension keys aren't known at edit time, so the user
+  //    can pick those two and hand-edit the JSON for dimension filters.
+  //  - all_files: union of columns across every synced Drive file.
+  //  - normal: the matched source file's columns.
+  // This unblocks the "Add filter" button + column dropdowns for std lifetime
+  // tiles and any AggOp whose `source` doesn't match a Drive filename.
+  const availableColumns = (() => {
+    if (agg.source_type) return ['ts', 'value']
+    if (agg.all_files) {
+      const union = new Set<string>()
+      for (const f of files) for (const c of f.columns) union.add(c)
+      return Array.from(union).sort()
+    }
+    return sourceFile?.columns ?? []
+  })()
+
   function patch(p: Partial<AggOp>) {
     onChange({ ...agg, ...p })
   }
   function addFilter() {
-    patch({ filters: [...filters, { column: sourceFile?.columns[0] ?? '', op: 'eq', value: '' }] })
+    patch({ filters: [...filters, { column: availableColumns[0] ?? '', op: 'eq', value: '' }] })
   }
   function removeFilter(i: number) {
     patch({ filters: filters.filter((_, idx) => idx !== i) })
@@ -677,9 +783,9 @@ function AggEditor({
     patch({ filters: filters.map((f, idx) => (idx === i ? { ...f, ...p } : f)) })
   }
 
-  const dateColumns = sourceFile?.columns.filter((c) =>
-    /date|time|created|modified|at$|when/i.test(c)
-  ) ?? []
+  const dateColumns = availableColumns.filter((c) =>
+    /date|time|created|modified|at$|when|^ts$/i.test(c)
+  )
 
   return (
     <div className="space-y-2">
@@ -707,7 +813,7 @@ function AggEditor({
             disabled={agg.op === 'count'}
           >
             <option value="">— none —</option>
-            {sourceFile?.columns.map((c) => (
+            {availableColumns.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -721,7 +827,7 @@ function AggEditor({
           className={inputCls}
         >
           <option value="">— none (timeframe filter ignored) —</option>
-          {(dateColumns.length > 0 ? dateColumns : sourceFile?.columns ?? []).map((c) => (
+          {(dateColumns.length > 0 ? dateColumns : availableColumns).map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
@@ -730,7 +836,11 @@ function AggEditor({
       <div>
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-slate-400">Filters (AND)</span>
-          <button onClick={addFilter} className="text-xs text-amber-400 hover:text-amber-300" disabled={!sourceFile}>
+          <button
+            onClick={addFilter}
+            className="text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50"
+            disabled={availableColumns.length === 0}
+          >
             + Add filter
           </button>
         </div>
@@ -742,7 +852,8 @@ function AggEditor({
               <div key={i} className="grid grid-cols-12 gap-2 items-end">
                 <div className="col-span-4">
                   <select value={f.column} onChange={(e) => updateFilter(i, { column: e.target.value })} className={inputCls}>
-                    {sourceFile?.columns.map((c) => (
+                    <option value="">— column —</option>
+                    {availableColumns.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>

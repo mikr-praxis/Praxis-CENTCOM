@@ -173,6 +173,23 @@ export type ReportShareToken = {
   revoked_at: string | null
 }
 
+/** External time-series fact written by an integration sync (PostHog today;
+ *  Stripe / Meta / etc. later). The reporting engine reads these directly
+ *  via AggOp.source_type — they are NEVER exposed as synthetic Drive files.
+ *  See content/memory/no-virtual-files.md. (migration 019) */
+export type ReportExternalFact = {
+  id: string
+  client_id: string
+  source_type: string
+  kind: string
+  ts: string
+  value: number | null
+  dimensions: Record<string, unknown>
+  external_id: string | null
+  inserted_at: string
+  updated_at: string
+}
+
 export type ReportAgentRunStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 
 /** Single KPI line in the snapshot fed to / saved with an agent run. */
@@ -546,6 +563,12 @@ export type Database = {
         Row: ReportAgentRun
         Insert: Partial<ReportAgentRun> & Pick<ReportAgentRun, 'client_id' | 'prompt'>
         Update: Partial<ReportAgentRun>
+        Relationships: []
+      }
+      report_external_facts: {
+        Row: ReportExternalFact
+        Insert: Partial<ReportExternalFact> & Pick<ReportExternalFact, 'client_id' | 'source_type' | 'kind' | 'ts'>
+        Update: Partial<ReportExternalFact>
         Relationships: []
       }
     }

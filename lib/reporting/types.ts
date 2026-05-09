@@ -26,20 +26,34 @@ export interface Filter {
 export interface AggOp {
   op: 'sum' | 'count' | 'count_distinct' | 'avg' | 'min' | 'max'
   /** Source filename in report_raw_files. Match by exact filename. Ignored
-   *  when `all_files` is true. */
+   *  when `all_files` is true OR when `source_type` is set (external fact
+   *  rows are addressed by `source_type`+`kind`, not by filename). */
   source: string
-  /** Column to aggregate. Required for sum/avg/min/max/count_distinct. Optional for count (= row count). */
+  /** External data source discriminator. Unset = Drive-backed AggOp,
+   *  evaluated against report_raw_files (existing path). Set = facts-backed
+   *  AggOp, evaluated against report_external_facts via SQL filters on
+   *  (client_id, source_type, kind). Examples: 'posthog', 'stripe',
+   *  'meta_ads'. See content/memory/kpi-data-sources-plan.md. */
+  source_type?: string
+  /** Logical metric name within the source — required when source_type is set.
+   *  Maps to the `kind` column on report_external_facts. Examples: 'opt_ins',
+   *  'cash_collected', 'amount_spent'. */
+  kind?: string
+  /** Column to aggregate. Required for sum/avg/min/max/count_distinct. Optional for count (= row count).
+   *  For source_type-backed AggOps, defaults to 'value' (the numeric column on report_external_facts);
+   *  may also reference a key inside the dimensions JSONB. */
   column?: string
   /** Optional row filters (AND'd together). */
   filters?: Filter[]
-  /** Date column to apply timeframe filtering against. Required if timeframe filtering is desired. */
+  /** Date column to apply timeframe filtering against. Required if timeframe filtering is desired.
+   *  For source_type-backed AggOps, this is conventionally 'ts'. */
   timeframe_column?: string
   /** When true, the evaluator aggregates `column` across EVERY synced file
    *  that has it (or every file, for plain `count`). Used by the standard
    *  lifetime tiles so the user can pick one column and have the engine
    *  pull from the entire Drive folder. Supported ops: sum, count,
    *  count_distinct. avg/min/max in this mode operate on the union of
-   *  values, not per-file averages. */
+   *  values, not per-file averages. Ignored when source_type is set. */
   all_files?: boolean
 }
 
