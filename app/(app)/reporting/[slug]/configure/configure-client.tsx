@@ -519,23 +519,23 @@ function KPIEditor({ slug, value, files, onChange, onSave, onCancel, onDelete, i
         <FormulaPreview slug={slug} formula={value.formula} format={value.format} viz={value.viz_type} />
       </div>
 
-      <details className="mt-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40">
-        <summary className="cursor-pointer text-xs uppercase tracking-wide text-slate-500 hover:text-slate-300">
+      <section className="mt-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40">
+        <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">
           Advanced — Group by, comparison, forecasting
-        </summary>
+        </div>
         <AdvancedKPIOptions value={value} files={files} onChange={(patch) => onChange({ ...value, ...patch } as KPIRow)} />
-      </details>
+      </section>
 
-      <details className="mt-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40">
-        <summary className="cursor-pointer text-xs uppercase tracking-wide text-slate-500 hover:text-slate-300">
+      <section className="mt-3 p-3 rounded-lg border border-slate-700 bg-slate-950/40">
+        <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">
           Visualization options — color, axis, legend, top-N
-        </summary>
+        </div>
         <VizOptionsEditor
           vizType={value.viz_type}
           options={value.chart_options ?? {}}
           onChange={(co) => onChange({ ...value, chart_options: co } as KPIRow)}
         />
-      </details>
+      </section>
 
       <div className="mt-4 flex items-center justify-between gap-2">
         <div>
