@@ -502,16 +502,16 @@ export function KPIConfigModal({
               ))}
             </select>
           </div>
-          <details className="rounded-lg border border-slate-700 bg-slate-950/40 p-3">
-            <summary className="cursor-pointer text-xs uppercase tracking-wide text-slate-500 hover:text-slate-300">
+          <section className="rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+            <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">
               Visualization options — color, axis, legend, top-N
-            </summary>
+            </div>
             <VizOptionsEditor
               vizType={vizType}
               options={chartOptions}
               onChange={setChartOptions}
             />
-          </details>
+          </section>
         </div>
 
         {error && (
