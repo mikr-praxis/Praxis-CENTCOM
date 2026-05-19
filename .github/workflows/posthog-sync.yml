@@ -95,6 +95,7 @@ jobs:
           fi
           echo "http_code=${HTTP_CODE}" >> "$GITHUB_OUTPUT"
           # Step summary (visible at the bottom of the run page)
+          UPSERTED=0
           if command -v jq >/dev/null 2>&1; then
             UPSERTED=$(jq -r '.total_upserted // 0' response.json 2>/dev/null || echo 0)
             FAILED=$(jq -r '.failed // 0' response.json 2>/dev/null || echo 0)
@@ -108,11 +109,39 @@ jobs:
               echo "- Failures: \`${FAILED}\`"
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+          echo "upserted=${UPSERTED}" >> "$GITHUB_OUTPUT"
           # Fail loudly if HTTP wasn't 2xx
           if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
             echo "::error::Sync HTTP ${HTTP_CODE}"
             exit 1
           fi
+
+      # When the sync upserts zero rows, the cause is almost always that
+      # PostHog doesn't have events matching the configured event name +
+      # property. Hit the diagnostic endpoint to dump the top events
+      # actually in PostHog so we can fix the sync filter in one round
+      # instead of guessing.
+      - name: Inspect PostHog (only when sync upserted 0)
+        id: inspect
+        if: steps.sync.outputs.upserted == '0' && steps.sync.outputs.http_code == '200'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="https://praxis-centcom.vercel.app/api/integrations/posthog/inspect?lookback=30&limit=20"
+          echo "POST ${URL}"
+          HTTP_CODE=$(curl -sS -o inspect.json -w "%{http_code}" \
+            -X POST "${URL}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json")
+          echo "HTTP ${HTTP_CODE}"
+          echo "----- inspect response -----"
+          if command -v jq >/dev/null 2>&1; then
+            jq . inspect.json || cat inspect.json
+          else
+            cat inspect.json
+          fi
+          echo "http_code=${HTTP_CODE}" >> "$GITHUB_OUTPUT"
 
       - name: Post result to tracking issue #13
         if: always()
@@ -128,9 +157,20 @@ jobs:
             echo "- Event: \`${{ github.event.inputs.event || 'opt_in_submitted' }}\` · Property: \`${{ github.event.inputs.property || 'client_slug' }}\` · Kind: \`${{ github.event.inputs.kind || 'opt_ins' }}\` · Lookback: \`${{ github.event.inputs.lookback || '90' }}d\` · Slug: \`${{ github.event.inputs.slug || '*all*' }}\`"
             echo "- HTTP: \`${HTTP_CODE:-?}\`"
             echo ""
+            echo '#### Sync response'
             echo '```json'
             cat response.json 2>/dev/null || echo '{ "error": "no response.json — sync step likely failed before request" }'
             echo ''
             echo '```'
+            if [ -f inspect.json ]; then
+              echo ''
+              echo '#### Diagnostics — top events PostHog has (last 30d)'
+              echo 'Sync upserted 0 rows, so the workflow also hit `/api/integrations/posthog/inspect`. Use this list to retune the sync filter (Run workflow → set `event` / `property`).'
+              echo ''
+              echo '```json'
+              cat inspect.json
+              echo ''
+              echo '```'
+            fi
           } > "$BODY_FILE"
           gh issue comment 13 --repo "${{ github.repository }}" --body-file "$BODY_FILE"

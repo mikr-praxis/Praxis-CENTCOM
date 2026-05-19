@@ -141,3 +141,80 @@ export async function fetchDailyEventCounts(args: {
   }
   return out
 }
+
+export interface TopEvent {
+  event: string
+  count: number
+  /** Up to 10 property keys observed on this event, with sample values
+   *  (first non-null), for quickly matching the sync filter to real data. */
+  properties: { key: string; sample: string }[]
+}
+
+/**
+ * Diagnostic helper: what events does PostHog actually have for this project
+ * in the lookback window, ranked by volume, with their property keys? Used by
+ * /api/integrations/posthog/inspect so the sync workflow can self-diagnose
+ * when total_upserted: 0 (event name / property mismatch is the usual cause).
+ */
+export async function fetchTopEvents(args: {
+  config: PostHogConfig
+  lookbackDays: number
+  limit?: number
+}): Promise<TopEvent[]> {
+  const { config, lookbackDays } = args
+  const days = Math.max(1, Math.min(365, Math.floor(lookbackDays)))
+  const limit = Math.max(1, Math.min(100, Math.floor(args.limit ?? 20)))
+
+  // Top events by count.
+  const eventsQ = `
+    SELECT event, count() AS cnt
+    FROM events
+    WHERE timestamp >= now() - INTERVAL ${days} DAY
+    GROUP BY event
+    ORDER BY cnt DESC
+    LIMIT ${limit}
+  `.trim()
+  const { results: eventRows } = await runHogQL(config, eventsQ)
+  const out: TopEvent[] = []
+  for (const row of eventRows) {
+    const ev = String(row[0] ?? '')
+    const cnt = Number(row[1] ?? 0)
+    if (!ev) continue
+    out.push({ event: ev, count: cnt, properties: [] })
+  }
+
+  // For each event, fetch the keys + a sample value. Bounded by `out.length`
+  // (<=20 by default) so cost stays tiny.
+  for (const e of out) {
+    // Event name has gone through the regex check above (it came from
+    // PostHog itself), but defensively quote-escape just in case.
+    const safeEvent = e.event.replace(/'/g, "''")
+    const propsQ = `
+      SELECT key, anyIf(value, value IS NOT NULL AND value != '') AS sample
+      FROM (
+        SELECT arrayJoin(JSONExtractKeysAndValuesRaw(properties)) AS kv,
+               kv.1 AS key, kv.2 AS value
+        FROM events
+        WHERE event = '${safeEvent}'
+          AND timestamp >= now() - INTERVAL ${days} DAY
+      )
+      GROUP BY key
+      ORDER BY count() DESC
+      LIMIT 10
+    `.trim()
+    try {
+      const { results: propRows } = await runHogQL(config, propsQ)
+      for (const row of propRows) {
+        const key = String(row[0] ?? '')
+        const sample = row[1] == null ? '' : String(row[1]).slice(0, 80)
+        if (key) e.properties.push({ key, sample })
+      }
+    } catch {
+      // Best-effort — skip property enumeration if HogQL rejects this shape
+      // on a particular event (rare; usually only on `$exception` events
+      // that have nested JSON).
+    }
+  }
+
+  return out
+}
