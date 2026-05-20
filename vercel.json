@@ -1,12 +1,10 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/sync-drive-reports",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/integrations/posthog/sync",
-      "schedule": "0 6 * * *"
-    }
+    { "path": "/api/cron/sync-drive-reports", "schedule": "0 3 * * *" },
+    { "path": "/api/integrations/posthog/sync", "schedule": "0 6 * * *" },
+    { "path": "/api/integrations/stripe/sync", "schedule": "0 5 * * *" },
+    { "path": "/api/integrations/hubspot/sync", "schedule": "30 6 * * *" },
+    { "path": "/api/integrations/meta-ads/sync", "schedule": "0 7 * * *" },
+    { "path": "/api/integrations/google-ads/sync", "schedule": "30 7 * * *" }
   ]
 }

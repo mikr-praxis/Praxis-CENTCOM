@@ -12,22 +12,11 @@
  *   POST /api/integrations/posthog/inspect?lookback=90&limit=40
  */
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { isIntegrationAuthorized } from '@/lib/integrations/auth'
 import { fetchTopEvents, getPostHogConfig } from '@/lib/integrations/posthog-server'
 
-async function isAuthorized(req: Request): Promise<boolean> {
-  const { userId } = await auth()
-  if (userId) return true
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const header = req.headers.get('authorization') || ''
-    if (header === `Bearer ${cronSecret}`) return true
-  }
-  return false
-}
-
 export async function POST(req: Request) {
-  if (!(await isAuthorized(req))) {
+  if (!(await isIntegrationAuthorized(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const cfg = getPostHogConfig()

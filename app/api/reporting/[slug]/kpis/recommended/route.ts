@@ -9,6 +9,10 @@ import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { buildRecommendedKPIs, type FileColumns } from '@/lib/reporting/recommended-kpis'
 import { isPostHogConfigured } from '@/lib/integrations/posthog-server'
+import { isStripeConfigured } from '@/lib/integrations/stripe-server'
+import { isHubSpotConfigured } from '@/lib/integrations/hubspot-server'
+import { isMetaAdsConfigured } from '@/lib/integrations/meta-ads-server'
+import { isGoogleAdsConfigured } from '@/lib/integrations/google-ads-server'
 import type { ReportKPI } from '@/lib/supabase/types'
 
 export async function POST(
@@ -36,14 +40,22 @@ export async function POST(
     .eq('client_id', client.id)
     .order('modified_time', { ascending: false })
 
-  const posthog = isPostHogConfigured()
-  // Drive files are optional now: an external source like PostHog can power
-  // a recommendation on its own. Only block when both are unavailable.
-  if ((!filesRaw || filesRaw.length === 0) && !posthog) {
+  const availability = {
+    posthog: isPostHogConfigured(),
+    stripe: isStripeConfigured(),
+    hubspot: await isHubSpotConfigured(),
+    meta_ads: isMetaAdsConfigured(),
+    google_ads: isGoogleAdsConfigured(),
+  }
+  const anyExternal = Object.values(availability).some(Boolean)
+  // Drive files are optional now: an external source (PostHog / Stripe /
+  // HubSpot / Meta / Google Ads) can power a recommendation on its own.
+  // Only block when nothing is available.
+  if ((!filesRaw || filesRaw.length === 0) && !anyExternal) {
     return NextResponse.json(
       {
         error:
-          'Nothing to recommend from. Sync the Drive folder, or set POSTHOG_PERSONAL_API_KEY + POSTHOG_PROJECT_ID to enable PostHog-backed KPIs.',
+          'Nothing to recommend from. Sync the Drive folder, or configure at least one integration (PostHog / Stripe / HubSpot / Meta Ads / Google Ads).',
       },
       { status: 400 }
     )
@@ -64,7 +76,7 @@ export async function POST(
     -1
   )
 
-  const recommendations = buildRecommendedKPIs(files, { posthog })
+  const recommendations = buildRecommendedKPIs(files, availability)
 
   type KPIInsert = Pick<ReportKPI, 'key' | 'display_name' | 'formula'> & Partial<ReportKPI>
   const inserts: KPIInsert[] = []

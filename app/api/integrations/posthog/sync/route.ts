@@ -19,8 +19,8 @@
  * for the same window just refreshes existing daily totals.
  */
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { isIntegrationAuthorized } from '@/lib/integrations/auth'
 import { fetchDailyEventCounts, getPostHogConfig } from '@/lib/integrations/posthog-server'
 
 const SOURCE_TYPE = 'posthog'
@@ -37,21 +37,8 @@ interface SyncResultClient {
   error?: string
 }
 
-async function isAuthorized(req: Request): Promise<boolean> {
-  // 1) Clerk session (UI-triggered sync)
-  const { userId } = await auth()
-  if (userId) return true
-  // 2) Cron / programmatic — `Authorization: Bearer ${CRON_SECRET}`
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const header = req.headers.get('authorization') || ''
-    if (header === `Bearer ${cronSecret}`) return true
-  }
-  return false
-}
-
 export async function POST(req: Request) {
-  if (!(await isAuthorized(req))) {
+  if (!(await isIntegrationAuthorized(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

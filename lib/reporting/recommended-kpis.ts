@@ -138,6 +138,32 @@ function tryBuild(
 export interface SourceAvailability {
   /** True when POSTHOG_PERSONAL_API_KEY + POSTHOG_PROJECT_ID are set. */
   posthog: boolean
+  /** True when STRIPE_SECRET_KEY is set. Unlocks `cash_collected` + `close_rate` numerator. */
+  stripe?: boolean
+  /** True when HubSpot token is configured (env or app_config). Unlocks
+   *  `qualified_leads`, `unqualified_leads`, `qualified_ratio`. */
+  hubspot?: boolean
+  /** True when META_ACCESS_TOKEN is set. Unlocks `amount_spent` + `cpm`
+   *  (and contributes to `total_blended_cost`). */
+  meta_ads?: boolean
+  /** True when the full Google Ads OAuth env is set. Same KPIs as meta_ads. */
+  google_ads?: boolean
+}
+
+/** A typed-source AggOp template for a given (catalog_key, source_type, kind). */
+function typedFormula(
+  source_type: string,
+  kind: string,
+  op: 'sum' = 'sum'
+): import('./types').AggOp {
+  return {
+    op,
+    source: '',
+    source_type,
+    kind,
+    column: 'value',
+    timeframe_column: 'ts',
+  }
 }
 
 /**
@@ -159,26 +185,107 @@ export function buildRecommendedKPIs(
   const all: CatalogEntry[] = [...STANDARD_CATALOG, ...CUSTOMIZABLE_CATALOG]
   const out: RecommendedKPI[] = []
 
-  if (availability.posthog) {
-    // PostHog → opt_ins. Engine reads from report_external_facts via the
-    // typed source_type path. No filename, no virtual file.
-    const optInsEntry = all.find((e) => e.catalog_key === 'opt_ins')
-    if (optInsEntry) {
+  function emit(catalogKey: string, sourceType: string, kind: string, providerLabel: string) {
+    const entry = all.find((e) => e.catalog_key === catalogKey)
+    if (!entry) return
+    out.push({
+      catalog_key: entry.catalog_key,
+      display_name: `${entry.display_name} (${providerLabel})`,
+      description: `${entry.description} Sourced from ${providerLabel} via /api/integrations/${sourceType}/sync.`,
+      format: entry.format,
+      viz_type: entry.viz_type,
+      formula: typedFormula(sourceType, kind),
+      inputs_matched: { [kind]: { filename: `${sourceType}:${kind}`, column: 'value' } },
+    })
+  }
+
+  // PostHog → opt_ins
+  if (availability.posthog) emit('opt_ins', 'posthog', 'opt_ins', 'PostHog')
+
+  // Stripe → cash_collected (revenue). close_rate also gets a Stripe-backed
+  // numerator via the `closes` fact the sync route writes alongside.
+  if (availability.stripe) emit('cash_collected', 'stripe', 'cash_collected', 'Stripe')
+
+  // HubSpot → qualified_leads, unqualified_leads, qualified_ratio
+  if (availability.hubspot) {
+    emit('qualified_leads', 'hubspot', 'qualified_leads', 'HubSpot')
+    emit('unqualified_leads', 'hubspot', 'unqualified_leads', 'HubSpot')
+    // qualified_ratio = qualified / unqualified — compose typed AggOps directly
+    const ratioEntry = all.find((e) => e.catalog_key === 'qualified_ratio')
+    if (ratioEntry) {
       out.push({
-        catalog_key: optInsEntry.catalog_key,
-        display_name: `${optInsEntry.display_name} (PostHog)`,
-        description: `${optInsEntry.description} Sourced from PostHog events via /api/integrations/posthog/sync.`,
-        format: optInsEntry.format,
-        viz_type: optInsEntry.viz_type,
+        catalog_key: ratioEntry.catalog_key,
+        display_name: `${ratioEntry.display_name} (HubSpot)`,
+        description: `${ratioEntry.description} Sourced from HubSpot via /api/integrations/hubspot/sync.`,
+        format: ratioEntry.format,
+        viz_type: ratioEntry.viz_type,
         formula: {
-          op: 'sum',
-          source: '',
-          source_type: 'posthog',
-          kind: 'opt_ins',
-          column: 'value',
-          timeframe_column: 'ts',
+          op: 'divide',
+          numerator: typedFormula('hubspot', 'qualified_leads'),
+          denominator: typedFormula('hubspot', 'unqualified_leads'),
         },
-        inputs_matched: { optins: { filename: 'posthog:opt_ins', column: 'value' } },
+        inputs_matched: {
+          qualified: { filename: 'hubspot:qualified_leads', column: 'value' },
+          unqualified: { filename: 'hubspot:unqualified_leads', column: 'value' },
+        },
+      })
+    }
+  }
+
+  // Meta Ads → amount_spent + cpm
+  if (availability.meta_ads) {
+    emit('amount_spent', 'meta_ads', 'amount_spent', 'Meta Ads')
+    // cpm = (spend / impressions) * 1000
+    const cpmEntry = all.find((e) => e.catalog_key === 'cpm')
+    if (cpmEntry) {
+      out.push({
+        catalog_key: cpmEntry.catalog_key,
+        display_name: `${cpmEntry.display_name} (Meta Ads)`,
+        description: `${cpmEntry.description} Sourced from Meta Marketing API via /api/integrations/meta-ads/sync.`,
+        format: cpmEntry.format,
+        viz_type: cpmEntry.viz_type,
+        formula: {
+          op: 'multiply',
+          left: {
+            op: 'divide',
+            numerator: typedFormula('meta_ads', 'amount_spent'),
+            denominator: typedFormula('meta_ads', 'impressions'),
+          },
+          right: { op: 'const', value: 1000 },
+        },
+        inputs_matched: {
+          spend: { filename: 'meta_ads:amount_spent', column: 'value' },
+          impressions: { filename: 'meta_ads:impressions', column: 'value' },
+        },
+      })
+    }
+  }
+
+  // Google Ads — same KPIs as Meta, only emit if Meta didn't already claim
+  // those slots so we don't double-recommend amount_spent / cpm.
+  if (availability.google_ads && !availability.meta_ads) {
+    emit('amount_spent', 'google_ads', 'amount_spent', 'Google Ads')
+    const cpmEntry = all.find((e) => e.catalog_key === 'cpm')
+    if (cpmEntry) {
+      out.push({
+        catalog_key: cpmEntry.catalog_key,
+        display_name: `${cpmEntry.display_name} (Google Ads)`,
+        description: `${cpmEntry.description} Sourced from Google Ads via /api/integrations/google-ads/sync.`,
+        format: cpmEntry.format,
+        viz_type: cpmEntry.viz_type,
+        formula: {
+          op: 'multiply',
+          left: {
+            op: 'divide',
+            numerator: typedFormula('google_ads', 'amount_spent'),
+            denominator: typedFormula('google_ads', 'impressions'),
+          },
+          right: { op: 'const', value: 1000 },
+        },
+        inputs_matched: {
+          spend: { filename: 'google_ads:amount_spent', column: 'value' },
+          impressions: { filename: 'google_ads:impressions', column: 'value' },
+        },
       })
     }
   }
