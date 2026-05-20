@@ -14,6 +14,7 @@ import type { BoardDetail, DetailedTask, OwnershipData, TaskTier } from '@/app/a
 import type { ProjectKPI, KPISnapshot } from '@/app/api/projects/kpis/route'
 import { MilestoneRoadmap } from '@/components/projects/MilestoneRoadmap'
 import { useFormatters } from '@/components/providers/BrandingProvider'
+import { Skeleton, SkeletonList, SkeletonChart } from '@/components/ui/Skeleton'
 
 // Ã¢ÂÂÃ¢ÂÂ Colors & Constants Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
@@ -112,11 +113,7 @@ function TaskListQuadrant({ tasks, loading }: { tasks: DetailedTask[]; loading: 
   }, [tasks, searchTerm])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
-      </div>
-    )
+    return <SkeletonList rows={6} cols={3} className="p-3" />
   }
 
   return (
@@ -220,8 +217,8 @@ function TaskListQuadrant({ tasks, loading }: { tasks: DetailedTask[]; loading: 
 function OwnershipQuadrant({ ownership, loading }: { ownership: OwnershipData[]; loading: boolean }) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+      <div className="flex items-center justify-center h-full p-6">
+        <Skeleton className="h-40 w-40 rounded-full" />
       </div>
     )
   }
@@ -469,11 +466,7 @@ function KPIQuadrant({
   }, [selectedKpiId, snapshots, f])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
-      </div>
-    )
+    return <SkeletonChart className="h-full m-3" />
   }
 
   return (
