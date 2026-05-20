@@ -1,0 +1,50 @@
+name: Deploy status → issue #13
+
+# Listens for Vercel (or any provider's) deployment_status events on this
+# repo. When a PRODUCTION deploy reaches a terminal state, post a one-line
+# comment to the tracking issue. The authenticated GitHub MCP can read the
+# issue comments without hitting the unauthenticated 60/hour rate limit
+# that the public deployments API uses.
+#
+# Only fires for the `production` environment + terminal states
+# (success/failure/error) so the issue stays readable.
+
+on:
+  deployment_status:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  post:
+    if: >
+      github.event.deployment.environment == 'production'
+      && (github.event.deployment_status.state == 'success'
+          || github.event.deployment_status.state == 'failure'
+          || github.event.deployment_status.state == 'error')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE: ${{ github.event.deployment_status.state }}
+          SHA: ${{ github.event.deployment.sha }}
+          URL: ${{ github.event.deployment_status.environment_url }}
+          LOG_URL: ${{ github.event.deployment_status.log_url }}
+          DESC: ${{ github.event.deployment_status.description }}
+        run: |
+          set -euo pipefail
+          ICON="✅"
+          if [ "${STATE}" != "success" ]; then ICON="❌"; fi
+          SHORT_SHA="${SHA:0:7}"
+          BODY=$(cat <<EOF
+### ${ICON} Production deploy — \`${STATE}\`
+
+- Commit: [\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${SHA})
+- URL: ${URL:-_n/a_}
+- Log: ${LOG_URL:-_n/a_}
+- Description: \`${DESC:-—}\`
+EOF
+)
+          gh issue comment 13 --repo "${{ github.repository }}" --body "$BODY"
