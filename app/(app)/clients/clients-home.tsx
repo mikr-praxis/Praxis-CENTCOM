@@ -30,6 +30,7 @@ import { PieBlock, TableBlock, GaugeBlock } from '@/components/reporting/VizBloc
 import { FileBrowser } from '@/components/reporting/FileBrowser'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
 import { SlicersBar } from '@/components/reporting/SlicersBar'
+import { StudioBuilder } from '@/components/reporting/StudioBuilder'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViewsBar'
 import { ShareDialog } from '@/components/reporting/ShareDialog'
@@ -736,6 +737,10 @@ function Workspace({
               ))}
             </div>
           )}
+
+          <div className="mt-6">
+            <StudioBuilder slug={client.slug} timeframe={timeframe} />
+          </div>
         </>
       )}
 
