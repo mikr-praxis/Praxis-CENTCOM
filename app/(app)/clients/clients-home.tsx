@@ -31,6 +31,8 @@ import { FileBrowser } from '@/components/reporting/FileBrowser'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
 import { SlicersBar } from '@/components/reporting/SlicersBar'
 import { StudioBuilder } from '@/components/reporting/StudioBuilder'
+import { SourcePicker } from '@/components/reporting/SourcePicker'
+import { resultMatchesSource, type SourceCatalog } from '@/components/reporting/studio-types'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViewsBar'
 import { ShareDialog } from '@/components/reporting/ShareDialog'
@@ -351,6 +353,22 @@ function Workspace({
     computeTimeframe(defaultTimeframe as Parameters<typeof computeTimeframe>[0], null, null)
   )
   const [slicers, setSlicers] = useState<Slicer[]>([])
+  // Source filter — narrows KPI tiles + StudioBuilder to one source. Null = all.
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
+  const [sourceCatalog, setSourceCatalog] = useState<SourceCatalog[] | null>(null)
+
+  // Load the unified source catalog once per client (shared by SourcePicker + StudioBuilder).
+  useEffect(() => {
+    let cancel = false
+    fetch(`/api/reporting/${client.slug}/fields`)
+      .then(async (r) => {
+        if (!r.ok) return
+        const b = (await r.json()) as { sources?: SourceCatalog[] }
+        if (!cancel) setSourceCatalog(b.sources ?? [])
+      })
+      .catch(() => { /* best-effort; picker just won't render */ })
+    return () => { cancel = true }
+  }, [client.slug])
   const [results, setResults] = useState<KPIResult[]>([])
   const [kpiCount, setKpiCount] = useState(client.kpi_count)
   const [loading, setLoading] = useState(false)
@@ -433,11 +451,24 @@ function Workspace({
   }, [fetchKpis])
 
   const visibleResults = useMemo(() => {
-    if (selectedFiles.size === 0 || selectedFiles.size === client.filenames.length) return results
-    return results.filter(
-      (r) => r.source_files.length === 0 || r.source_files.every((f) => selectedFiles.has(f))
-    )
-  }, [results, selectedFiles, client.filenames.length])
+    let filtered = results
+    // Existing file multi-select filter (untouched semantics).
+    if (selectedFiles.size > 0 && selectedFiles.size !== client.filenames.length) {
+      filtered = filtered.filter(
+        (r) => r.source_files.length === 0 || r.source_files.every((f) => selectedFiles.has(f))
+      )
+    }
+    // New source filter from SourcePicker — narrows non-std tiles to those
+    // whose engine-reported source_files intersect the selected source.
+    // std_lifetime_* tiles render via StandardKPITiles upstream and are
+    // unaffected by this filter (matches the "always show std tiles" choice).
+    if (selectedSourceId) {
+      filtered = filtered.filter(
+        (r) => isStandardKey(r.key) || resultMatchesSource(r.source_files, selectedSourceId)
+      )
+    }
+    return filtered
+  }, [results, selectedFiles, client.filenames.length, selectedSourceId])
 
   function toggleFile(name: string) {
     setSelectedFiles((prev) => {
@@ -609,6 +640,14 @@ function Workspace({
       <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-3 mb-3 space-y-2 print:hidden">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <TimeframePicker value={timeframe} onChange={setTimeframe} slug={client.slug} />
+          {sourceCatalog && sourceCatalog.length > 0 && (
+            <SourcePicker
+              sources={sourceCatalog}
+              value={selectedSourceId}
+              onChange={setSelectedSourceId}
+              compact
+            />
+          )}
           {client.file_count > 0 && (
             <SlicersBar
               slug={client.slug}
@@ -739,7 +778,12 @@ function Workspace({
           )}
 
           <div className="mt-6">
-            <StudioBuilder slug={client.slug} timeframe={timeframe} />
+            <StudioBuilder
+              slug={client.slug}
+              timeframe={timeframe}
+              catalog={sourceCatalog ?? undefined}
+              lockedSourceId={selectedSourceId}
+            />
           </div>
         </>
       )}
