@@ -34,18 +34,8 @@ import {
   Tooltip,
 } from 'recharts'
 import { Skeleton } from '@/components/ui/Skeleton'
+import type { SourceCatalog } from './studio-types'
 
-interface FieldDef {
-  name: string
-  type: 'date' | 'number' | 'category'
-}
-interface SourceCatalog {
-  id: string
-  label: string
-  kind: 'drive' | 'external'
-  row_count: number
-  fields: FieldDef[]
-}
 interface FieldsResp {
   sources: SourceCatalog[]
 }
@@ -72,10 +62,17 @@ const PIE_COLORS = [
 interface Props {
   slug: string
   timeframe?: { start: string | null; end: string | null }
+  /** Optional pre-loaded source catalog. When provided, skips the internal
+   *  fetch and lets the parent share one fetch across SourcePicker + Builder. */
+  catalog?: SourceCatalog[]
+  /** When set, the Source dropdown is hidden and the builder is locked to
+   *  this source. Set by the parent's SourcePicker; null = builder picks
+   *  its own. */
+  lockedSourceId?: string | null
 }
 
-export function StudioBuilder({ slug, timeframe }: Props) {
-  const [catalog, setCatalog] = useState<SourceCatalog[] | null>(null)
+export function StudioBuilder({ slug, timeframe, catalog: catalogProp, lockedSourceId }: Props) {
+  const [catalog, setCatalog] = useState<SourceCatalog[] | null>(catalogProp ?? null)
   const [catalogError, setCatalogError] = useState<string | null>(null)
 
   const [sourceId, setSourceId] = useState<string>('')
@@ -88,8 +85,14 @@ export function StudioBuilder({ slug, timeframe }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load the field catalog once on mount.
+  // If the parent passed an updated catalog, mirror it.
   useEffect(() => {
+    if (catalogProp) setCatalog(catalogProp)
+  }, [catalogProp])
+
+  // Load the field catalog only when the parent didn't supply one.
+  useEffect(() => {
+    if (catalogProp) return
     let cancel = false
     fetch(`/api/reporting/${slug}/fields`)
       .then(async (r) => {
@@ -100,19 +103,27 @@ export function StudioBuilder({ slug, timeframe }: Props) {
       .then((b) => {
         if (cancel) return
         setCatalog(b.sources)
-        // Auto-pick first source with at least one number + one date/category field.
-        const first = b.sources.find(
-          (s) => s.fields.some((f) => f.type === 'number') && s.fields.length >= 2
-        ) ?? b.sources[0]
-        if (first) {
-          setSourceId(first.id)
-        }
       })
       .catch((e) => {
         if (!cancel) setCatalogError(e instanceof Error ? e.message : 'Failed to load fields')
       })
     return () => { cancel = true }
-  }, [slug])
+  }, [slug, catalogProp])
+
+  // If a source is locked from the parent, that's our source. Otherwise
+  // auto-pick the first source with usable shape.
+  useEffect(() => {
+    if (!catalog) return
+    if (lockedSourceId) {
+      setSourceId(lockedSourceId)
+      return
+    }
+    if (sourceId) return // already chosen
+    const first = catalog.find(
+      (s) => s.fields.some((f) => f.type === 'number') && s.fields.length >= 2
+    ) ?? catalog[0]
+    if (first) setSourceId(first.id)
+  }, [catalog, lockedSourceId, sourceId])
 
   const selectedSource = useMemo(
     () => catalog?.find((s) => s.id === sourceId) ?? null,
@@ -234,20 +245,22 @@ export function StudioBuilder({ slug, timeframe }: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-        {/* Source */}
-        <Dropdown label="Source" value={sourceId} onChange={setSourceId}>
-          <optgroup label="Drive files">
-            {catalog.filter((s) => s.kind === 'drive').map((s) => (
-              <option key={s.id} value={s.id}>{s.label} ({s.row_count.toLocaleString()} rows)</option>
-            ))}
-          </optgroup>
-          <optgroup label="Integrations">
-            {catalog.filter((s) => s.kind === 'external').map((s) => (
-              <option key={s.id} value={s.id}>{s.label} ({s.row_count.toLocaleString()} rows)</option>
-            ))}
-          </optgroup>
-        </Dropdown>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${lockedSourceId ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-2`}>
+        {/* Source — hidden when locked from the parent SourcePicker. */}
+        {!lockedSourceId && (
+          <Dropdown label="Source" value={sourceId} onChange={setSourceId}>
+            <optgroup label="Drive files">
+              {catalog.filter((s) => s.kind === 'drive').map((s) => (
+                <option key={s.id} value={s.id}>{s.label} ({s.row_count.toLocaleString()} rows)</option>
+              ))}
+            </optgroup>
+            <optgroup label="Integrations">
+              {catalog.filter((s) => s.kind === 'external').map((s) => (
+                <option key={s.id} value={s.id}>{s.label} ({s.row_count.toLocaleString()} rows)</option>
+              ))}
+            </optgroup>
+          </Dropdown>
+        )}
 
         {/* Measure */}
         <Dropdown
