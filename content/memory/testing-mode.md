@@ -14,23 +14,30 @@ scoped flag that overrides default behavior around merging + deploying.
 
 ## What this changes
 
-1. **Do NOT merge PRs to `main` without explicit per-PR approval.** Even
+1. **Prompt before every push.** ANY `git push`, `mcp__github__push_files`,
+   `mcp__github__create_or_update_file`, PR creation, or PR merge requires
+   an explicit per-action confirmation in chat. The agent never assumes the
+   owner wants the change shipped just because CI is green or the work is
+   done — it always asks first. Default action when no confirmation has
+   been received: leave the change local / unpushed.
+
+2. **Do NOT merge PRs to `main` without explicit per-PR approval.** Even
    when CI is green and the change looks complete, the default action is
    to leave the PR open. The owner reviews the preview deploy and tells
    you when to merge. The merge happens only when they say "merge" (or
    equivalent) for a specific PR.
 
-2. **Do NOT push directly to `main`** for anything that ships product
+3. **Do NOT push directly to `main`** for anything that ships product
    code. CI config and tracking-issue plumbing are the only exceptions
-   (these don't change product behavior); everything else goes via
-   feature branch → PR → preview → owner approval → merge.
+   (these don't change product behavior) — and even those should still
+   prompt per rule #1.
 
-3. **Treat live data as fixture data**, not customer data. Don't take
+4. **Treat live data as fixture data**, not customer data. Don't take
    irreversible actions against connected services (Stripe charges,
    HubSpot contacts, Meta/Google ad accounts) without per-action
    confirmation.
 
-4. **Vercel production URL is the testing surface**, not the customer-
+5. **Vercel production URL is the testing surface**, not the customer-
    facing site. The owner is the only user during this window.
 
 ## What ends testing mode
