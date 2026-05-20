@@ -1,50 +1,134 @@
 name: Deploy status → issue #13
 
-# Listens for Vercel (or any provider's) deployment_status events on this
-# repo. When a PRODUCTION deploy reaches a terminal state, post a one-line
-# comment to the tracking issue. The authenticated GitHub MCP can read the
-# issue comments without hitting the unauthenticated 60/hour rate limit
-# that the public deployments API uses.
+# Listens for any signal Vercel posts back to GitHub when a deploy lands —
+# whichever it uses (deployment_status, commit status, or check_run) — and
+# writes a compact comment to issue #13 so the deploy lifecycle becomes
+# queryable via the authenticated GitHub MCP (no rate limit).
 #
-# Only fires for the `production` environment + terminal states
-# (success/failure/error) so the issue stays readable.
+# Why so broad: Vercel's project configuration varies. Some projects emit
+# GitHub Deployments → deployment_status events. Others use the commit
+# status API. Newer ones use check_runs. We listen to all three and let
+# the per-event filters narrow.
 
 on:
   deployment_status:
+  status:
+  check_run:
+    types: [completed]
 
 permissions:
   issues: write
   contents: read
 
 jobs:
-  post:
-    if: >
-      github.event.deployment.environment == 'production'
-      && (github.event.deployment_status.state == 'success'
-          || github.event.deployment_status.state == 'failure'
-          || github.event.deployment_status.state == 'error')
+  # ─────────── deployment_status (GitHub Deployments API path) ───────────
+  deploy-event:
+    if: github.event_name == 'deployment_status'
     runs-on: ubuntu-latest
     steps:
-      - name: Comment on tracking issue
+      - name: Comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATE: ${{ github.event.deployment_status.state }}
+          ENV: ${{ github.event.deployment.environment }}
           SHA: ${{ github.event.deployment.sha }}
           URL: ${{ github.event.deployment_status.environment_url }}
           LOG_URL: ${{ github.event.deployment_status.log_url }}
           DESC: ${{ github.event.deployment_status.description }}
+        # Only post on terminal states. Includes inactive (Vercel marks
+        # superseded deploys this way) so we can see deploy turnover too.
         run: |
           set -euo pipefail
+          case "${STATE}" in
+            success|failure|error|inactive)
+              ;;
+            *)
+              echo "skip non-terminal state: ${STATE}"; exit 0 ;;
+          esac
           ICON="✅"
           if [ "${STATE}" != "success" ]; then ICON="❌"; fi
           SHORT_SHA="${SHA:0:7}"
           BODY=$(cat <<EOF
-### ${ICON} Production deploy — \`${STATE}\`
+### ${ICON} \`deployment_status\` — \`${STATE}\` (env: \`${ENV:-?}\`)
 
 - Commit: [\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${SHA})
 - URL: ${URL:-_n/a_}
 - Log: ${LOG_URL:-_n/a_}
 - Description: \`${DESC:-—}\`
+EOF
+)
+          gh issue comment 13 --repo "${{ github.repository }}" --body "$BODY"
+
+  # ─────────── status (commit status API path) ───────────
+  status-event:
+    if: github.event_name == 'status'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment (Vercel commit-status path)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE: ${{ github.event.state }}
+          CONTEXT: ${{ github.event.context }}
+          SHA: ${{ github.event.sha }}
+          TARGET_URL: ${{ github.event.target_url }}
+          DESC: ${{ github.event.description }}
+        # Only Vercel-flavored contexts, only terminal states. Without this
+        # filter every Cloudflare / GitHub / etc. status update would flood
+        # the issue.
+        run: |
+          set -euo pipefail
+          case "${STATE}" in
+            success|failure|error) ;;
+            *) echo "skip non-terminal state: ${STATE}"; exit 0 ;;
+          esac
+          if ! echo "${CONTEXT}" | grep -qi 'vercel\|deploy'; then
+            echo "skip non-deploy context: ${CONTEXT}"; exit 0
+          fi
+          ICON="✅"
+          if [ "${STATE}" != "success" ]; then ICON="❌"; fi
+          SHORT_SHA="${SHA:0:7}"
+          BODY=$(cat <<EOF
+### ${ICON} \`status\` — \`${STATE}\` (\`${CONTEXT}\`)
+
+- Commit: [\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${SHA})
+- Target: ${TARGET_URL:-_n/a_}
+- Description: \`${DESC:-—}\`
+EOF
+)
+          gh issue comment 13 --repo "${{ github.repository }}" --body "$BODY"
+
+  # ─────────── check_run (check API path) ───────────
+  check-event:
+    if: github.event_name == 'check_run'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment (Vercel check_run path)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NAME: ${{ github.event.check_run.name }}
+          CONCLUSION: ${{ github.event.check_run.conclusion }}
+          SHA: ${{ github.event.check_run.head_sha }}
+          DETAILS_URL: ${{ github.event.check_run.details_url }}
+          HTML_URL: ${{ github.event.check_run.html_url }}
+        # Same idea — only Vercel-flavored check names, only conclusive.
+        run: |
+          set -euo pipefail
+          case "${CONCLUSION}" in
+            success|failure|cancelled|timed_out) ;;
+            *) echo "skip non-conclusive: ${CONCLUSION}"; exit 0 ;;
+          esac
+          if ! echo "${NAME}" | grep -qi 'vercel\|deploy'; then
+            echo "skip non-deploy check: ${NAME}"; exit 0
+          fi
+          ICON="✅"
+          if [ "${CONCLUSION}" != "success" ]; then ICON="❌"; fi
+          SHORT_SHA="${SHA:0:7}"
+          BODY=$(cat <<EOF
+### ${ICON} \`check_run\` — \`${CONCLUSION}\` (\`${NAME}\`)
+
+- Commit: [\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${SHA})
+- Details: ${DETAILS_URL:-_n/a_}
+- Check: ${HTML_URL:-_n/a_}
 EOF
 )
           gh issue comment 13 --repo "${{ github.repository }}" --body "$BODY"
