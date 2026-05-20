@@ -30,6 +30,7 @@ import { PieBlock, TableBlock, GaugeBlock } from '@/components/reporting/VizBloc
 import { FileBrowser } from '@/components/reporting/FileBrowser'
 import { AddClientButton } from '@/components/reporting/AddClientButton'
 import { SlicersBar } from '@/components/reporting/SlicersBar'
+import { SkeletonList } from '@/components/ui/Skeleton'
 import { SavedViewsBar, type SavedView } from '@/components/reporting/SavedViewsBar'
 import { ShareDialog } from '@/components/reporting/ShareDialog'
 import { DriveFolderConfigurator } from '@/components/reporting/DriveFolderConfigurator'
@@ -1048,7 +1049,7 @@ function FileBrowserInner({ slug, filenames }: { slug: string; filenames: string
           </span>
         )}
       </div>
-      {loading && <p className="text-sm text-slate-400">Loading…</p>}
+      {loading && <SkeletonList rows={5} cols={3} className="mt-2" />}
       {error && <p className="text-sm text-red-400">{error}</p>}
       {!loading && !error && data && tab === 'columns' && (
         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
